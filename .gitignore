@@ -44,3 +44,5 @@ app-example
 
 config/firebase-service-account.json
 *.json
+
+
