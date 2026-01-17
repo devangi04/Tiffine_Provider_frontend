@@ -42,7 +42,5 @@ app-example
 /ios
 /android
 
-config/firebase-service-account.json
-*.json
-
+google-services.json
 
