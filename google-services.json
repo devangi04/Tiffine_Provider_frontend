@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "673204474902",
+    "project_id": "tiffine-provider",
+    "storage_bucket": "tiffine-provider.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:673204474902:android:c2372dfe2d440dabb6d137",
+        "android_client_info": {
+          "package_name": "com.triospheretech.tiffineprovider"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyArwkCTjwLBJ0HJc1y0Kn02MA-Z7jH9EPY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
