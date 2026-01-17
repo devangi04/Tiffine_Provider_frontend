@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Keyboard } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppDispatch, useAppSelector } from '../app/store/hooks';
 import { fetchSearchResults, setSearchQuery, clearSearchQuery } from '../app/store/slices/searchslice';
@@ -8,19 +8,22 @@ interface SearchBarProps {
   onSearch?: (text: string) => void;
   placeholder?: string;
   autoFocus?: boolean;
+  onFocus?: () => void;
+  onBlur?: () => void;
 }
 
 const SearchBar: React.FC<SearchBarProps> = ({ 
   onSearch, 
-  placeholder = "Search customers, dishes, menus, responses, bills...",
-  autoFocus = false
+  placeholder = "Search customers",
+  autoFocus = false,
+  onFocus,
+  onBlur
 }) => {
   const dispatch = useAppDispatch();
   const searchState = useAppSelector((state) => state.search);
   const searchQuery = searchState.query;
   const searchLoading = searchState.loading;
   
-  // Local state for responsive typing
   const [localText, setLocalText] = useState(searchQuery);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
   const textInputRef = useRef<TextInput>(null);
@@ -35,41 +38,36 @@ const SearchBar: React.FC<SearchBarProps> = ({
     if (autoFocus && textInputRef.current) {
       setTimeout(() => {
         textInputRef.current?.focus();
-      }, 300);
+      }, 100);
     }
   }, [autoFocus]);
 
+  
   const handleSearch = (text: string) => {
-    // Update local state immediately for responsive typing
     setLocalText(text);
     
-    // Clear previous timer
     if (debounceTimer.current) {
       clearTimeout(debounceTimer.current);
     }
     
-    // Update Redux state immediately (for UI sync)
     dispatch(setSearchQuery(text));
     
-    // Call parent callback if provided
     if (onSearch) {
       onSearch(text);
     }
 
-    // Set new timer for API calls (debounced)
     debounceTimer.current = setTimeout(() => {
       if (text.trim().length > 0) {
         dispatch(fetchSearchResults(text));
       } else {
         dispatch(clearSearchQuery());
       }
-    }, 500); // 500ms delay for API calls
+    }, 300);
   };
 
   const handleClear = () => {
     setLocalText('');
     
-    // Clear any pending timer
     if (debounceTimer.current) {
       clearTimeout(debounceTimer.current);
     }
@@ -79,18 +77,31 @@ const SearchBar: React.FC<SearchBarProps> = ({
       onSearch('');
     }
     
-    // Focus back on input after clear
-    textInputRef.current?.focus();
+    // Keep focus after clearing
+    setTimeout(() => {
+      textInputRef.current?.focus();
+    }, 50);
   };
 
   const handleSubmit = () => {
-    // If user presses enter/return, trigger search immediately
     if (debounceTimer.current) {
       clearTimeout(debounceTimer.current);
     }
     
     if (localText.trim().length > 0) {
       dispatch(fetchSearchResults(localText));
+    }
+  };
+
+  const handleFocus = () => {
+    if (onFocus) {
+      onFocus();
+    }
+  };
+
+  const handleBlur = () => {
+    if (onBlur) {
+      onBlur();
     }
   };
 
@@ -111,19 +122,23 @@ const SearchBar: React.FC<SearchBarProps> = ({
           style={styles.searchInput}
           placeholder={placeholder}
           placeholderTextColor="#999"
-          value={localText} // Use local state for immediate feedback
+          value={localText}
           onChangeText={handleSearch}
           returnKeyType="search"
           onSubmitEditing={handleSubmit}
           autoCapitalize="none"
           autoCorrect={false}
           autoFocus={autoFocus}
+          blurOnSubmit={false}
+          enablesReturnKeyAutomatically={true}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
         />
         
         {localText.length > 0 ? (
           <View style={styles.iconsContainer}>
             {searchLoading ? (
-              <ActivityIndicator size="small" color="#2c95f8" style={styles.loadingIndicator} />
+              <ActivityIndicator size="small" color="#15803d" style={styles.loadingIndicator} />
             ) : null}
             <TouchableOpacity 
               onPress={handleClear} 
@@ -134,9 +149,14 @@ const SearchBar: React.FC<SearchBarProps> = ({
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={styles.searchIconButton}>
+          <TouchableOpacity 
+            onPress={() => {
+              textInputRef.current?.focus();
+            }}
+            style={styles.searchIconButton}
+          >
             <Ionicons name="search" size={20} color="#999" />
-          </View>
+          </TouchableOpacity>
         )}
       </View>
     </View>
@@ -145,7 +165,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
 const styles = StyleSheet.create({
   searchContainer: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 5,
     marginTop: 10,
     marginBottom: 15,
   },

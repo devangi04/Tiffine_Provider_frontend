@@ -104,7 +104,6 @@ const CustomerDetailsScreen = () => {
       setFetchingCustomer(true);
       await dispatch(fetchCustomerById(customerId as string)).unwrap();
     } catch (error) {
-      console.error('Failed to fetch customer:', error);
       Alert.alert('Error', 'Failed to load customer details');
     } finally {
       setFetchingCustomer(false);
@@ -118,7 +117,6 @@ const CustomerDetailsScreen = () => {
       setLoadingBills(true);
       await dispatch(fetchCustomerBills({ customerId: customerId as string })).unwrap();
     } catch (error: any) {
-      console.error('Failed to fetch bills:', error);
       // Handle empty bills gracefully
       dispatch(clearCurrentBills()); // Set empty array
     } finally {
@@ -153,7 +151,7 @@ const CustomerDetailsScreen = () => {
   if (!customer && fetchingCustomer) {
     return (
       <SafeAreaView style={styles.container}>
-        <StatusBar backgroundColor="#FFFFFF" barStyle="dark-content" />
+        <StatusBar backgroundColor="#FFFFFF" barStyle="default" />
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <ChevronLeft size={24} color="#1E293B" />
@@ -163,7 +161,7 @@ const CustomerDetailsScreen = () => {
         </View>
         
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2c95f8" />
+          <ActivityIndicator size="large" color="#15803d" />
           <Text style={styles.loadingText}>Loading customer details...</Text>
         </View>
       </SafeAreaView>
@@ -356,12 +354,12 @@ const CustomerDetailsScreen = () => {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Customer Details</Text>
           <TouchableOpacity onPress={handleEditCustomer}>
-            <Edit size={20} color="#004C99" />
+            <Edit size={20} color="#15803d" />
           </TouchableOpacity>
         </View>
         
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2c95f8" />
+          <ActivityIndicator size="large" color="#15803d" />
           <Text style={styles.loadingText}>Loading bills...</Text>
         </View>
       </SafeAreaView>
@@ -370,7 +368,7 @@ const CustomerDetailsScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar backgroundColor="#FFFFFF" barStyle="dark-content" />
+      <StatusBar backgroundColor="#FFFFFF" barStyle="default" />
       
       {/* Header */}
       <View style={styles.header}>
@@ -379,7 +377,7 @@ const CustomerDetailsScreen = () => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Customer Details</Text>
         <TouchableOpacity onPress={handleEditCustomer}>
-          <Edit size={20} color="#004C99" />
+          <Edit size={20} color="#15803d" />
         </TouchableOpacity>
       </View>
 
@@ -439,7 +437,7 @@ const CustomerDetailsScreen = () => {
           <RefreshControl 
             refreshing={refreshing} 
             onRefresh={onRefresh}
-            colors={['#004C99']}
+            colors={['#15803d']}
           />
         }
       >
@@ -514,7 +512,7 @@ const CustomerDetailsScreen = () => {
                 onPress={() => bills.length > 0 ? handleViewBill(bills[0]) : handleGenerateBill()}
               >
                 <View style={styles.actionContent}>
-                  <IndianRupee size={24} color="#004C99" />
+                  <IndianRupee size={24} color="#15803d" />
                   <Text style={styles.actionText}>
                     {bills.length > 0 ? 'View Latest Bill' : 'Generate Bill'}
                   </Text>
@@ -527,7 +525,7 @@ const CustomerDetailsScreen = () => {
                 onPress={handleGenerateBill}
               >
                 <View style={styles.actionContent}>
-                  <Calendar size={24} color="#004C99" />
+                  <Calendar size={24} color="#15803d" />
                   <Text style={styles.actionText}>Generate New Bill</Text>
                 </View>
                 <ArrowRight size={20} color="#9CA3AF" />
@@ -617,7 +615,7 @@ const CustomerDetailsScreen = () => {
                         style={[styles.billActionBtn, styles.emailBtn]}
                         onPress={() => handleSendEmail(bill)}
                       >
-                        <Mail size={16} color="#004C99" />
+                        <Mail size={16} color="#15803d" />
                         <Text style={styles.emailBtnText}>Email</Text>
                       </TouchableOpacity>
                     </View>
@@ -734,6 +732,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
+    marginTop:20,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
@@ -744,6 +743,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
+
     color: '#111827',
   },
   profileCard: {
@@ -765,7 +765,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#004C99',
+    backgroundColor: '#15803d',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -837,7 +837,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   activeTabText: {
-    color: '#004C99',
+    color: '#15803d',
     fontWeight: '600',
   },
   contentContainer: {
@@ -937,7 +937,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   generateBillButton: {
-    backgroundColor: '#004C99',
+    backgroundColor: '#15803d',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -1045,7 +1045,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#E0E7FF',
   },
   emailBtnText: {
-    color: '#004C99',
+    color: '#15803d',
     fontSize: 12,
     fontWeight: '500',
     marginLeft: 4,
@@ -1063,7 +1063,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   retryButton: {
-    backgroundColor: '#004C99',
+    backgroundColor: '#15803d',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -1130,7 +1130,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   methodButtonActive: {
-    borderColor: '#004C99',
+    borderColor: '#15803d',
     backgroundColor: '#EEF2FF',
   },
   methodButtonText: {
@@ -1138,7 +1138,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   methodButtonTextActive: {
-    color: '#004C99',
+    color: '#15803d',
     fontWeight: '600',
   },
   modalButtons: {
@@ -1157,7 +1157,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   confirmButton: {
-    backgroundColor: '#004C99',
+    backgroundColor: '#15803d',
     marginLeft: 8,
   },
   cancelButtonText: {

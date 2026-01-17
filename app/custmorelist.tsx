@@ -1,4 +1,3 @@
-// CustomerListScreen.tsx (updated for cursor-based pagination)
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
@@ -10,14 +9,15 @@ import {
   TextInput,
   ActivityIndicator,
   Dimensions,
-  Easing,
   RefreshControl,
-  FlatList
+  FlatList,
+  Switch
 } from 'react-native';
 import { Text } from '@/components/ztext';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp } from '@react-navigation/native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import Icon  from 'react-native-vector-icons/MaterialIcons';
+
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useAppSelector, useAppDispatch } from './store/hooks';
@@ -28,7 +28,8 @@ import {
   deleteCustomer as deleteCustomerAction,
   toggleCustomerActive as toggleCustomerStatusAction,
   Customer as ReduxCustomer,
-  resetCustomers
+  resetCustomers,
+  addCustomerToFront
 } from './store/slices/customerslice';
 
 type RootStackParamList = {
@@ -62,7 +63,8 @@ const CustomerListScreen: React.FC<Props> = ({ navigation }) => {
     hasMore,
     totalItems,
     nextCursor,
-    nextId
+    nextId,
+    lastRefreshed
   } = useAppSelector((state) => state.customer);
   const provider = useAppSelector((state) => state.provider);
   const providerId = provider.id;
@@ -71,6 +73,7 @@ const CustomerListScreen: React.FC<Props> = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
   
   const searchInputRef = useRef<TextInput>(null);
   const searchWidth = useRef(new Animated.Value(width - 32)).current;
@@ -79,18 +82,22 @@ const CustomerListScreen: React.FC<Props> = ({ navigation }) => {
   const router = useRouter();
   const nav = useNavigation();
   
+  // Store pending toggle states for optimistic updates
+  const [pendingToggles, setPendingToggles] = useState<Record<string, boolean>>({});
+  
   useEffect(() => {
     nav.setOptions({
       headerShown: false,
     });
   }, [nav]);
 
-  // Load initial customers
+  // Load initial customers only once
   useEffect(() => {
-    if (providerId) {
+    if (providerId && isFirstLoad) {
       loadInitialCustomers();
+      setIsFirstLoad(false);
     }
-  }, [providerId]);
+  }, [providerId, isFirstLoad]);
 
   // Filter customers based on search
   useEffect(() => {
@@ -106,54 +113,59 @@ const CustomerListScreen: React.FC<Props> = ({ navigation }) => {
       const emailMatch = customer.email?.toLowerCase().includes(query) ?? false;
       const areaMatch = customer.area?.toLowerCase().includes(query) ?? false;
       const addressMatch = customer.address?.toLowerCase().includes(query) ?? false;
+      const pincodeMatch = customer.pincode?.includes(query) ?? false;
+      const cityMatch = customer.city?.toLowerCase().includes(query) ?? false;
+      const stateMatch = customer.state?.toLowerCase().includes(query) ?? false;
 
-      return nameMatch || phoneMatch || emailMatch || areaMatch || addressMatch;
+      return nameMatch || phoneMatch || emailMatch || areaMatch || addressMatch || pincodeMatch||cityMatch||stateMatch;
     });
     
     setFilteredCustomers(filtered);
   }, [searchQuery, customers]);
 
-  const handleSearchFocus = () => {
-    setIsSearchFocused(true);
-  };
-
-  const handleSearchBlur = () => {
-    if (searchQuery === '') {
-      setIsSearchFocused(false);
-    }
-  };
-
-  const clearSearch = () => {
-    setSearchQuery('');
-    searchInputRef.current?.blur();
-    setIsSearchFocused(false);
-  };
-
+  // Auto-refresh when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
+      // Clear search when screen focuses
       setSearchQuery('');
       setIsSearchFocused(false);
       searchInputRef.current?.blur();
       
+      // Scroll to top
       if (listRef.current) {
         listRef.current.scrollToOffset({ offset: 0, animated: false });
       }
 
+      // Refresh data if it's been more than 30 seconds since last refresh
+      const shouldRefresh = !lastRefreshed || (Date.now() - lastRefreshed > 30000);
+      
+      if (providerId && shouldRefresh) {
+        refreshData();
+      }
+
       return () => {
-        setSearchQuery('');
-        setIsSearchFocused(false);
+        // Cleanup if needed
       };
-    }, [])
+    }, [providerId, lastRefreshed])
   );
 
   const loadInitialCustomers = async () => {
     if (!providerId) return;
     
     try {
-      await dispatch(resetCustomers());
-      await dispatch(fetchCustomers({ providerId })).unwrap();
+      await dispatch(fetchCustomers({ providerId, isRefresh: false })).unwrap();
     } catch (error) {
       Alert.alert("Error", "Failed to load customers. Please try again.");
+    }
+  };
+
+  const refreshData = async () => {
+    if (!providerId) return;
+    
+    try {
+      await dispatch(fetchCustomers({ providerId, isRefresh: true })).unwrap();
+    } catch (error) {
+      console.error('Refresh failed:', error);
     }
   };
 
@@ -174,24 +186,41 @@ const CustomerListScreen: React.FC<Props> = ({ navigation }) => {
         isFetchingMore.current = false;
       }, 500);
     });
-  }, [providerId, loadingMore, hasMore, nextCursor, nextId]);
+  }, [providerId, loadingMore, hasMore, nextCursor, nextId, dispatch]);
 
   const onRefresh = useCallback(() => {
     if (!providerId) return;
     
     setRefreshing(true);
+    
+    // Reset and fetch fresh data
     dispatch(resetCustomers());
-    dispatch(fetchCustomers({ providerId }))
+    dispatch(fetchCustomers({ providerId, isRefresh: true }))
       .finally(() => {
         setRefreshing(false);
         isFetchingMore.current = false;
       });
-  }, [providerId]);
+  }, [providerId, dispatch]);
 
   const handleSearch = (text: string) => {
     setSearchQuery(text);
   };
 
+  const handleSearchFocus = () => {
+    setIsSearchFocused(true);
+  };
+
+  const handleSearchBlur = () => {
+    if (searchQuery === '') {
+      setIsSearchFocused(false);
+    }
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    searchInputRef.current?.blur();
+    setIsSearchFocused(false);
+  };
 
   const deleteCustomer = async (customerId: string | undefined) => {
     if (!customerId) {
@@ -228,10 +257,34 @@ const CustomerListScreen: React.FC<Props> = ({ navigation }) => {
       return;
     }
 
+    // Store the new value for optimistic update
+    const newStatus = !currentStatus;
+    setPendingToggles(prev => ({
+      ...prev,
+      [customerId]: newStatus
+    }));
+
     try {
       await dispatch(toggleCustomerStatusAction(customerId)).unwrap();
-      Alert.alert("Success", `Customer ${!currentStatus ? 'activated' : 'deactivated'} successfully!`);
+      // Success - clear the pending toggle
+      setPendingToggles(prev => {
+        const newState = { ...prev };
+        delete newState[customerId];
+        return newState;
+      });
     } catch (error) {
+      // Error - revert the optimistic update
+      setPendingToggles(prev => {
+        const newState = { ...prev };
+        delete newState[customerId];
+        return newState;
+      });
+      
+      // Refresh data to get correct state from server
+      if (providerId) {
+        dispatch(fetchCustomers({ providerId, isRefresh: true }));
+      }
+      
       Alert.alert("Error", "Failed to update customer status. Please try again.");
     }
   };
@@ -258,108 +311,138 @@ const CustomerListScreen: React.FC<Props> = ({ navigation }) => {
     });
   };
 
-  const renderCustomerItem = ({ item }: { item: Customer }) => (
-    <View style={styles.customerCard}>
-      <View style={styles.customerHeader}>
-        <View style={styles.customerMainInfo}>
-          <View style={styles.nameStatusContainer}>
-            <Text weight="extraBold" style={styles.customerName}>{item.name || 'No Name'}</Text>
-            <View style={[
-              styles.statusBadge,
-              item.isActive ? styles.statusActive : styles.statusInactive
-            ]}>
-              <Text weight="extraBold" style={[
-                styles.statusText,
-                item.isActive ? styles.statusTextActive : styles.statusTextInactive
+  const renderCustomerItem = ({ item }: { item: Customer }) => {
+    // Use pending toggle value if available, otherwise use actual value
+    const displayStatus = item._id && pendingToggles[item._id] !== undefined 
+      ? pendingToggles[item._id] 
+      : item.isActive;
+    
+    return (
+      <View style={styles.customerCard}>
+        <View style={styles.customerHeader}>
+          <View style={styles.customerMainInfo}>
+            <View style={styles.nameStatusContainer}>
+              <Text weight="extraBold" style={styles.customerName}>{item.name || 'No Name'}</Text>
+              <View style={[
+                styles.statusBadge,
+                displayStatus ? styles.statusActive : styles.statusInactive
               ]}>
-                {item.isActive ? 'Active' : 'Inactive'}
-              </Text>
-            </View>
-          </View>
-          
-          <View style={styles.customerContact}>
-            <View style={styles.contactRow}>
-              <Icon name="phone" size={14} color="#64748b" />
-              <Text style={styles.contactText}>{item.phone || 'No Phone'}</Text>
-            </View>
-            {item.email ? (
-              <View style={styles.contactRow}>
-                <Icon name="email" size={14} color="#64748b" />
-                <Text style={styles.contactText}>{item.email}</Text>
+                <Text weight="extraBold" style={[
+                  styles.statusText,
+                  displayStatus ? styles.statusTextActive : styles.statusTextInactive
+                ]}>
+                  {displayStatus ? 'Active' : 'Inactive'}
+                </Text>
               </View>
-            ) : null}
+            </View>
+            
+            <View style={styles.customerContact}>
+              <View style={styles.contactRow}>
+                <Icon name="phone" size={14} color="#64748b" />
+                <Text style={styles.contactText}>{item.phone || 'No Phone'}</Text>
+              </View>
+              {item.email ? (
+                <View style={styles.contactRow}>
+                  <Icon name="email" size={14} color="#64748b" />
+                  <Text style={styles.contactText}>{item.email}</Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+          
+          <View>
+            <Switch
+              value={displayStatus}
+              onValueChange={() => toggleCustomerStatus(item._id, item.isActive)}
+              trackColor={{ false: '#E5E7EB', true: '#d3f4dbff' }}
+              thumbColor={displayStatus ? '#15803d' : '#9CA3AF'}
+              ios_backgroundColor="#E5E7EB"
+            />
           </View>
         </View>
         
-        <TouchableOpacity
-          onPress={() => toggleCustomerStatus(item._id, item.isActive)}
-          style={styles.statusToggle}
-        >
-          <Icon
-            name={item.isActive ? "toggle-on" : "toggle-off"}
-            size={44}
-            color={item.isActive ? "#10b981" : "#94a3b8"}
-          />
-        </TouchableOpacity>
-      </View>
-      
-      <View style={styles.addressContainer}>
-        <Icon style={styles.addressicon} name="location-on" size={14} color="#64748b" />
-        <Text style={styles.addressText} numberOfLines={2}>
-          {[item.area, item.address].filter(Boolean).join(' - ') || 'No Address'}
-        </Text>
-      </View>
-      
-      <View style={styles.cardFooter}>
-        <View style={[
-          styles.preferenceBadge,
-          item.preference === 'veg' && styles.preferenceVeg,
-          item.preference === 'non-veg' && styles.preferenceNonVeg,
-          item.preference === 'jain' && styles.preferenceJain,
-        ]}>
-          <Text weight='extraBold' style={[
-            styles.preferenceText,
-            item.preference === 'veg' && styles.preferenceTextVeg,
-            item.preference === 'non-veg' && styles.preferenceTextNonVeg,
-            item.preference === 'jain' && styles.preferenceTextJain,
-          ]}>
-            {(item.preference || 'veg').charAt(0).toUpperCase() + (item.preference || 'veg').slice(1)}
-          </Text>
+     <View style={styles.addressContainer}>
+  <Icon style={styles.addressIcon} name="location-on" size={14} color="#64748b" />
+  <View style={styles.addressDetails}>
+    <Text style={styles.addressText} numberOfLines={1}>
+      {item.address || 'No Address'}
+    </Text>
+    <View style={styles.locationDetails}>
+      {item.area ? (
+        <View style={styles.locationBadge}>
+          <Text style={styles.locationText}>{item.area}</Text>
         </View>
-        
-        <View style={styles.actionButtons}>
-          <TouchableOpacity 
-            style={[styles.actionBtn, styles.billBtn]}
-            onPress={() => generateBill(item)}
-          >
-            <Icon name="receipt" size={16} color="#fff" />
-            <Text style={styles.billBtnText}>Bill</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.actionBtn, styles.editBtn]}
-            onPress={() => editCustomer(item)}
-          >
-            <Icon name="edit" size={16} color="#0ea5e9" />
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.actionBtn, styles.deleteBtn]}
-            onPress={() => deleteCustomer(item._id)}
-          >
-            <Icon name="delete" size={16} color="#ef4444" />
-          </TouchableOpacity>
+      ) : null}
+      {item.city ? (
+        <View style={styles.locationBadge}>
+          <Text style={styles.locationText}>{item.city}</Text>
         </View>
-      </View>
+      ) : null}
+      {item.pincode ? (
+        <View style={[styles.locationBadge, styles.pincodeBadge]}>
+          <Text style={styles.locationText}>{item.pincode}</Text>
+        </View>
+      ) : null}
+      {item.state ? (
+        <View style={[styles.locationBadge, styles.stateBadge]}>
+          <Text style={styles.locationText}>{item.state}</Text>
+        </View>
+      ) : null}
     </View>
-  );
+  </View>
+</View>
+        
+        <View style={styles.cardFooter}>
+          <View style={[
+            styles.preferenceBadge,
+            item.preference === 'veg' && styles.preferenceVeg,
+            item.preference === 'non-veg' && styles.preferenceNonVeg,
+            item.preference === 'jain' && styles.preferenceJain,
+          ]}>
+            <Text weight='extraBold' style={[
+              styles.preferenceText,
+              item.preference === 'veg' && styles.preferenceTextVeg,
+              item.preference === 'non-veg' && styles.preferenceTextNonVeg,
+              item.preference === 'jain' && styles.preferenceTextJain,
+            ]}>
+              {(item.preference || 'veg').charAt(0).toUpperCase() + (item.preference || 'veg').slice(1)}
+            </Text>
+          </View>
+          
+          <View style={styles.actionButtons}>
+            <TouchableOpacity 
+              style={[styles.actionBtn, styles.billBtn]}
+              onPress={() => generateBill(item)}
+            >
+              <Icon name="receipt" size={16} color="#fff" />
+              <Text style={styles.billBtnText}>Bill</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.actionBtn, styles.editBtn]}
+              onPress={() => editCustomer(item)}
+            >
+              <Icon name="edit" size={16} color="#0ea5e9" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.actionBtn, styles.deleteBtn]}
+              onPress={() => deleteCustomer(item._id)}
+            >
+              <Icon name="delete" size={16} color="#ef4444" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  };
 
   const renderFooter = () => {
     if (!loadingMore) return null;
     
     return (
       <View style={styles.footerLoader}>
-        <ActivityIndicator size="small" color="#2c95f8" />
+        <ActivityIndicator size="small" color="#15803d" />
         <Text style={styles.loadingMoreText}>Loading more customers...</Text>
       </View>
     );
@@ -374,22 +457,27 @@ const CustomerListScreen: React.FC<Props> = ({ navigation }) => {
       <Text style={styles.emptySubtitle}>
         {searchQuery ? 'Try a different search term' : 'Add your first customer to get started'}
       </Text>
+      {/* {!loading && (
+        <TouchableOpacity 
+          style={styles.refreshButton}
+          onPress={onRefresh}
+        >
+          <Icon name="refresh" size={20} color="#15803d" />
+          <Text style={styles.refreshButtonText}>Refresh</Text>
+        </TouchableOpacity>
+      )} */}
     </View>
   );
 
   const renderHeader = () => (
     <View style={styles.header}>
       <View style={styles.searchSection}>
-        {/* Total Customers Badge */}
-       
-
-        {/* Search Bar */}
         <Animated.View style={[styles.searchContainer, { width: searchWidth }]}>
           <Icon name="search" size={20} color="#64748b" style={styles.searchIcon} />
           <TextInput
             ref={searchInputRef}
             style={styles.searchInput}
-            placeholder="Search by name, phone, area..."
+            placeholder="Search by name"
             value={searchQuery}
             onChangeText={handleSearch}
             placeholderTextColor="#94a3b8"
@@ -403,27 +491,29 @@ const CustomerListScreen: React.FC<Props> = ({ navigation }) => {
           )}
         </Animated.View>
 
-          <View style={styles.totalCustomersContainer}>
+        <View style={styles.totalCustomersContainer}>
           <Text style={styles.totalCustomersLabel}>Total</Text>
           <View style={styles.totalCustomersCount}>
-            <Text style={styles.totalCustomersText}>{filteredCustomers.length}</Text>
+            <Text style={styles.totalCustomersText}>
+              {searchQuery ? filteredCustomers.length : totalItems}
+            </Text>
           </View>
         </View>
       </View>
     </View>
   );
-  // ... (rest of your functions remain the same)
 
   // Stable key extractor
   const keyExtractor = (item: Customer, index: number): string => {
-    return item._id || `customer-${index}`;
+    return item._id ? `customer-${item._id}` : `customer-${index}`;
   };
 
-  if (loading && !refreshing && customers.length === 0) {
+  // Show loading only on first load when there's no data
+  if (loading && customers.length === 0 && isFirstLoad) {
     return (
       <View style={styles.container}>
         <View style={styles.loadingState}>
-          <ActivityIndicator size="large" color="#2c95f8" />
+          <ActivityIndicator size="large" color="#15803d" />
           <Text style={styles.loadingText}>Loading customers...</Text>
         </View>
       </View>
@@ -445,31 +535,35 @@ const CustomerListScreen: React.FC<Props> = ({ navigation }) => {
         data={filteredCustomers}
         renderItem={renderCustomerItem}
         keyExtractor={keyExtractor}
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={[
+          styles.listContainer,
+          filteredCustomers.length === 0 && styles.emptyListContainer
+        ]}
         showsVerticalScrollIndicator={false}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
-        ListEmptyComponent={renderEmptyState}
+        ListEmptyComponent={!loading && renderEmptyState}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#004C99']}
-            tintColor={'#004C99'}
+            colors={['#15803d']}
+            tintColor={'#15803d'}
           />
         }
         ItemSeparatorComponent={() => <View style={styles.listSpacing} />}
         ListFooterComponentStyle={{ paddingBottom: 80 }}
+        extraData={[customers.length, pendingToggles]} // Force re-render when customers or pending toggles change
       />
 
       {/* Floating Add Button */}
-      <TouchableOpacity 
+      {/* <TouchableOpacity 
         style={styles.floatingButton}
         onPress={addNewCustomer}
       >
         <Icon name="add" size={24} color="#fff" />
-      </TouchableOpacity>
+      </TouchableOpacity> */}
     </View>
   );
 };
@@ -479,10 +573,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
-  // Sticky Header Section
   stickyHeader: {
     backgroundColor: '#f8fafcff',
-    paddingTop: 10,
+    paddingTop: 30,
     paddingHorizontal: 16,
     paddingBottom: 16,
     borderBottomWidth: 1,
@@ -493,25 +586,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop:1,
+    marginTop: 1,
   },
   totalCustomersContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: '#15803d',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    marginLeft:20,
-    // marginRight: 12,
+    marginLeft: 20,
   },
   totalCustomersLabel: {
     fontSize: 14,
-    color: '#64748b',
+    color: '#fff',
     marginRight: 8,
   },
   totalCustomersCount: {
-    backgroundColor: '#004C99',
+    backgroundColor: '#ffff',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 50,
@@ -519,7 +611,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   totalCustomersText: {
-    color: '#fff',
+    color: '#15803d',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -545,13 +637,14 @@ const styles = StyleSheet.create({
   clearButton: {
     padding: 4,
   },
-  // List Container
   listContainer: {
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 20,
   },
-  // Customer Card Styles (keep all existing styles)
+  emptyListContainer: {
+    flexGrow: 1,
+  },
   customerCard: {
     backgroundColor: '#ffffff',
     borderRadius: 12,
@@ -622,10 +715,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     flex: 1,
   },
-  statusToggle: {
-    padding: 2,
-  },
-  addressContainer: {
+ addressContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     backgroundColor: '#f8fafc',
@@ -633,16 +723,42 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 12,
   },
+  addressIcon: {
+    marginTop: 1,
+    marginRight: 8,
+  },
+  addressDetails: {
+    flex: 1,
+  },
   addressText: {
     fontSize: 13,
     color: '#475569',
-    marginLeft: 8,
-    flex: 1,
     lineHeight: 18,
+    marginBottom: 6,
   },
-  addressicon:{
-    marginTop:1,
+  locationDetails: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
   },
+  locationBadge: {
+    backgroundColor: '#e2e8f0',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  pincodeBadge: {
+    backgroundColor: '#dbeafe',
+  },
+  stateBadge: {
+    backgroundColor: '#f0fdf4',
+  },
+  locationText: {
+    fontSize: 11,
+    color: '#475569',
+    fontWeight: '500',
+  },
+  
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -691,7 +807,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   billBtn: {
-    backgroundColor: '#004C99',
+    backgroundColor: '#15803d',
     flexDirection: 'row',
     minWidth: 60,
   },
@@ -718,7 +834,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 60,
     flex: 1,
-    minHeight: 300,
   },
   emptyTitle: {
     fontSize: 18,
@@ -731,6 +846,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#64748b',
     textAlign: 'center',
+    marginBottom: 20,
+  },
+  refreshButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0fdf4',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  refreshButtonText: {
+    color: '#15803d',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   loadingState: {
     flex: 1,
@@ -763,7 +895,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#004C99',
+    backgroundColor: '#15803d',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -773,5 +905,5 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
 });
+
 export default CustomerListScreen;
-// ... (styles remain the same)

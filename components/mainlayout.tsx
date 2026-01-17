@@ -26,7 +26,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   showUserButton = true,
   onBackPress,
   onUserPress,
-  backgroundColor = '#2c95f8',
+  backgroundColor = '#15803d',
   textColor = '#fff',
   subtitleColor = 'rgba(255, 255, 255, 0.8)',
 }) => {

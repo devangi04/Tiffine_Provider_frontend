@@ -42,7 +42,6 @@ export const useCoachMark = (pageId?: string) => {
         setShowCoachMark(true);
       }
     } catch (error) {
-      console.error('Error checking coach mark status:', error);
     }
   };
 

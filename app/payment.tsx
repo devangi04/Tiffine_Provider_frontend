@@ -1,35 +1,28 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
-
   StyleSheet,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  FlatList,
   TextInput,
   Alert,
-  Animated,
-  Dimensions,
-  Easing,
   Modal,
 } from 'react-native';
-import {Text,TextStyles} from '@/components/ztext';
-
+import {Text} from '@/components/ztext';
 import { useRouter } from 'expo-router';
 import { 
   ChevronLeft, 
   Search, 
   IndianRupee, 
   CheckCircle, 
-  AlertCircle, 
   Clock, 
   Calendar, 
   ChevronRight, 
-  X, 
-  Download,
-  Mail
+  X,
+  Mail,
+  ReceiptText
 } from 'lucide-react-native';
 import axios from 'axios';
 import moment from 'moment';
@@ -37,8 +30,6 @@ import { useAppSelector } from './store/hooks';
 import { API_URL } from './config/env';
 
 const API_BASE_URL = `${API_URL}/api`;
-const { width } = Dimensions.get('window');
-const ITEMS_PER_PAGE = 10;
 
 interface Customer {
   id: string;
@@ -67,14 +58,14 @@ interface Bill {
 
 interface CustomerWithBill extends Customer {
   bill?: Bill;
-  paymentStatus: 'paid' | 'unpaid' | 'partial' | 'no-bill';
+  paymentStatus: 'paid' | 'unpaid' | 'no-bill';
   dueAmount: number;
   totalAmount: number;
   paidAmount: number;
   month: string;
 }
 
-type FilterType = 'all' | 'unpaid' | 'partial' | 'paid' | 'no-bill';
+type FilterType = 'all' | 'unpaid' | 'paid' | 'no-bill';
 
 const PaymentStatusScreen = () => {
   const router = useRouter();
@@ -89,18 +80,17 @@ const PaymentStatusScreen = () => {
   const [generatingBills, setGeneratingBills] = useState(false);
   const [sendingEmails, setSendingEmails] = useState(false);
   
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
+  // Load More state
+  const [displayedCustomers, setDisplayedCustomers] = useState<CustomerWithBill[]>([]);
+  const [loadedCount, setLoadedCount] = useState(20);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   
   // Calendar modal state
   const [calendarVisible, setCalendarVisible] = useState(false);
   const [currentCalendarYear, setCurrentCalendarYear] = useState(moment().year());
 
-  // Animation refs
   const searchInputRef = useRef<TextInput>(null);
-  const searchWidth = useRef(new Animated.Value(200)).current;
-  const paginationOpacity = useRef(new Animated.Value(1)).current;
 
   const provider = useAppSelector((state) => state.provider);
   const providerId = provider.id;
@@ -110,310 +100,295 @@ const PaymentStatusScreen = () => {
   }, [currentMonth, providerId]);
 
   useEffect(() => {
-    setCurrentPage(1); // Reset to first page when filter changes
+    // Reset load more when filter or search changes
+    setLoadedCount(20);
+    setHasMore(true);
   }, [activeFilter, searchQuery]);
 
-  const fetchPaymentStatus = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-     
-      const customersResponse = await axios.get(`${API_BASE_URL}/customer/provider/${providerId}`);
-      
-      let allCustomers: Customer[] = [];
-      
-      if (customersResponse.data && customersResponse.data.data) {
-        allCustomers = customersResponse.data.data;
-      } else if (Array.isArray(customersResponse.data)) {
-        allCustomers = customersResponse.data;
-      } else {
-        allCustomers = [];
-      }
-      
-      if (allCustomers.length === 0) {
-        setCustomers([]);
-        return;
-      }
+  useEffect(() => {
+    // Update displayed customers when filtered customers change
+    const filtered = getFilteredCustomers();
+    setDisplayedCustomers(filtered.slice(0, loadedCount));
+    setHasMore(loadedCount < filtered.length);
+  }, [customers, activeFilter, searchQuery, loadedCount]);
 
-      const billsResponse = await axios.get(`${API_BASE_URL}/bills/list?month=${currentMonth}`);
-      
-      let bills: Bill[] = [];
-      if (billsResponse.data && billsResponse.data.data) {
-        bills = billsResponse.data.data;
-      } else if (Array.isArray(billsResponse.data)) {
-        bills = billsResponse.data;
+const fetchPaymentStatus = async () => {
+  try {
+    setLoading(true);
+    setError(null);
+    
+    // Calculate date range for the selected month
+    const monthStart = moment(currentMonth).startOf('month').toDate();
+    const monthEnd = moment(currentMonth).endOf('month').toDate();
+    
+    // Fetch ALL customers
+    const customersResponse = await axios.get(`${API_BASE_URL}/customer/provider/${providerId}`, {
+      params: { 
+        limit: 1000
       }
+    });
+    
+    let allCustomers: Customer[] = [];
+    
+    if (customersResponse.data && customersResponse.data.data) {
+      allCustomers = customersResponse.data.data;
+    } else if (Array.isArray(customersResponse.data)) {
+      allCustomers = customersResponse.data;
+    } else {
+      allCustomers = [];
+    }
+    
+    // Filter customers who were active during the selected month
+    const customersForMonth = allCustomers.filter(customer => {
+      const customerCreatedAt = customer.createdAt ? new Date(customer.createdAt) : null;
+      const customerDeactivatedAt = (customer as any).deactivatedAt ? new Date((customer as any).deactivatedAt) : null;
       
-      const customersWithBills: CustomerWithBill[] = allCustomers.map(customer => {
-        const customerBill = bills.find(bill => {
-          try {
-            if (typeof bill.customerId === 'string') {
-              return bill.customerId === customer._id;
-            } else if (bill.customerId && typeof bill.customerId === 'object') {
-              return bill.customerId._id === customer._id;
-            }
-            return false;
-          } catch (error) {
-            return false;
+      // If customer has no createdAt, include them (shouldn't happen)
+      if (!customerCreatedAt) return true;
+      
+      // Customer was created after this month
+      if (customerCreatedAt > monthEnd) return false;
+      
+      // Customer was deactivated before this month
+      if (customerDeactivatedAt && customerDeactivatedAt < monthStart) return false;
+      
+      // Customer is still active or was active during this month
+      return true;
+    });
+    
+    console.log(`Fetched ${allCustomers.length} total customers, ${customersForMonth.length} active in ${currentMonth}`);
+    
+    if (customersForMonth.length === 0) {
+      setCustomers([]);
+      setDisplayedCustomers([]);
+      return;
+    }
+
+    // Rest of your existing code...
+    const billsResponse = await axios.get(`${API_BASE_URL}/bills/list`, {
+      params: { 
+        month: currentMonth,
+        limit: 1000
+      }
+    });
+    
+    let bills: Bill[] = [];
+    if (billsResponse.data && billsResponse.data.data) {
+      bills = billsResponse.data.data;
+    } else if (Array.isArray(billsResponse.data)) {
+      bills = billsResponse.data;
+    }
+    
+    console.log(`Fetched ${bills.length} bills for month ${currentMonth}`);
+    
+    // Match customers with bills (use customersForMonth instead of allCustomers)
+    const customersWithBills: CustomerWithBill[] = customersForMonth.map(customer => {
+      const customerBill = bills.find(bill => {
+        try {
+          if (typeof bill.customerId === 'string') {
+            return bill.customerId === customer._id;
+          } else if (bill.customerId && typeof bill.customerId === 'object') {
+            const billCustomerId = bill.customerId as Customer;
+            return billCustomerId._id === customer._id || billCustomerId.id === customer._id;
           }
-        });
-        
-        if (customerBill) {
-          return {
-            ...customer,
-            bill: customerBill,
-            paymentStatus: customerBill.paymentStatus || 'unpaid',
-            dueAmount: customerBill.dueAmount || 0,
-            totalAmount: customerBill.totalAmount || 0,
-            paidAmount: customerBill.paidAmount || 0,
-            month: currentMonth
-          };
-        } else {
-          return {
-            ...customer,
-            paymentStatus: 'no-bill',
-            dueAmount: 0,
-            totalAmount: 0,
-            paidAmount: 0,
-            month: currentMonth
-          };
+          return false;
+        } catch (error) {
+          console.error('Error matching bill to customer:', error);
+          return false;
         }
       });
       
-      setCustomers(customersWithBills);
-      
-    } catch (error: any) {
-      
-      let errorMessage = 'Failed to load payment status';
-      
-      if (error.response) {
-        if (error.response.status === 404) {
-          errorMessage = 'No bills found for this month. Generate bills to get started.';
-        } else if (error.response.status === 500) {
-          errorMessage = 'Server error. Please try again later.';
-        } else {
-          errorMessage = error.response.data?.message || errorMessage;
-        }
-      } else if (error.request) {
-        errorMessage = 'Network error. Please check your connection and server.';
+      if (customerBill) {
+        const paymentStatus = customerBill.paymentStatus === 'partial' ? 'unpaid' : customerBill.paymentStatus;
+        
+        return {
+          ...customer,
+          bill: customerBill,
+          paymentStatus: paymentStatus || 'unpaid',
+          dueAmount: customerBill.dueAmount || 0,
+          totalAmount: customerBill.totalAmount || 0,
+          paidAmount: customerBill.paidAmount || 0,
+          month: currentMonth
+        };
       } else {
-        errorMessage = error.message || errorMessage;
+        return {
+          ...customer,
+          paymentStatus: 'no-bill',
+          dueAmount: 0,
+          totalAmount: 0,
+          paidAmount: 0,
+          month: currentMonth
+        };
       }
-      
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+    });
+    
+    setCustomers(customersWithBills);
+    setDisplayedCustomers(customersWithBills.slice(0, 20));
+    setHasMore(customersWithBills.length > 20);
+    
+  } catch (error: any) {
+    // Error handling remains the same
+    console.error('Error fetching payment status:', error);
+    
+    let errorMessage = 'Failed to load payment status';
+    
+    if (error.response) {
+      if (error.response.status === 404) {
+        errorMessage = 'No customers or bills found for this month.';
+      } else if (error.response.status === 500) {
+        errorMessage = 'Server error. Please try again later.';
+      } else {
+        errorMessage = error.response.data?.message || errorMessage;
+      }
+    } else if (error.request) {
+      errorMessage = 'Network error. Please check your connection.';
+    } else {
+      errorMessage = error.message || errorMessage;
     }
-  };
-
+    
+    setError(errorMessage);
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+};
   // Generate bills for all customers
-  const generateAllBills = async () => {
-    try {
-      setGeneratingBills(true);
-      
-      const [year, month] = currentMonth.split('-');
-      
-      Alert.alert(
-        'Generate Bills',
-        `Generate bills for all active customers for ${moment(currentMonth).format('MMMM YYYY')}?`,
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel'
-          },
-          {
-            text: 'Generate',
-            onPress: async () => {
-              try {
-                const response = await axios.post(
-                  `${API_BASE_URL}/bills/generate-all/${year}/${month}`
-                );
+ const generateAllBills = async () => {
+  try {
+    setGeneratingBills(true);
+    
+    const [year, month] = currentMonth.split('-');
+    
+    Alert.alert(
+      'Generate Bills',
+      `Generate bills for all active customers for ${moment(currentMonth).format('MMMM YYYY')}?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+          onPress: () => {
+            // Reset the generating state when user cancels
+            setGeneratingBills(false);
+          }
+        },
+        {
+          text: 'Generate',
+          onPress: async () => {
+            try {
+              const response = await axios.post(
+                `${API_BASE_URL}/bills/generate-all/${year}/${month}`
+              );
 
-                if (response.data.success) {
-                  const { billsGenerated, billsSkipped, errors } = response.data.data;
-                  
-                  let message = `Successfully generated ${billsGenerated} bills`;
-                  if (billsSkipped > 0) {
-                    message += `, ${billsSkipped} skipped (already exist or no data)`;
-                  }
-                  if (errors.length > 0) {
-                    message += `, ${errors.length} errors`;
-                  }
-                  
-                  Alert.alert(
-                    'Success', 
-                    message,
-                    [{ text: 'OK', onPress: fetchPaymentStatus }]
-                  );
-                } else {
-                  Alert.alert('Error', response.data.message || 'Failed to generate bills');
+              if (response.data.success) {
+                const { billsGenerated, billsSkipped, errors } = response.data.data;
+                
+                let message = `Successfully generated ${billsGenerated} bills`;
+                if (billsSkipped > 0) {
+                  message += `, ${billsSkipped} skipped (already exist or no data)`;
                 }
-              } catch (error: any) {
+                if (errors.length > 0) {
+                  message += `, ${errors.length} errors`;
+                }
+                
                 Alert.alert(
-                  'Error', 
-                  error.response?.data?.message || 'Failed to generate bills. Please try again.'
+                  'Success', 
+                  message,
+                  [{ text: 'OK', onPress: fetchPaymentStatus }]
                 );
-              } finally {
-                setGeneratingBills(false);
+              } else {
+                Alert.alert('Error', response.data.message || 'Failed to generate bills');
               }
+            } catch (error: any) {
+              Alert.alert(
+                'Error', 
+                error.response?.data?.message || 'Failed to generate bills. Please try again.'
+              );
+            } finally {
+              setGeneratingBills(false);
             }
           }
-        ]
-      );
-    } catch (error) {
-      setGeneratingBills(false);
-    }
-  };
-
+        }
+      ],
+      {
+        // This callback runs when the alert is dismissed (including when tapping outside)
+        onDismiss: () => {
+          setGeneratingBills(false);
+        }
+      }
+    );
+  } catch (error) {
+    // This catches errors in the initial setup, not in the async generation
+    setGeneratingBills(false);
+  }
+};
   // Send bills to all customers via email
-  const sendBillsToAllCustomers = async () => {
-    try {
-      setSendingEmails(true);
+  // const sendBillsToAllCustomers = async () => {
+  //   try {
+  //     setSendingEmails(true);
       
-      const [year, month] = currentMonth.split('-');
+  //     const [year, month] = currentMonth.split('-');
       
-      Alert.alert(
-        'Send Bill Emails',
-        `Send bill emails to all customers for ${moment(currentMonth).format('MMMM YYYY')}?`,
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel'
-          },
-          {
-            text: 'Send Emails',
-            onPress: async () => {
-              try {
-                const response = await axios.post(
-                  `${API_BASE_URL}/bills/send-all/${year}/${month}`
-                );
+  //     Alert.alert(
+  //       'Send Bill Emails',
+  //       `Send bill emails to all customers for ${moment(currentMonth).format('MMMM YYYY')}?`,
+  //       [
+  //         {
+  //           text: 'Cancel',
+  //           style: 'cancel'
+  //         },
+  //         {
+  //           text: 'Send Emails',
+  //           onPress: async () => {
+  //             try {
+  //               const response = await axios.post(
+  //                 `${API_BASE_URL}/bills/send-all/${year}/${month}`
+  //               );
 
-                if (response.data.success) {
-                  const { emailsSent, emailsFailed } = response.data.data;
+  //               if (response.data.success) {
+  //                 const { emailsSent, emailsFailed } = response.data.data;
                   
-                  let message = `Successfully sent ${emailsSent} emails`;
-                  if (emailsFailed > 0) {
-                    message += `, ${emailsFailed} failed`;
-                  }
+  //                 let message = `Successfully sent ${emailsSent} emails`;
+  //                 if (emailsFailed > 0) {
+  //                   message += `, ${emailsFailed} failed`;
+  //                 }
                   
-                  Alert.alert(
-                    'Success', 
-                    message,
-                    [{ text: 'OK', onPress: fetchPaymentStatus }]
-                  );
-                } else {
-                  Alert.alert('Info', response.data.message || 'No bills to send or already sent');
-                }
-              } catch (error: any) {
-                Alert.alert(
-                  'Error', 
-                  error.response?.data?.message || 'Failed to send emails. Please try again.'
-                );
-              } finally {
-                setSendingEmails(false);
-              }
-            }
-          }
-        ]
-      );
-    } catch (error) {
-      setSendingEmails(false);
-    }
-  };
+  //                 Alert.alert(
+  //                   'Success', 
+  //                   message,
+  //                   [{ text: 'OK', onPress: fetchPaymentStatus }]
+  //                 );
+  //               } else {
+  //                 Alert.alert('Info', response.data.message || 'No bills to send or already sent');
+  //               }
+  //             } catch (error: any) {
+  //               Alert.alert(
+  //                 'Error', 
+  //                 error.response?.data?.message || 'Failed to send emails. Please try again.'
+  //               );
+  //             } finally {
+  //               setSendingEmails(false);
+  //             }
+  //           }
+  //         }
+  //       ]
+  //     );
+  //   } catch (error) {
+  //     setSendingEmails(false);
+  //   }
+  // };
 
-  // Auto generate and send bills (demo function)
-  const triggerAutoGeneration = async () => {
-    try {
-      setGeneratingBills(true);
-      
-      Alert.alert(
-        'Auto Generate & Send Bills',
-        'This will automatically generate bills for all customers and send email notifications.',
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel'
-          },
-          {
-            text: 'Proceed',
-            onPress: async () => {
-              try {
-                const response = await axios.post(
-                  `${API_BASE_URL}/bills/auto-generate`
-                );
-
-                if (response.data.success) {
-                  const data = response.data.data;
-                  Alert.alert(
-                    'Success', 
-                    `Generated ${data.generation.billsGenerated} bills and sent ${data.email.emailsSent} emails`,
-                    [{ text: 'OK', onPress: fetchPaymentStatus }]
-                  );
-                } else {
-                  Alert.alert('Info', response.data.message || 'Auto generation completed');
-                }
-              } catch (error: any) {
-                Alert.alert(
-                  'Error', 
-                  error.response?.data?.message || 'Failed to auto generate bills. Please try again.'
-                );
-              } finally {
-                setGeneratingBills(false);
-              }
-            }
-          }
-        ]
-      );
-    } catch (error) {
-      setGeneratingBills(false);
-    }
-  };
-
-  // Month navigation handlers
   const handleMonthChange = (direction: 'prev' | 'next') => {
     const newMonth = moment(currentMonth).add(direction === 'prev' ? -1 : 1, 'month').format('YYYY-MM');
     setCurrentMonth(newMonth);
   };
 
-  // Search animation handlers
   const handleSearchFocus = () => {
     setIsSearchFocused(true);
-    Animated.parallel([
-      Animated.spring(searchWidth, {
-        toValue: width - 32,
-        damping: 20,
-        stiffness: 180,
-        mass: 1,
-        useNativeDriver: false,
-      }),
-      Animated.timing(paginationOpacity, {
-        toValue: 0,
-        duration: 250,
-        easing: Easing.inOut(Easing.ease),
-        useNativeDriver: true,
-      }),
-    ]).start();
   };
 
   const handleSearchBlur = () => {
     if (searchQuery === '') {
       setIsSearchFocused(false);
-      Animated.parallel([
-        Animated.spring(searchWidth, {
-          toValue: 200,
-          damping: 20,
-          stiffness: 180,
-          mass: 1,
-          useNativeDriver: false,
-        }),
-        Animated.timing(paginationOpacity, {
-          toValue: 1,
-          duration: 250,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ]).start();
     }
   };
 
@@ -421,18 +396,6 @@ const PaymentStatusScreen = () => {
     setSearchQuery('');
     searchInputRef.current?.blur();
     setIsSearchFocused(false);
-    Animated.parallel([
-      Animated.timing(searchWidth, {
-        toValue: 200,
-        duration: 300,
-        useNativeDriver: false,
-      }),
-      Animated.timing(paginationOpacity, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      })
-    ]).start();
   };
 
   const onRefresh = () => {
@@ -444,75 +407,67 @@ const PaymentStatusScreen = () => {
     fetchPaymentStatus();
   };
 
-  const filteredCustomers = useMemo(() => {
-    let filtered = customers;
-    
-    // Apply search filter
-    if (searchQuery) {
-      filtered = filtered.filter(customer =>
-        customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        customer.phone.includes(searchQuery)
-      );
-    }
-    
-    // Apply status filter
-    if (activeFilter !== 'all') {
-      filtered = filtered.filter(customer => customer.paymentStatus === activeFilter);
-    }
-    
-    return filtered;
-  }, [customers, searchQuery, activeFilter]);
+  // Filter customers based on search and active filter
+const getFilteredCustomers = () => {
+  let filtered = customers;
+  
+  // Apply search filter
+  if (searchQuery) {
+    filtered = filtered.filter(customer =>
+      customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      customer.phone.includes(searchQuery)
+    );
+  }
+  
+  // Apply status filter - only if activeFilter is not 'all'
+  if (activeFilter !== 'all') {
+    filtered = filtered.filter(customer => customer.paymentStatus === activeFilter);
+  }
+  
+  return filtered;
+};
 
-  // Pagination logic
-  const totalPages = filteredCustomers.length > 0 
-    ? Math.ceil(filteredCustomers.length / ITEMS_PER_PAGE) 
-    : 0;
-
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = startIndex + ITEMS_PER_PAGE;
-  const paginatedCustomers = filteredCustomers.slice(startIndex, endIndex);
-
-  const goToNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
-  };
-
-  const goToPrevPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
+  // Load more customers
+  const loadMoreCustomers = () => {
+    const filteredCustomers = getFilteredCustomers();
+    if (loadedCount < filteredCustomers.length) {
+      const newCount = loadedCount + 20;
+      setLoadedCount(newCount);
+      setDisplayedCustomers(filteredCustomers.slice(0, newCount));
+      setHasMore(newCount < filteredCustomers.length);
     }
   };
 
   // Summary statistics
-  const getSummaryStats = () => {
-    const totalCustomers = customers.length;
-    const paidCount = customers.filter(c => c.paymentStatus === 'paid').length;
-    const partialCount = customers.filter(c => c.paymentStatus === 'partial').length;
-    const unpaidCount = customers.filter(c => c.paymentStatus === 'unpaid').length;
-    const noBillCount = customers.filter(c => c.paymentStatus === 'no-bill').length;
-    
-    const totalDue = customers.reduce((sum, customer) => sum + customer.dueAmount, 0);
-    const totalPaid = customers.reduce((sum, customer) => sum + customer.paidAmount, 0);
-    const totalAmount = customers.reduce((sum, customer) => sum + customer.totalAmount, 0);
+const getSummaryStats = () => {
+  // Use the original customers array, not the filtered one
+  const totalCustomers = customers.length;
+  const paidCount = customers.filter(c => c.paymentStatus === 'paid').length;
+  const unpaidCount = customers.filter(c => c.paymentStatus === 'unpaid').length;
+  const noBillCount = customers.filter(c => c.paymentStatus === 'no-bill').length;
+  
+  // Calculate totals from ALL customers, not filtered ones
+  const totalDue = customers.reduce((sum, customer) => sum + customer.dueAmount, 0);
+  const totalPaid = customers.reduce((sum, customer) => sum + customer.paidAmount, 0);
+  const totalAmount = customers.reduce((sum, customer) => sum + customer.totalAmount, 0);
 
-    return {
-      totalCustomers,
-      paidCount,
-      partialCount,
-      unpaidCount,
-      noBillCount,
-      totalDue,
-      totalPaid,
-      totalAmount
-    };
+  return {
+    totalCustomers,
+    paidCount,
+    unpaidCount,
+    noBillCount,
+    totalDue,
+    totalPaid,
+    totalAmount
   };
+};
 
   const stats = getSummaryStats();
 
   // Handle summary card press to filter
   const handleSummaryCardPress = (filter: FilterType) => {
     setActiveFilter(filter);
+    setLoadedCount(20);
   };
 
   // Calendar functions for month-year picker
@@ -550,10 +505,9 @@ const PaymentStatusScreen = () => {
           onPress={() => setCalendarVisible(false)}
         >
           <View style={styles.calendarContainer}>
-            {/* Year Navigation */}
             <View style={styles.yearHeader}>
               <TouchableOpacity onPress={() => navigateYear('prev')}>
-                <ChevronLeft size={24} color="#2c95f8" />
+                <ChevronLeft size={24} color="#15803d" />
               </TouchableOpacity>
               
               <Text weight='bold' style={styles.yearTitle}>
@@ -561,11 +515,10 @@ const PaymentStatusScreen = () => {
               </Text>
               
               <TouchableOpacity onPress={() => navigateYear('next')}>
-                <ChevronRight size={24} color="#2c95f8" />
+                <ChevronRight size={24} color="#15803d" />
               </TouchableOpacity>
             </View>
             
-            {/* Months Grid */}
             <View style={styles.monthsGrid}>
               {months.map((month, index) => {
                 const isSelected = currentMonthIndex === index && currentYear === currentCalendarYear;
@@ -593,7 +546,6 @@ const PaymentStatusScreen = () => {
               })}
             </View>
             
-            {/* Quick Actions */}
             <View style={styles.quickActions}>
               <TouchableOpacity
                 style={styles.todayButton}
@@ -616,7 +568,6 @@ const PaymentStatusScreen = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'paid': return '#10B981';
-      case 'partial': return '#F59E0B';
       case 'unpaid': return '#EF4444';
       case 'no-bill': return '#6B7280';
       default: return '#6B7280';
@@ -626,7 +577,6 @@ const PaymentStatusScreen = () => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'paid': return <CheckCircle size={20} color="#10B981" />;
-      case 'partial': return <AlertCircle size={20} color="#F59E0B" />;
       case 'unpaid': return <Clock size={20} color="#EF4444" />;
       case 'no-bill': return <Calendar size={20} color="#6B7280" />;
       default: return <Clock size={20} color="#6B7280" />;
@@ -636,7 +586,6 @@ const PaymentStatusScreen = () => {
   const getStatusText = (status: string) => {
     switch (status) {
       case 'paid': return 'Paid';
-      case 'partial': return 'Partial';
       case 'unpaid': return 'Pending';
       case 'no-bill': return 'No Bill';
       default: return status;
@@ -658,8 +607,9 @@ const PaymentStatusScreen = () => {
     });
   };
 
-  const renderCustomerItem = ({ item }: { item: CustomerWithBill }) => (
+  const renderCustomerItem = (item: CustomerWithBill) => (
     <TouchableOpacity 
+      key={item._id}
       style={styles.customerCard}
       onPress={() => handleCustomerPress(item)}
     >
@@ -691,14 +641,14 @@ const PaymentStatusScreen = () => {
           </View>
           <View style={styles.amountRow}>
             <Text weight='bold' style={styles.amountLabel}>Due Amount:</Text>
-            <Text  weight='bold'style={[styles.amountValue, { color: '#EF4444' }]}>
+            <Text weight='bold' style={[styles.amountValue, { color: '#EF4444' }]}>
               ₹{item.dueAmount.toFixed(2)}
             </Text>
           </View>
           {item.bill?.emailSent && (
             <View style={styles.emailSentBadge}>
               <Mail size={14} color="#10B981" />
-              <Text  weight='bold' style={styles.emailSentText}>Email Sent</Text>
+              <Text weight='bold' style={styles.emailSentText}>Email Sent</Text>
             </View>
           )}
         </View>
@@ -712,10 +662,28 @@ const PaymentStatusScreen = () => {
     </TouchableOpacity>
   );
 
+  const renderLoadMoreButton = () => {
+    if (!hasMore) return null;
+    
+    const filteredCustomers = getFilteredCustomers();
+    const remainingCount = filteredCustomers.length - displayedCustomers.length;
+    
+    return (
+      <TouchableOpacity 
+        style={styles.loadMoreButton}
+        onPress={loadMoreCustomers}
+      >
+        <Text weight='bold' style={styles.loadMoreButtonText}>
+          Load More ({remainingCount} more)
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2c95f8" />
+        <ActivityIndicator size="large" color="#15803d" />
         <Text weight='bold' style={styles.loadingText}>Loading payment status...</Text>
       </View>
     );
@@ -725,7 +693,7 @@ const PaymentStatusScreen = () => {
     return (
       <View style={styles.errorContainer}>
         <Text weight='bold' style={styles.errorTitle}>Something went wrong</Text>
-        <Text  weight='bold'style={styles.errorText}>{error}</Text>
+        <Text weight='bold' style={styles.errorText}>{error}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
           <Text weight='bold' style={styles.retryButtonText}>Try Again</Text>
         </TouchableOpacity>
@@ -779,90 +747,35 @@ const PaymentStatusScreen = () => {
             {generatingBills ? (
               <ActivityIndicator size="small" color="#ffffff" />
             ) : (
-              <Download size={18} color="#ffffff" />
+              <ReceiptText size={18} color="#ffffff" />
             )}
+           
             <Text weight='bold' style={styles.actionButtonText}>
               {generatingBills ? 'Generating...' : 'Generate Bills'}
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={[styles.actionButton, styles.emailButton, sendingEmails && styles.buttonDisabled]}
-            onPress={sendBillsToAllCustomers}
-            disabled={sendingEmails}
-          >
-            {sendingEmails ? (
-              <ActivityIndicator size="small" color="#ffffff" />
-            ) : (
-              <Mail size={18} color="#ffffff" />
-            )}
-            <Text  weight='bold'style={styles.actionButtonText}>
-              {sendingEmails ? 'Sending...' : 'Send Emails'}
-            </Text>
-          </TouchableOpacity>
+       
         </View>
 
-        {/* Demo Button - Only show in development */}
-        {/* {__DEV__ && (
-          <TouchableOpacity 
-            style={[styles.demoButton, generatingBills && styles.buttonDisabled]}
-            onPress={triggerAutoGeneration}
-            disabled={generatingBills}
-          >
-            <Text style={styles.demoButtonText}>
-              {generatingBills ? 'Processing...' : 'Demo: Auto Generate & Send'}
-            </Text>
-          </TouchableOpacity>
-        )} */}
-
-        {/* Search and Pagination */}
-        <View style={styles.topBarContainer}>
-          <Animated.View style={[styles.searchContainer, { width: searchWidth }]}>
-            <Search size={20} color="#64748b" style={styles.searchIcon} />
-            <TextInput
-              ref={searchInputRef}
-              style={styles.searchInput}
-              placeholder="Search customers..."
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholderTextColor="#94a3b8"
-              onFocus={handleSearchFocus}
-              onBlur={handleSearchBlur}
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={clearSearch}>
-                <X size={20} color="#64748b" />
-              </TouchableOpacity>
-            )}
-          </Animated.View>
-
-          <Animated.View style={[styles.paginationContainer, { opacity: paginationOpacity }]}>
-            <TouchableOpacity
-              style={styles.paginationButton}
-              onPress={goToPrevPage}
-              disabled={currentPage === 1 || totalPages === 0}
-            >
-              <ChevronLeft
-                size={20}
-                color={currentPage === 1 || totalPages === 0 ? "#94a3b8" : "#3b82f6"}
-              />
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <Search size={20} color="#64748b" style={styles.searchIcon} />
+          <TextInput
+            ref={searchInputRef}
+            style={styles.searchInput}
+            placeholder="Search customers..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholderTextColor="#94a3b8"
+            onFocus={handleSearchFocus}
+            onBlur={handleSearchBlur}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={clearSearch}>
+              <X size={20} color="#64748b" />
             </TouchableOpacity>
-
-            <Text weight='bold' style={styles.paginationInfo}>
-              {totalPages === 0 ? "0/0" : `${currentPage} / ${totalPages}`}
-            </Text>
-
-            <TouchableOpacity
-              style={styles.paginationButton}
-              onPress={goToNextPage}
-              disabled={currentPage === totalPages || totalPages === 0}
-            >
-              <ChevronRight
-                size={20}
-                color={currentPage === totalPages || totalPages === 0 ? "#94a3b8" : "#3b82f6"}
-              />
-            </TouchableOpacity>
-          </Animated.View>
+          )}
         </View>
       </View>
 
@@ -904,18 +817,6 @@ const PaymentStatusScreen = () => {
             <TouchableOpacity 
               style={[
                 styles.statCard, 
-                { backgroundColor: '#F59E0B15' },
-                activeFilter === 'partial' && styles.statCardActive
-              ]}
-              onPress={() => handleSummaryCardPress('partial')}
-            >
-              <Text weight='bold' style={[styles.statNumber, { color: '#F59E0B' }]}>{stats.partialCount}</Text>
-              <Text weight='bold' style={styles.statLabel}>Partial</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[
-                styles.statCard, 
                 { backgroundColor: '#EF444415' },
                 activeFilter === 'unpaid' && styles.statCardActive
               ]}
@@ -923,6 +824,18 @@ const PaymentStatusScreen = () => {
             >
               <Text weight='bold' style={[styles.statNumber, { color: '#EF4444' }]}>{stats.unpaidCount}</Text>
               <Text weight='bold' style={styles.statLabel}>Pending</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[
+                styles.statCard, 
+                { backgroundColor: '#6B728015' },
+                activeFilter === 'no-bill' && styles.statCardActive
+              ]}
+              onPress={() => handleSummaryCardPress('no-bill')}
+            >
+              <Text weight='bold' style={[styles.statNumber, { color: '#6B7280' }]}>{stats.noBillCount}</Text>
+              <Text weight='bold' style={styles.statLabel}>No Bill</Text>
             </TouchableOpacity>
           </View>
           
@@ -948,11 +861,11 @@ const PaymentStatusScreen = () => {
 
         {/* Customers List */}
         <View style={styles.listSection}>
-          <Text  weight='bold' style={styles.sectionTitle}>
-            Customers ({filteredCustomers.length})
+          <Text weight='bold' style={styles.sectionTitle}>
+            Customers ({getFilteredCustomers().length})
           </Text>
           
-          {paginatedCustomers.length === 0 ? (
+          {displayedCustomers.length === 0 ? (
             <View style={styles.emptyState}>
               <IndianRupee size={48} color="#94A3B8" />
               <Text weight='bold' style={styles.emptyStateTitle}>
@@ -966,23 +879,22 @@ const PaymentStatusScreen = () => {
                     : `No ${activeFilter === 'all' ? '' : activeFilter + ' '}customers found`
                 }
               </Text>
-              {activeFilter === 'no-bill' && stats.totalCustomers > 0 && (
+              {activeFilter === 'no-bill' && customers.length > 0 && (
                 <TouchableOpacity 
                   style={styles.generateEmptyStateButton}
                   onPress={generateAllBills}
                 >
-                  <Text  weight='bold' style={styles.generateEmptyStateButtonText}>Generate Bills for All Customers</Text>
+                  <Text weight='bold' style={styles.generateEmptyStateButtonText}>Generate Bills for All Customers</Text>
                 </TouchableOpacity>
               )}
             </View>
           ) : (
-            <FlatList
-              data={paginatedCustomers}
-              renderItem={renderCustomerItem}
-              keyExtractor={(item) => item._id}
-              scrollEnabled={false}
-              showsVerticalScrollIndicator={false}
-            />
+            <>
+              {displayedCustomers.map((item) => renderCustomerItem(item))}
+              
+              {/* Load More Button */}
+              {renderLoadMoreButton()}
+            </>
           )}
         </View>
       </ScrollView>
@@ -995,8 +907,8 @@ const PaymentStatusScreen = () => {
 
 const styles = StyleSheet.create({
   container: {
+    // paddingTop:130,
     flex: 1,
-    paddingBottom: 80,
     backgroundColor: '#f8fafc',
   },
   stickyHeader: {
@@ -1010,7 +922,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContentContainer: {
-    paddingBottom: 20,
+    paddingBottom: 60,
   },
   dateNav: {
     paddingHorizontal: 20,
@@ -1025,7 +937,7 @@ const styles = StyleSheet.create({
   navArrow: {
     width: 40,
     height: 40,
-    backgroundColor: '#004C99',
+    backgroundColor: '#15803d',
     borderRadius: 50,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1069,7 +981,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   generateButton: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#15803d',
   },
   emailButton: {
     backgroundColor: '#8B5CF6',
@@ -1082,35 +994,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 16,
   },
-  demoButton: {
-    backgroundColor: '#F59E0B',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-    marginHorizontal: 20,
-    marginBottom: 12,
-    alignItems: 'center',
-  },
-  demoButtonText: {
-    color: '#ffffff',
-    fontWeight: '500',
-    fontSize: 12,
-  },
-  topBarContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginHorizontal: 16,
-    marginBottom: 15,
-  },
   searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
     borderRadius: 30,
     paddingHorizontal: 16,
     height: 45,
-    shadowColor: "#000",
+    marginHorizontal: 16,
+    marginBottom: 15,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -1124,24 +1017,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginTop: 1,
     marginBottom: 2,
-    color: "#1e293b",
-  },
-  paginationContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f8fafc",
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  paginationButton: {
-    paddingHorizontal: 6,
-  },
-  paginationInfo: {
-    fontSize: 16,
-    color: "#333",
-    fontWeight: "500",
-    marginHorizontal: 6,
+    color: '#1e293b',
   },
   summarySection: {
     backgroundColor: '#F8FAFC',
@@ -1163,7 +1039,7 @@ const styles = StyleSheet.create({
   },
   statCardActive: {
     borderWidth: 2,
-    borderColor: '#004C99',
+    borderColor: '#15803d',
     transform: [{ scale: 1.05 }],
   },
   statNumber: {
@@ -1172,7 +1048,7 @@ const styles = StyleSheet.create({
     color: '#1E293B',
   },
   statLabel: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#333',
     marginTop: 4,
   },
@@ -1213,7 +1089,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#004C99',
+    borderLeftColor: '#15803d',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -1323,6 +1199,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 14,
   },
+  loadMoreButton: {
+    backgroundColor: '#15803d',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  loadMoreButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 16,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -1418,10 +1308,10 @@ const styles = StyleSheet.create({
   monthButtonCurrent: {
     backgroundColor: '#e6f2ff',
     borderWidth: 1,
-    borderColor: '#2c95f8',
+    borderColor: '#15803d',
   },
   monthButtonSelected: {
-    backgroundColor: '#2c95f8',
+    backgroundColor: '#15803d',
   },
   monthButtonText: {
     fontSize: 16,
@@ -1429,7 +1319,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   monthButtonTextCurrent: {
-    color: '#2c95f8',
+    color: '#15803d',
     fontWeight: 'bold',
   },
   monthButtonTextSelected: {
@@ -1442,7 +1332,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
   todayButton: {
-    backgroundColor: '#2c95f8',
+    backgroundColor: '#15803d',
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',

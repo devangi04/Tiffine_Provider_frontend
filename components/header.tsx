@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import {Text,TextStyles} from '@/components/ztext';
 import { ArrowLeft, User } from "lucide-react-native";
-import { useRouter } from "expo-router";
+import { useRouter, usePathname } from "expo-router";
 
 interface HeaderProps {
   title: string;
@@ -31,12 +31,13 @@ const Header: React.FC<HeaderProps> = ({
   showUserButton = true,
   onBackPress,
   onUserPress,
-  backgroundColor = "#004C99",
+  backgroundColor = "#15803d",
   textColor = "#fff",
   subtitleColor = "#e3e3e3ff",
   statusBarOverlay = false,
 }) => {
   const router = useRouter();
+  const pathname = usePathname(); // Get current route
 
   const handleBackPress = () => {
     if (onBackPress) {
@@ -50,6 +51,11 @@ const Header: React.FC<HeaderProps> = ({
     if (onUserPress) {
       onUserPress();
     } else {
+      // Check if we're already on the profile page
+      if (pathname === "/profile") {
+        // Already on profile page, do nothing
+        return;
+      }
       router.push("/profile");
     }
   };
@@ -72,7 +78,7 @@ const Header: React.FC<HeaderProps> = ({
                 pressed && { transform: [{ scale: 0.95 }] },
               ]}
             >
-              <ArrowLeft size={24} color="#004c99" />
+              <ArrowLeft size={24} color="#15803d" />
             </Pressable>
           ) : (
             <View style={styles.placeholderButton} />
@@ -95,7 +101,7 @@ const Header: React.FC<HeaderProps> = ({
               onPress={handleUserPress}
               activeOpacity={0.7}
             >
-              <User size={24} color="#004c99" />
+              <User size={24} color="#15803d" />
             </TouchableOpacity>
           ) : (
             <View style={styles.placeholderButton} />
@@ -108,12 +114,10 @@ const Header: React.FC<HeaderProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#004C99',
+    backgroundColor: '#15803d',
     paddingTop: Platform.OS === 'ios' ? 70 : 50,
     paddingHorizontal: 20,
     paddingBottom: 20,
-    // borderBottomLeftRadius: 30,
-    // borderBottomRightRadius: 30,
     overflow: "hidden",
   },
   topSection: {
@@ -135,7 +139,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-
   userButton: {
     width: 44,
     height: 44,

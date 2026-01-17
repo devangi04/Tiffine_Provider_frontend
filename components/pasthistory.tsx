@@ -130,7 +130,7 @@ const PastHistory: React.FC<PastHistoryProps> = ({
 
   const renderLoadingState = () => (
     <View style={styles.loadingState}>
-      <ActivityIndicator size="small" color="#2c95f8" />
+      <ActivityIndicator size="small" color="#15803d" />
       <Text  weight='bold' style={styles.loadingText}>Loading...</Text>
     </View>
   );
@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 6,
     borderLeftWidth: 3,
-    borderLeftColor: '#2c95f8',
+    borderLeftColor: '#15803d',
   },
   compactHeader: {
     flexDirection: 'row',
@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
   categoryLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#2c95f8',
+    color: '#15803d',
     minWidth: 60,
   },
   dishList: {

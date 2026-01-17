@@ -1,39 +1,71 @@
 // app/_layout.tsx
 import { useEffect } from 'react';
 import { Provider } from 'react-redux';
-import { store } from './store';
+import { store,persistor } from './store';
 import { Stack, usePathname } from 'expo-router';
+import { PersistGate } from 'redux-persist/integration/react'; // ✅ Import PersistGate
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { View, StyleSheet, Text } from 'react-native';
+import { View, StyleSheet, Text,ActivityIndicator } from 'react-native';
 import 'react-native-reanimated';
 import { useFonts } from "expo-font";
 import * as SplashScreen from 'expo-splash-screen';
+
+// Import Nunito Sans Fonts (existing)
+import {
+  NunitoSans_200ExtraLight,
+  NunitoSans_300Light,
+  NunitoSans_400Regular,
+  NunitoSans_600SemiBold,
+  NunitoSans_700Bold,
+  NunitoSans_800ExtraBold,
+  NunitoSans_900Black,
+} from '@expo-google-fonts/nunito-sans';
+
+// Import Zomato-like Fonts
+import {
+  Inter_100Thin,
+  Inter_200ExtraLight,
+  Inter_300Light,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+  Inter_800ExtraBold,
+  Inter_900Black,
+} from '@expo-google-fonts/inter';
+
+import {
+  OpenSans_300Light,
+  OpenSans_400Regular,
+  OpenSans_500Medium,
+  OpenSans_600SemiBold,
+  OpenSans_700Bold,
+  OpenSans_800ExtraBold,
+} from '@expo-google-fonts/open-sans';
+
+import {
+  Poppins_100Thin,
+  Poppins_200ExtraLight,
+  Poppins_300Light,
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+  Poppins_800ExtraBold,
+  Poppins_900Black,
+} from '@expo-google-fonts/poppins';
+
 // Custom UI Components
 import Header from '../components/header';
 import BottomNavBar from '../components/navbar';
 import DashboardHeader from '../components/dahsboardheader';
-
-// Nunito Sans Fonts
-import {
-  NunitoSans_200ExtraLight,
-  NunitoSans_200ExtraLight_Italic,
-  NunitoSans_300Light,
-  NunitoSans_300Light_Italic,
-  NunitoSans_400Regular,
-  NunitoSans_400Regular_Italic,
-  NunitoSans_600SemiBold,
-  NunitoSans_600SemiBold_Italic,
-  NunitoSans_700Bold,
-  NunitoSans_700Bold_Italic,
-  NunitoSans_800ExtraBold,
-  NunitoSans_800ExtraBold_Italic,
-  NunitoSans_900Black,
-  NunitoSans_900Black_Italic,
-} from '@expo-google-fonts/nunito-sans';
+import AuthGate from '@/components/authcheck';
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
+
+// ... Rest of your LayoutContent component ...
 
 function LayoutContent() {
   const pathname = usePathname();
@@ -54,8 +86,9 @@ function LayoutContent() {
     '/welcome': { title: '', showHeader: false, showNavbar: false, headerType: 'none' },
     '/login': { title: '', showHeader: false, showNavbar: false, headerType: 'none' },
     '/forgotpassword': { title: '', showHeader: false, showNavbar: false, headerType: 'none' },
-    
-    // Main app screens
+     '/customer': { title: 'Customer',subtitle: 'Add your customer', showHeader: true, showNavbar: false, headerType: 'default' },
+
+
     '/dashboard': { title: '', showHeader: false, showNavbar: true, headerType: 'dashboard' },
     '/profile': { title: 'Profile', subtitle: 'Manage your account', showHeader: true, showNavbar: true, headerType: 'default' },
     '/custmorelist': { title: 'Customers', subtitle: 'All registered users', showHeader: true, showNavbar: true, headerType: 'default' },
@@ -67,6 +100,9 @@ function LayoutContent() {
     '/savedmenu': { title: 'Saved Menu', subtitle: 'See Weekly Menus', showHeader: true, showNavbar: true, headerType: 'default' },
     '/subscriptionmanagement': { title: 'Subscription Details', subtitle: 'See your details', showHeader: true, showNavbar: true, headerType: 'default' },
     '/menu': { title: 'Weekly Menu', subtitle: 'Create Menus', showHeader: true, showNavbar: false, headerType: 'default' },
+     '/legalmenu': { title: 'About us', subtitle: 'Terms & Privacy Policy', showHeader: true, showNavbar: false, headerType: 'default' },
+         '/providerseetingscreen': { title: 'Provider setting', subtitle: 'Configure your services', showHeader: true, showNavbar: false, headerType: 'default' },
+
     '/categorymaster': { title: 'Category Master', subtitle: 'Manage Categories', showHeader: true, showNavbar: true, headerType: 'default' },
     '/edit': { title: 'Personal Details', subtitle: 'Manage Details', showHeader: true, showNavbar: false, headerType: 'default' },
     
@@ -115,13 +151,15 @@ function LayoutContent() {
         <Stack
           screenOptions={{
             headerShown: false,
-            animation: 'fade',
+            animation: 'flip',
             gestureEnabled: true,
             presentation: 'card',
           }}
         >
+           <Stack.Screen name="index" />
           <Stack.Screen name="welcome" />
           <Stack.Screen name="login" />
+          <Stack.Screen name="auth" />
           <Stack.Screen name="forgotpassword" />
           <Stack.Screen name="dashboard" />
           <Stack.Screen name="profile" />
@@ -134,6 +172,7 @@ function LayoutContent() {
           <Stack.Screen name="savedmenu" />
           <Stack.Screen name="subscriptionmanagement" />
           <Stack.Screen name="menu" />
+          <Stack.Screen  name="customer-details" options={{ headerShown: false,presentation: 'modal' }} />
           <Stack.Screen name="categorymaster" />
           <Stack.Screen name="edit" />
           <Stack.Screen name="(tabs)" />
@@ -151,7 +190,7 @@ function LayoutContent() {
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
-    // Regular weights
+    // Nunito Sans (existing)
     'NunitoSans-ExtraLight': NunitoSans_200ExtraLight,
     'NunitoSans-Light': NunitoSans_300Light,
     'NunitoSans-Regular': NunitoSans_400Regular,
@@ -160,14 +199,35 @@ export default function RootLayout() {
     'NunitoSans-ExtraBold': NunitoSans_800ExtraBold,
     'NunitoSans-Black': NunitoSans_900Black,
     
-    // Italic weights (optional)
-    'NunitoSans-ExtraLight-Italic': NunitoSans_200ExtraLight_Italic,
-    'NunitoSans-Light-Italic': NunitoSans_300Light_Italic,
-    'NunitoSans-Regular-Italic': NunitoSans_400Regular_Italic,
-    'NunitoSans-SemiBold-Italic': NunitoSans_600SemiBold_Italic,
-    'NunitoSans-Bold-Italic': NunitoSans_700Bold_Italic,
-    'NunitoSans-ExtraBold-Italic': NunitoSans_800ExtraBold_Italic,
-    'NunitoSans-Black-Italic': NunitoSans_900Black_Italic,
+    // Inter (Zomato-like clean font)
+    'Inter-Thin': Inter_100Thin,
+    'Inter-ExtraLight': Inter_200ExtraLight,
+    'Inter-Light': Inter_300Light,
+    'Inter-Regular': Inter_400Regular,
+    'Inter-Medium': Inter_500Medium,
+    'Inter-SemiBold': Inter_600SemiBold,
+    'Inter-Bold': Inter_700Bold,
+    'Inter-ExtraBold': Inter_800ExtraBold,
+    'Inter-Black': Inter_900Black,
+    
+    // Open Sans (clean and readable)
+    'OpenSans-Light': OpenSans_300Light,
+    'OpenSans-Regular': OpenSans_400Regular,
+    'OpenSans-Medium': OpenSans_500Medium,
+    'OpenSans-SemiBold': OpenSans_600SemiBold,
+    'OpenSans-Bold': OpenSans_700Bold,
+    'OpenSans-ExtraBold': OpenSans_800ExtraBold,
+    
+    // Poppins (modern, food app friendly)
+    'Poppins-Thin': Poppins_100Thin,
+    'Poppins-ExtraLight': Poppins_200ExtraLight,
+    'Poppins-Light': Poppins_300Light,
+    'Poppins-Regular': Poppins_400Regular,
+    'Poppins-Medium': Poppins_500Medium,
+    'Poppins-SemiBold': Poppins_600SemiBold,
+    'Poppins-Bold': Poppins_700Bold,
+    'Poppins-ExtraBold': Poppins_800ExtraBold,
+    'Poppins-Black': Poppins_900Black,
   });
 
   // Hide splash screen when fonts are loaded
@@ -177,16 +237,31 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError]);
 
-  // Return null while fonts are loading
   if (!fontsLoaded && !fontError) {
     return null;
   }
 
   return (
-    <Provider store={store}>
-      <SafeAreaProvider>
-        <LayoutContent />
-      </SafeAreaProvider>
+  <Provider store={store}>
+      {/* ✅ Wrap with PersistGate for Redux Persist */}
+      <PersistGate 
+        loading={
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#15803d" />
+          </View>
+        }
+        persistor={persistor}
+        onBeforeLift={() => {
+          console.log('Redux persistence is about to lift');
+        }}
+      >
+        <SafeAreaProvider>
+          <AuthGate>
+          {/* ✅ Wrap with AuthChecker for automatic auth redirection */}
+            <LayoutContent />
+         </AuthGate>
+        </SafeAreaProvider>
+      </PersistGate>
     </Provider>
   );
 }
@@ -197,10 +272,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   stickyHeader: {
-    zIndex: 1000,
-    elevation: 1000,
+   position: 'absolute', // 🔥 THIS IS REQUIRED
+  top: 0,
+  left: 0,
+  right: 0,
+  zIndex: 1000,
+  elevation: 1000,
+  backgroundColor: 'transparent',
   },
   content: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
   },
 });

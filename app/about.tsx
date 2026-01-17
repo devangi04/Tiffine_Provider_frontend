@@ -41,7 +41,7 @@ const AboutUsScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar backgroundColor="#f8fafc" barStyle="light-content" />
+      <StatusBar backgroundColor="#f8fafc" barStyle="dark-content" />
       
       {/* Header */}
       <Animated.View style={[styles.header, { opacity: headerOpacity, paddingTop: insets.top }]}>
@@ -77,7 +77,7 @@ const AboutUsScreen = () => {
         scrollEventThrottle={16}
       >
         {/* Hero Section */}
-        <LinearGradient colors={['#2c95f8', '#4694e2']} style={styles.heroCard}>
+        <LinearGradient colors={['#15803d', '#4694e2']} style={styles.heroCard}>
           <View style={styles.heroContent}>
             <View style={styles.logoCircle}>
               <Ionicons name="restaurant" size={32} color="white" />
@@ -106,7 +106,7 @@ const AboutUsScreen = () => {
             {features.map((feature, index) => (
               <View key={index} style={styles.featureItem}>
                 <View style={styles.featureIcon}>
-                  <Ionicons name={feature.icon as any} size={24} color="#2c95f8" />
+                  <Ionicons name={feature.icon as any} size={24} color="#15803d" />
                 </View>
                 <Text style={styles.featureTitle}>{feature.title}</Text>
                 <Text style={styles.featureDesc}>{feature.desc}</Text>
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
   fixedHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
   headerGradient: { paddingHorizontal: 20, paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)' },
   headerContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 60 },
-  backButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.9)', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
+   backButton: {width: 40,height: 40,borderRadius: 22,backgroundColor: 'white',alignItems: 'center',justifyContent: 'center',shadowColor: '#000',shadowOffset: { width: 0, height: 2 },shadowOpacity: 0.08,shadowRadius: 8,elevation: 3,},
   headerTitle: { fontSize: 18, fontWeight: '600', color: '#333' },
   placeholder: { width: 40 },
   scrollView: { flex: 1 },

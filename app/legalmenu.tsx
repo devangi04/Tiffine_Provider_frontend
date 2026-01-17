@@ -36,7 +36,7 @@ const LegalMenuScreen = () => {
       title: 'About Us',
       description: 'Learn about Tiffine, our story, mission and features',
       icon: 'information-circle',
-      iconColor: '#2c95f8',
+      iconColor: '#15803d',
       bgColor: 'rgba(44, 149, 248, 0.1)',
       screen: '/about'
     },
@@ -181,6 +181,7 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    // paddingTop:50,
   },
   scrollContent: {
     flexGrow: 1,

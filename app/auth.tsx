@@ -27,6 +27,9 @@ import OTPInputBoxes from '@/components/otpbox';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { persistor } from './store'; 
 import { API_URL } from './config/env';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
+import socketService from '../app/config/socketservice'; // Adjust path as needed
 
 
 
@@ -68,6 +71,14 @@ const FloatingInput = ({
   const animatedValue = useRef(new Animated.Value(value ? 1 : 0)).current;
 
   useEffect(() => {
+  const restoreAuth = async () => {
+    const token = await AsyncStorage.getItem('providerToken');
+  };
+
+  restoreAuth();
+}, []);
+
+  useEffect(() => {
     Animated.timing(animatedValue, {
       toValue: (isFocused || value) ? 1 : 0,
       duration: 200,
@@ -88,7 +99,7 @@ const FloatingInput = ({
     }),
     color: animatedValue.interpolate({
       inputRange: [0, 1],
-      outputRange: ['#9CA3AF', '#007AFF'],
+      outputRange: ['#9CA3AF', '#15803d'],
     }),
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 4,
@@ -99,7 +110,7 @@ const FloatingInput = ({
   const containerStyle = {
     borderColor: animatedValue.interpolate({
       inputRange: [0, 1],
-      outputRange: ['#E5E7EB', '#007AFF'],
+      outputRange: ['#E5E7EB', '#15803d'],
     }),
   } as any;
 
@@ -312,98 +323,183 @@ const switchTab = (tab: string) => {
     }, 50);
   };
 
-  const handleLogin = async () => {
+ // In your AuthScreen component
+const handleLogin = async () => {
+  if (!email || !password) {
+    Alert.alert('Error', 'Please enter both email and password');
+    return;
+  }
+
+  if (!/^\S+@\S+\.\S+$/.test(email)) {
+    Alert.alert('Error', 'Please enter a valid email address');
+    return;
+  }
+
+  setIsLoading(true);
+  setIsLoginSubmitted(true);
+  dispatch(setLoading(true));
+
+  let pushToken = null;
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    let finalStatus = status;
     
-    if (!email || !password) {
-      Alert.alert('Error', 'Please enter both email and password');
-      return;
+    if (status !== 'granted') {
+      const { status: newStatus } = await Notifications.requestPermissionsAsync();
+      finalStatus = newStatus;
     }
-
-    if (!/^\S+@\S+\.\S+$/.test(email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
-      return;
+    
+    if (finalStatus === 'granted') {
+      pushToken = (await Notifications.getExpoPushTokenAsync()).data;
+      console.log('📱 Push token obtained:', pushToken?.substring(0, 30) + '...');
     }
+  } catch (tokenError) {
+    console.log('Could not get push token:', tokenError);
+    // Continue login even if push token fails
+  }
 
-    setIsLoading(true);
-    setIsLoginSubmitted(true);
-    dispatch(setLoading(true));
-
-    try {
+ try {
+    const response = await axios.post(
+      `${API_BASE_URL}/api/auth/login`,
+      { email, password },
+      {
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      }
+    );
+    
+    if (response.data.success) {
+      const providerData = response.data.data;
+      const token = response.data.token;
       
-      const response = await axios.post(
-        `${API_BASE_URL}/api/auth/login`,
-        { email, password },
-        {
-          timeout: 10000,
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
+      // ✅ Save token to AsyncStorage
+      await AsyncStorage.setItem('providerToken', token);
+      
+      // ✅ Dispatch to Redux
+      dispatch(setProvider({
+        id: providerData.providerId,
+        email: providerData.email,
+        name: providerData.name,
+        phone: providerData.phone || '',
+        token: token,
+        subscription: providerData.subscription || { status: 'inactive' },
+        upiId: providerData.upiId || '',
+        notificationsEnabled: providerData.notificationsEnabled || false // ✅ Add this
+
+      }));
+      
+       console.log('Login successful:', providerData);
+      console.log('Push token registration status:', response.data.data.pushTokenUpdated);
+       if (!response.data.data.pushTokenUpdated && pushToken) {
+        try {
+          // Initialize socket with the token
+          await socketService.initializeSocket(token);
+          
+          // Register push token via socket
+          await socketService.registerProviderPushToken(
+            providerData.providerId,
+            pushToken
+          );
+          
+          console.log('✅ Push token registered via socket');
+        } catch (socketError) {
+          console.error('Socket registration failed:', socketError.message);
+          // Don't fail login if socket fails
+        }
+      }
+      // 🆓 Check trial status immediately
+      try {
+        const trialResponse = await axios.get(
+          `${API_BASE_URL}/api/subscription/trial-status/${providerData.providerId}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          }
+        );
+        
+        if (trialResponse.data.success) {
+          const { trialStatus, hasActiveSubscription } = trialResponse.data;
+          
+          // ALWAYS show subscription screen after login for trial users
+          // This educates them about the 7-day free trial
+          
+          if (trialStatus?.isActive && !hasActiveSubscription) {
+            // 🆓 User is on free trial - show subscription screen to inform them
+            Alert.alert(
+              "🎁 Welcome to Your Free Trial!",
+              `You have ${trialStatus.daysLeft} days of free access. After that, you'll need a subscription.`,
+              [
+                {
+                  text: "View Plans & Continue",
+                  onPress: () => {
+                    router.replace({
+                      pathname: "/subscription",
+                      params: { 
+                        providerId: providerData.providerId, 
+                        providerEmail: providerData.email,
+                        showTrialInfo: 'true' // Flag to show trial info
+                      }
+                    });
+                  }
+                }
+              ]
+            );
+          } else if (trialStatus?.requiresSubscription && !hasActiveSubscription) {
+            // Trial expired - must subscribe
+            Alert.alert(
+              "Trial Expired",
+              "Your 7-day free trial has ended. Please subscribe to continue.",
+              [
+                {
+                  text: "Subscribe Now",
+                  onPress: () => {
+                    router.replace({
+                      pathname: "/subscription",
+                      params: { 
+                        providerId: providerData.providerId, 
+                        providerEmail: providerData.email,
+                        trialExpired: 'true'
+                      }
+                    });
+                  }
+                }
+              ]
+            );
+          } else if (hasActiveSubscription) {
+            // Already subscribed - go directly to dashboard
+            console.log('Already subscribed, going to dashboard');
+            // AuthChecker will handle navigation
+          } else {
+            // No trial, no subscription (edge case)
+            router.replace({
+              pathname: "/subscription",
+              params: { 
+                providerId: providerData.providerId, 
+                providerEmail: providerData.email 
+              }
+            });
           }
         }
-      );
-      
-      if (response.data.success) {
-        
-        const providerData = response.data.data;
-
-        dispatch(setProvider({
-          id: providerData.providerId,
-          email: providerData.email,
-          name: providerData.name,
-          subscription: providerData.subscription
-        }));
-
-        if (!providerData.subscription || 
-            !providerData.subscription.status || 
-            providerData.subscription.status !== 'active') {
-          
-          Alert.alert(
-            "Subscription Required",
-            "Your subscription is not active. Please subscribe to a plan to continue.",
-            [
-              {
-                text: "OK",
-                onPress: () => {
-                  router.replace({
-                    pathname: "/subscription",
-                    params: { 
-                      providerId: providerData.providerId, 
-                      providerEmail: providerData.email 
-                    }
-                  });
-                }
-              }
-            ]
-          );
-          return;
-        } else {
-          router.replace("/dashboard");
-        }
-      } else {
-        setIsLoginSubmitted(false);
-        throw new Error(response.data.error || 'Login failed');
+      } catch (trialError) {
+        console.error('Failed to check trial status:', trialError);
+        // On error, redirect to dashboard
+        router.replace('/dashboard');
       }
-    } catch (error: any) {
       
-      setIsLoginSubmitted(false);
-      let errorMessage = 'Login failed. Please try again.';
-      
-      if (error.response) {
-        errorMessage = error.response.data?.error || 
-                      error.response.data?.message || 
-                      `Server error (${error.response.status})`;
-      } else if (error.code === 'ECONNABORTED') {
-        errorMessage = 'Request timeout. Check your connection.';
-      } else if (error.message.includes('Network Error')) {
-        errorMessage = 'Cannot connect to server. Please:\n\n• Ensure both devices are on same WiFi\n• Verify backend is running\n• Check your local IP is correct';
-      }
-
-      Alert.alert('Error', errorMessage);
-    } finally {
-      setIsLoading(false);
-      dispatch(setLoading(false));
+    } else {
+      throw new Error(response.data.error || 'Login failed');
     }
-  };
+  } catch (error: any) {
+    // ... existing error handling ...
+  } finally {
+    setIsLoading(false);
+    dispatch(setLoading(false));
+  }
+};
 
   const handleRegister = async () => {
     if (!name || !email || !phone || !password) {
@@ -703,7 +799,7 @@ const switchTab = (tab: string) => {
         activeOpacity={0.8}
       >
         <LinearGradient
-          colors={['#004C99', '#4694e2ff']}
+          colors={['#15803d', '#15803d']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.loginBtn}
@@ -809,7 +905,7 @@ const switchTab = (tab: string) => {
         activeOpacity={0.8}
       >
         <LinearGradient
-         colors={['#004C99', '#4694e2ff']}
+         colors={['#15803d', '#15803d']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.loginBtn}
@@ -844,7 +940,7 @@ const switchTab = (tab: string) => {
       {/* Verification Icon */}
       <View style={styles.verifyIconContainer}>
         <View style={styles.verifyIcon}>
-          <Ionicons name="mail-outline" size={60} color="#007AFF" />
+          <Ionicons name="mail-outline" size={60} color="#15803d" />
         </View>
       </View>
 
@@ -881,7 +977,7 @@ const switchTab = (tab: string) => {
         activeOpacity={0.8}
       >
         <LinearGradient
-         colors={['#004C99', '#4694e2ff']}
+         colors={['#15803d', '#15803d']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.loginBtn}
@@ -909,7 +1005,7 @@ const switchTab = (tab: string) => {
       {/* Forgot Password Icon */}
       <View style={styles.verifyIconContainer}>
         <View style={styles.verifyIcon}>
-          <Ionicons name="lock-closed-outline" size={60} color="#007AFF" />
+          <Ionicons name="lock-closed-outline" size={60} color="#15803d" />
         </View>
       </View>
 
@@ -933,7 +1029,7 @@ const switchTab = (tab: string) => {
         activeOpacity={0.8}
       >
         <LinearGradient
-         colors={['#004C99', '#4694e2ff']}
+         colors={['#15803d', '#15803d']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.loginBtn}
@@ -961,7 +1057,7 @@ const switchTab = (tab: string) => {
       {/* Verification Icon */}
       <View style={styles.verifyIconContainer}>
         <View style={styles.verifyIcon}>
-          <Ionicons name="mail-outline" size={60} color="#007AFF" />
+          <Ionicons name="mail-outline" size={60} color="#15803d" />
         </View>
       </View>
 
@@ -998,7 +1094,7 @@ const switchTab = (tab: string) => {
         activeOpacity={0.8}
       >
         <LinearGradient
-        colors={['#004C99', '#4694e2ff']}
+        colors={['#15803d', '#15803d']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.loginBtn}
@@ -1026,7 +1122,7 @@ const switchTab = (tab: string) => {
       {/* Reset Password Icon */}
       <View style={styles.verifyIconContainer}>
         <View style={styles.verifyIcon}>
-          <Ionicons name="key-outline" size={60} color="#007AFF" />
+          <Ionicons name="key-outline" size={60} color="#15803d" />
         </View>
       </View>
 
@@ -1063,7 +1159,7 @@ const switchTab = (tab: string) => {
         activeOpacity={0.8}
       >
         <LinearGradient
-        colors={['#004C99', '#4694e2ff']}
+        colors={['#15803d', '#15803d']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.loginBtn}
@@ -1140,7 +1236,7 @@ const switchTab = (tab: string) => {
           ]} 
         >
           <LinearGradient
-           colors={['#004C99', '#4694e2ff']}
+           colors={['#15803d', '#15803d']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.tabIndicatorGradient}
@@ -1277,7 +1373,7 @@ const styles = StyleSheet.create({
     width: width/2 - 34,
     height: 42,
     borderRadius: 21,
-    shadowColor: '#007AFF',
+    shadowColor: '#15803d',
     shadowOffset: {
       width: 0,
       height: 3,
@@ -1297,7 +1393,8 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 1,
+    zIndex: 10,      // 🔥 important
+  elevation: 10,
   },
   tabText: {
     fontSize: 15,
@@ -1377,7 +1474,7 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     height: 52,
     marginBottom: 30,
-    shadowColor: '#007AFF',
+    shadowColor: '#15803d',
     shadowOffset: {
       width: 0,
       height: 4,
@@ -1423,14 +1520,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#007AFF',
+    borderColor: '#15803d',
   },
   forgotPasswordContainer: {
     alignItems: 'flex-end',
     marginBottom: 30,
   },
   forgotPassword: {
-    color: '#007AFF',
+    color: '#15803d',
     fontSize: 14,
     fontWeight: '500',
   },
@@ -1444,7 +1541,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   signupLinkText: {
-    color: '#007AFF',
+    color: '#15803d',
     fontWeight: '600',
     fontSize: 16,
   },

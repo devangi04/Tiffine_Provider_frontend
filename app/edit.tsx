@@ -20,8 +20,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import axios from 'axios';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useAppSelector, useAppDispatch } from '@/app/store/hooks'; // Add useAppDispatch
-import { setProvider } from '@/app/store/slices/providerslice'; // Import setProvider
+import { useAppSelector, useAppDispatch } from '@/app/store/hooks';
+import { setProvider } from '@/app/store/slices/providerslice';
 import {Text,TextStyles} from '@/components/ztext';
 import { API_URL } from './config/env';
 
@@ -29,7 +29,7 @@ const { height } = Dimensions.get('window');
 
 const API_BASE_URL = API_URL;
 
-// Floating Input Component (unchanged, but add maxLength prop)
+// Updated Floating Input Component with editable prop
 const FloatingInput = ({
   label,
   value,
@@ -41,7 +41,8 @@ const FloatingInput = ({
   iconName,
   onSubmitEditing,
   returnKeyType = 'next',
-  maxLength // Add this
+  maxLength,
+  editable = true // Add editable prop
 }: {
   label: string;
   value: string;
@@ -53,7 +54,8 @@ const FloatingInput = ({
   iconName?: string;
   onSubmitEditing?: () => void;
   returnKeyType?: 'next' | 'done';
-  maxLength?: number; // Add this
+  maxLength?: number;
+  editable?: boolean; // Add this
 }) => {
   const [isFocused, setIsFocused] = useState(false);
   const animatedValue = useRef(new Animated.Value(value ? 1 : 0)).current;
@@ -79,9 +81,9 @@ const FloatingInput = ({
     }),
     color: animatedValue.interpolate({
       inputRange: [0, 1],
-      outputRange: ['#9CA3AF', '#004C99'],
+      outputRange: ['#9CA3AF', editable ? '#15803d' : '#6B7280'], // Change color based on editable
     }),
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#f8fafc',
     paddingHorizontal: 4,
     fontWeight: '500',
     zIndex: 1,
@@ -90,9 +92,12 @@ const FloatingInput = ({
   const containerStyle = {
     borderColor: animatedValue.interpolate({
       inputRange: [0, 1],
-      outputRange: ['#E5E7EB', '#004C99'],
+      outputRange: ['#E5E7EB', editable ? '#15803d' : '#D1D5DB'], // Change border color
     }),
+    backgroundColor: editable ? '#FFFFFF' : '#F9FAFB', // Different background for disabled
   } as any;
+
+  const iconColor = editable ? '#9CA3AF' : '#D1D5DB';
 
   return (
     <View style={styles.floatingInputContainer}>
@@ -106,6 +111,7 @@ const FloatingInput = ({
             styles.floatingInput,
             multiline && styles.multilineInput,
             iconName && styles.floatingInputWithIcon,
+            !editable && styles.disabledInput, // Add disabled style
           ]}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
@@ -120,17 +126,32 @@ const FloatingInput = ({
           multiline={multiline}
           numberOfLines={multiline ? 3 : 1}
           textAlignVertical={multiline ? 'top' : 'center'}
-          maxLength={maxLength} // Add this
+          maxLength={maxLength}
+          editable={editable} // Pass editable prop
+          selectTextOnFocus={editable} // Only allow text selection if editable
         />
         {iconName && (
           <MaterialIcons
             name={iconName}
             size={20}
-            color="#9CA3AF"
+            color={iconColor}
             style={styles.floatingInputIcon}
           />
         )}
+        {!editable && (
+          <MaterialIcons
+            name="lock-outline"
+            size={16}
+            color="#9CA3AF"
+            style={styles.lockIcon}
+          />
+        )}
       </Animated.View>
+      {!editable && (
+        <Text style={styles.disabledHint}>
+          This field cannot be edited
+        </Text>
+      )}
     </View>
   );
 };
@@ -138,10 +159,10 @@ const FloatingInput = ({
 const EditProfileScreen = () => {
   const router = useRouter();
   const reduxProvider = useAppSelector((state) => state.provider);
-  const dispatch = useAppDispatch(); // Add dispatch
+  const dispatch = useAppDispatch();
 
   const [loading, setLoading] = useState(false);
-  const [fetching, setFetching] = useState(true); // Add fetching state
+  const [fetching, setFetching] = useState(true);
   const [image, setImage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -167,7 +188,6 @@ const EditProfileScreen = () => {
           return;
         }
 
-        // Direct API call like your dashboard
         const response = await axios.get(
           `${API_BASE_URL}/api/providers/${providerId}`,
           {
@@ -180,16 +200,14 @@ const EditProfileScreen = () => {
           }
         );
 
-
         if (response.data.success) {
           const providerData = response.data.data;
-          
           
           // Update form data
           setFormData({
             name: providerData.name || '',
             email: providerData.email || '',
-            phone: providerData.phone || '', // This should now have the phone
+            phone: providerData.phone || '',
           });
           
           // Update Redux state as well
@@ -197,7 +215,7 @@ const EditProfileScreen = () => {
             id: providerData.id || providerId,
             email: providerData.email || '',
             name: providerData.name || '',
-            phone: providerData.phone || '', // Ensure phone is included
+            phone: providerData.phone || '',
             subscription: providerData.subscription || {}
           }));
         } else {
@@ -210,18 +228,7 @@ const EditProfileScreen = () => {
             });
           }
         }
-      } catch (error: any) {
-        
-        let errorMessage = 'Failed to fetch profile data.';
-        if (error.response) {
-          errorMessage = error.response.data?.error || `Server error (${error.response.status})`;
-        } else if (error.code === 'ECONNABORTED') {
-          errorMessage = 'Request timeout.';
-        } else if (error.message.includes('Network Error')) {
-          errorMessage = 'Cannot connect to server.';
-        }
-        
-        
+      } catch (error: any) {       
         // Fallback to Redux data
         if (reduxProvider) {
           setFormData({
@@ -236,7 +243,7 @@ const EditProfileScreen = () => {
     };
 
     fetchProviderDirectly();
-  }, []); // Empty dependency array - only run once on mount
+  }, []);
 
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
@@ -252,10 +259,13 @@ const EditProfileScreen = () => {
   };
 
   const handleInputChange = (field: keyof typeof formData, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    // Only allow phone to be changed
+    if (field === 'phone') {
+      setFormData(prev => ({
+        ...prev,
+        [field]: value
+      }));
+    }
   };
 
   const focusNextField = (nextRef: React.RefObject<TextInput>) => {
@@ -273,37 +283,47 @@ const EditProfileScreen = () => {
       return;
     }
 
+    // Check if phone number has actually changed
+    const phoneChanged = formData.phone !== reduxProvider.phone;
+    if (!phoneChanged) {
+      Alert.alert('No Changes', 'Phone number is unchanged.');
+      return;
+    }
+
     setLoading(true);
     try {
+      // Only send phone number to API
+      const updateData = {
+        phone: formData.phone
+      };
+
       const response = await axios.put(
         `${API_BASE_URL}/api/providers/${reduxProvider.id}`,
-        formData,
+        updateData,
         { 
           withCredentials: true,
           timeout: 10000
         }
       );
 
-
       if (response.data.success) {
-        Alert.alert('Success', 'Profile updated successfully!');
+        Alert.alert('Success', 'Phone number updated successfully!');
         
-        // Update Redux with new data
+        // Update Redux with new phone
         dispatch(setProvider({
           id: reduxProvider.id,
-          email: formData.email,
-          name: formData.name,
-          phone: formData.phone, // Update phone in Redux
+          email: reduxProvider.email, // Keep original
+          name: reduxProvider.name, // Keep original
+          phone: formData.phone, // Only update phone
           subscription: reduxProvider.subscription || {}
         }));
         
         router.back();
       } else {
-        throw new Error(response.data.error || 'Failed to update profile');
+        throw new Error(response.data.error || 'Failed to update phone number');
       }
-    } catch (error: any) {
-      
-      let errorMessage = 'Failed to update profile. Please try again.';
+    } catch (error: any) {      
+      let errorMessage = 'Failed to update phone number. Please try again.';
       if (error.response) {
         errorMessage = error.response.data?.error || `Server error (${error.response.status})`;
       }
@@ -336,9 +356,9 @@ const EditProfileScreen = () => {
   if (fetching) {
     return (
       <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#007AFF" />
+        <StatusBar barStyle="light-content" backgroundColor="transparent" />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2c95f8" />
+          <ActivityIndicator size="large" color="#15803d" />
           <Text style={styles.loadingText}>Loading profile data...</Text>
         </View>
       </SafeAreaView>
@@ -354,19 +374,6 @@ const EditProfileScreen = () => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-        {/* Header */}
-        {/* <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons name="arrow-back" size={24} color="#004C99" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Edit Profile</Text>
-          <View style={styles.headerPlaceholder} />
-        </View> */}
-
         {/* Scrollable Content */}
         <ScrollView
           style={styles.scrollView}
@@ -382,7 +389,6 @@ const EditProfileScreen = () => {
             >
               {renderAvatar()}
             </TouchableOpacity>
-           
           </View>
 
           {/* Form Section */}
@@ -396,6 +402,7 @@ const EditProfileScreen = () => {
               onSubmitEditing={() => focusNextField(emailRef)}
               returnKeyType="next"
               iconName="store"
+              editable={false} // Disabled
             />
 
             <FloatingInput
@@ -408,6 +415,7 @@ const EditProfileScreen = () => {
               onSubmitEditing={() => focusNextField(phoneRef)}
               returnKeyType="next"
               iconName="email"
+              editable={false} // Disabled
             />
 
             <FloatingInput
@@ -420,11 +428,9 @@ const EditProfileScreen = () => {
               onSubmitEditing={handleSaveProfile}
               returnKeyType="done"
               iconName="phone"
+              editable={true} // Enabled - only editable field
             />
           </View>
-
-          {/* Debug Button (optional - remove in production) */}
-      
         </ScrollView>
 
         {/* Fixed Save Button */}
@@ -433,20 +439,25 @@ const EditProfileScreen = () => {
             style={[styles.submitButton, loading && styles.submitButtonDisabled]}
             onPress={handleSaveProfile}
             activeOpacity={0.9}
-            disabled={loading || fetching}
+            disabled={loading || fetching || formData.phone === reduxProvider.phone}
           >
             <LinearGradient
-              colors={['#004C99', '#007AFF']}
+              colors={['#15803d', '#15803d']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
-              style={styles.submitGradient}
+              style={[
+                styles.submitGradient,
+                (formData.phone === reduxProvider.phone) && styles.submitGradientDisabled
+              ]}
             >
               {loading ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
                 <View style={styles.buttonContent}>
                   <MaterialIcons name="save" size={20} color="#FFFFFF" />
-                  <Text style={styles.submitText}>Save Changes</Text>
+                  <Text style={styles.submitText}>
+                    {formData.phone === reduxProvider.phone ? 'No Changes' : 'Save Changes'}
+                  </Text>
                 </View>
               )}
             </LinearGradient>
@@ -460,6 +471,7 @@ const EditProfileScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    // paddingTop:120,
     backgroundColor: "#f8fafc",
   },
   keyboardAvoid: {
@@ -497,7 +509,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#004C99',
+    color: '#15803d',
     fontWeight: '500',
   },
   scrollView: {
@@ -505,7 +517,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 120, // Add padding for button
+    paddingBottom: 120,
   },
   profilePhotoSection: {
     alignItems: 'center',
@@ -534,7 +546,7 @@ const styles = StyleSheet.create({
   avatarPlaceholder: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#004C99',
+    backgroundColor: '#15803d',
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 60,
@@ -558,14 +570,13 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
   },
   changePhotoText: {
-    color: '#004C99',
+    color: '#15803d',
     fontSize: 14,
     fontWeight: '500',
   },
   formSection: {
     paddingHorizontal: 20,
     paddingBottom: 20,
-   
   },
   floatingInputContainer: {
     marginBottom: 20,
@@ -601,10 +612,25 @@ const styles = StyleSheet.create({
   floatingInputWithIcon: {
     paddingRight: 50,
   },
+  disabledInput: {
+    color: '#6B7280',
+  },
   floatingInputIcon: {
     position: 'absolute',
     right: 16,
     top: 19,
+  },
+  lockIcon: {
+    position: 'absolute',
+    right: 42, // Position next to other icon
+    top: 20,
+  },
+  disabledHint: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 4,
+    marginLeft: 8,
+    fontStyle: 'italic',
   },
   bottomContainer: {
     position: 'absolute',
@@ -617,19 +643,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8fafc",
     borderTopWidth: 1,
     borderTopColor: "#F3F4F6",
-    // shadowColor: '#000',
-    // shadowOffset: {
-    //   width: 0,
-    //   height: -2,
-    // },
-    // shadowOpacity: 0.1,
-    // shadowRadius: 4,
-    // elevation: 5,
   },
   submitButton: {
     borderRadius: 25,
     overflow: "hidden",
-    shadowColor: '#004C99',
+    shadowColor: '#15803d',
     shadowOffset: {
       width: 0,
       height: 4,
@@ -646,6 +664,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 8,
+  },
+  submitGradientDisabled: {
+    backgroundColor: '#D1D5DB',
+    opacity: 0.6,
   },
   buttonContent: {
     flexDirection: 'row',

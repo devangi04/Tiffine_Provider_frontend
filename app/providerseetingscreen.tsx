@@ -1,5 +1,5 @@
 // screens/MealPreferencesScreen.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -15,7 +15,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  Animated,
+  Animated
 } from 'react-native';
 import { Text } from '@/components/ztext';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -27,9 +27,11 @@ import {
   clearError,
   resetMealPreferences 
 } from './store/slices/mealsslice';
-import { fetchUpiId, saveUpiId } from './store/slices/upislice'; // 🔥 IMPORT UPI ACTIONS
+import { fetchUpiId, saveUpiId } from './store/slices/upislice';
 import { MealService, MealType } from './store/types/meals';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
@@ -43,8 +45,8 @@ type MealPreferencesScreenNavigationProp = StackNavigationProp<
   'MealPreferences'
 >;
 
-// Clock Time Picker Component
-const ClockTimePicker = ({ 
+// Fixed Time Picker Component (remove the useEffect with preferences from here)
+const TimePickerModal = ({ 
   visible, 
   onClose, 
   onTimeSelect,
@@ -58,261 +60,381 @@ const ClockTimePicker = ({
   const [hour, setHour] = useState(10);
   const [minute, setMinute] = useState(30);
   const [isAM, setIsAM] = useState(true);
-  const clockSize = Math.min(width * 0.7, 350);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+  
+  // Animation values
+  const slideAnim = useRef(new Animated.Value(300)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // Refs for scroll views
+  const hourWheelRef = useRef<ScrollView>(null);
+  const minuteWheelRef = useRef<ScrollView>(null);
+  const ampmWheelRef = useRef<ScrollView>(null);
+
+  const ITEM_HEIGHT = 44;
+  const VISIBLE_ITEMS = 5;
+
+  // Time options
+  const hours = Array.from({ length: 12 }, (_, i) => i === 0 ? 12 : i);
+  const minutes = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+  const ampm = ['AM', 'PM'];
+
+  // Parse time string to extract hour, minute, and period
+  const parseTimeString = (timeStr: string) => {
+    try {
+      let timePart = timeStr;
+      let period = 'AM';
+      
+      if (timeStr.includes('AM') || timeStr.includes('PM')) {
+        const parts = timeStr.split(' ');
+        timePart = parts[0];
+        period = parts[1];
+      }
+      
+      const [h, m] = timePart.split(':').map(Number);
+      
+      let hour12 = h % 12;
+      if (hour12 === 0) hour12 = 12;
+      
+      if (!timeStr.includes('AM') && !timeStr.includes('PM')) {
+        period = h < 12 ? 'AM' : 'PM';
+      }
+      
+      const minuteVal = Math.round(m / 5) * 5;
+      
+      return {
+        hour: hour12,
+        minute: minuteVal,
+        isAM: period === 'AM'
+      };
+    } catch (error) {
+      return {
+        hour: 10,
+        minute: 30,
+        isAM: true
+      };
+    }
+  };
+
+  // Initialize time picker
+  useEffect(() => {
+    if (visible && !isInitialized) {
+      const parsedTime = parseTimeString(currentTime);
+      setHour(parsedTime.hour);
+      setMinute(parsedTime.minute);
+      setIsAM(parsedTime.isAM);
+      setIsInitialized(true);
+    }
+  }, [visible, currentTime, isInitialized]);
+
+  // Reset when modal closes
+  useEffect(() => {
+    if (!visible) {
+      setIsInitialized(false);
+    }
+  }, [visible]);
+
+  // Scroll to positions after state is set
+  useEffect(() => {
+    if (visible && isInitialized) {
+      const hourIndex = hours.indexOf(hour);
+      const minuteIndex = minutes.indexOf(minute);
+      const ampmIndex = isAM ? 0 : 1;
+      
+      setTimeout(() => {
+        if (hourIndex !== -1 && hourWheelRef.current) {
+          hourWheelRef.current.scrollTo({
+            y: hourIndex * ITEM_HEIGHT,
+            animated: false
+          });
+        }
+        
+        if (minuteIndex !== -1 && minuteWheelRef.current) {
+          minuteWheelRef.current.scrollTo({
+            y: minuteIndex * ITEM_HEIGHT,
+            animated: false
+          });
+        }
+        
+        if (ampmIndex !== -1 && ampmWheelRef.current) {
+          ampmWheelRef.current.scrollTo({
+            y: ampmIndex * ITEM_HEIGHT,
+            animated: false
+          });
+        }
+      }, 50);
+    }
+  }, [visible, isInitialized, hour, minute, isAM]);
 
   useEffect(() => {
-    if (currentTime) {
-      try {
-        const [time, period] = currentTime.split(' ');
-        const [h, m] = time.split(':').map(Number);
-        const hour12 = h % 12 || 12;
-        setHour(hour12);
-        setMinute(m);
-        setIsAM(period === 'AM');
-      } catch (error) {
-        // Handle error silently
-      }
+    if (visible) {
+      setModalVisible(true);
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 300,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setModalVisible(false);
+      });
     }
-  }, [currentTime]);
-
-  const handleHourSelect = (selectedHour: number) => {
-    setHour(selectedHour);
-  };
-
-  const handleMinuteSelect = (selectedMinute: number) => {
-    setMinute(selectedMinute);
-  };
+  }, [visible, slideAnim, fadeAnim]);
 
   const handleConfirm = () => {
-    const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')} ${isAM ? 'AM' : 'PM'}`;
+    let hour24;
+    if (isAM) {
+      hour24 = hour === 12 ? 0 : hour;
+    } else {
+      hour24 = hour === 12 ? 12 : hour + 12;
+    }
+    
+    const timeString = `${hour24.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')} ${isAM ? 'AM' : 'PM'}`;
     onTimeSelect(timeString);
     onClose();
   };
 
-  const renderClockFace = () => {
-    const hours = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-    const center = clockSize / 2;
-    const markerRadius = clockSize / 2 - 35;
-
-    return (
-      <View style={[styles.clockFace, { 
-        width: clockSize, 
-        height: clockSize,
-        borderRadius: clockSize / 2 
-      }]}>
-        {hours.map((h, index) => {
-          const angle = (index * 30) * (Math.PI / 180);
-          const x = center + markerRadius * Math.sin(angle) - 22;
-          const y = center - markerRadius * Math.cos(angle) - 22;
-
-          return (
-            <TouchableOpacity
-              key={h}
-              style={[
-                styles.hourMarker,
-                {
-                  left: x,
-                  top: y,
-                  backgroundColor: hour === h ? '#007AFF' : '#FFFFFF',
-                  borderColor: hour === h ? '#0056CC' : '#E5E7EB',
-                },
-              ]}
-              onPress={() => handleHourSelect(h)}
-            >
-              <Text
-                style={[
-                  styles.hourText,
-                  { color: hour === h ? '#FFFFFF' : '#1F2937' },
-                ]}
-              >
-                {h}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-
-        {/* Center dot */}
-        <View style={[styles.clockCenter, { 
-          left: center - 6, 
-          top: center - 6 
-        }]} />
+  const handleScrollEnd = (
+    event: any, 
+    items: Array<string | number>, 
+    setter: (value: any) => void,
+    wheelType: 'hour' | 'minute' | 'ampm'
+  ) => {
+    const y = event.nativeEvent.contentOffset.y;
+    const index = Math.round(y / ITEM_HEIGHT);
+    
+    if (index >= 0 && index < items.length) {
+      const newValue = items[index];
+      setter(newValue);
+      
+      setTimeout(() => {
+        let ref;
+        switch(wheelType) {
+          case 'hour':
+            ref = hourWheelRef;
+            break;
+          case 'minute':
+            ref = minuteWheelRef;
+            break;
+          case 'ampm':
+            ref = ampmWheelRef;
+            break;
+        }
         
-        {/* Hour hand */}
-        <Animated.View
-          style={[
-            styles.hourHand,
-            {
-              transform: [
-                { rotate: `${(hour % 12) * 30 + minute * 0.5}deg` },
-                { translateX: -2.5 },
-              ],
-              left: center,
-              top: center,
-            },
-          ]}
-        />
-        
-        {/* Minute hand */}
-        <Animated.View
-          style={[
-            styles.minuteHand,
-            {
-              transform: [
-                { rotate: `${minute * 6}deg` },
-                { translateX: -1.5 },
-              ],
-              left: center,
-              top: center,
-            },
-          ]}
-        />
-      </View>
-    );
+        if (ref && ref.current) {
+          ref.current.scrollTo({
+            y: index * ITEM_HEIGHT,
+            animated: true
+          });
+        }
+      }, 100);
+    }
   };
 
-  const renderMinuteSelector = () => {
-    const minutes = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+const renderWheel = (
+  items: Array<string | number>,
+  selectedValue: string | number,
+  wheelType: 'hour' | 'minute' | 'ampm'
+) => {
+  // FIXED: Calculate padding to center the content properly
+  const wheelHeight = 240;
+  const itemHeight = ITEM_HEIGHT;
+  const visibleItems = VISIBLE_ITEMS;
+  
+  // The padding should make the selected item appear in the center
+  const paddingTop = (wheelHeight - itemHeight) / 2;
+  const paddingBottom = (wheelHeight - itemHeight) / 2;
+  
+  const wheelRef = wheelType === 'hour' ? hourWheelRef : 
+                  wheelType === 'minute' ? minuteWheelRef : 
+                  ampmWheelRef;
 
-    return (
+  return (
+    <View style={[
+      styles.wheelContainer,
+      wheelType === 'ampm' && styles.ampmWheelContainer
+    ]}>
       <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.minuteSelector}
-        contentContainerStyle={styles.minuteSelectorContent}
+        ref={wheelRef}
+        showsVerticalScrollIndicator={false}
+        snapToInterval={itemHeight}
+        decelerationRate="fast"
+        onMomentumScrollEnd={(e) => handleScrollEnd(e, items, 
+          wheelType === 'hour' ? setHour : 
+          wheelType === 'minute' ? setMinute : 
+          (val) => setIsAM(val === 'AM'),
+          wheelType
+        )}
+        scrollEventThrottle={16}
+        contentContainerStyle={{
+          paddingTop,
+          paddingBottom,
+        }}
       >
-        {minutes.map((m) => (
-          <TouchableOpacity
-            key={m}
+        {items.map((item, index) => (
+          <View
+            key={`${wheelType}-${index}`}
             style={[
-              styles.minuteOption,
-              minute === m && styles.selectedMinuteOption,
+              styles.wheelItem,
+              wheelType === 'ampm' && styles.ampmWheelItem
             ]}
-            onPress={() => handleMinuteSelect(m)}
           >
-            <Text
-              style={[
-                styles.minuteOptionText,
-                minute === m && styles.selectedMinuteOptionText,
-              ]}
-            >
-              {m.toString().padStart(2, '0')}
+            <Text style={[
+              styles.wheelItemText,
+              wheelType === 'ampm' && styles.ampmWheelItemText,
+              item === selectedValue && styles.wheelItemTextSelected,
+            ]}>
+              {wheelType === 'hour' || wheelType === 'minute' 
+                ? item.toString().padStart(2, '0') 
+                : item.toString()
+              }
             </Text>
-          </TouchableOpacity>
+          </View>
         ))}
       </ScrollView>
-    );
-  };
-
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalOverlay}>
-        <TouchableOpacity
-          style={styles.modalBackground}
-          activeOpacity={1}
-          onPress={onClose}
-        />
-        
-        <View style={styles.clockPickerContainer}>
-          <View style={styles.clockPickerHeader}>
-            <Text style={styles.clockPickerTitle}>Select Time</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Icon name="close" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.clockDisplay}>
-            <Text style={styles.currentTimeDisplay}>
-              {hour.toString().padStart(2, '0')}:{minute.toString().padStart(2, '0')}
-            </Text>
-            <View style={styles.ampmSelector}>
-              <TouchableOpacity
-                style={[styles.ampmOption, isAM && styles.selectedAmpmOption]}
-                onPress={() => setIsAM(true)}
-              >
-                <Text style={[styles.ampmText, isAM && styles.selectedAmpmText]}>
-                  AM
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.ampmOption, !isAM && styles.selectedAmpmOption]}
-                onPress={() => setIsAM(false)}
-              >
-                <Text style={[styles.ampmText, !isAM && styles.selectedAmpmText]}>
-                  PM
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <View style={styles.clockContainer}>
-            {renderClockFace()}
-          </View>
-
-          <View style={styles.minuteSection}>
-            <Text style={styles.minuteLabel}>Select Minutes</Text>
-            {renderMinuteSelector()}
-          </View>
-
-          <View style={styles.clockPickerActions}>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={onClose}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.confirmButton}
-              onPress={handleConfirm}
-            >
-              <Text style={styles.confirmButtonText}>Set Time</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-};
-
-// Price Input Component
-const PriceInput = ({ 
-  label, 
-  value, 
-  onChange, 
-  placeholder = "0",
-  disabled = false 
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  disabled?: boolean;
-}) => {
-  return (
-    <View style={styles.priceInputContainer}>
-      <Text style={styles.priceLabel}>{label}</Text>
-      <View style={styles.priceInputWrapper}>
-        <Icon name="currency-rupee" size={20} color="#666" />
-        <TextInput
-          style={[styles.priceInput, disabled && styles.priceInputDisabled]}
-          value={value}
-          onChangeText={onChange}
-          placeholder={placeholder}
-          placeholderTextColor="#94A3B8"
-          keyboardType="numeric"
-          editable={!disabled}
-        />
+      
+      {/* Selection highlight - positioned correctly */}
+      <View style={[
+        styles.selectionHighlight,
+        wheelType === 'ampm' && styles.ampmSelectionHighlight
+      ]} pointerEvents="none">
+        <View style={styles.selectionHighlightLine} />
+        <View style={styles.selectionHighlightLine} />
       </View>
     </View>
   );
 };
+  if (!modalVisible && !visible) return null;
+
+  return (
+    <Modal
+      visible={modalVisible}
+      transparent
+      animationType="none"
+      onRequestClose={onClose}
+      statusBarTranslucent={true}
+    >
+      <Animated.View style={[styles.modalContainer, { opacity: fadeAnim }]}>
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        
+        <Animated.View 
+          style={[
+            styles.modalContent,
+            {
+              transform: [{ translateY: slideAnim }],
+            }
+          ]}
+        >
+          <View style={styles.timePickerHeader}>
+            <TouchableOpacity onPress={onClose} style={styles.cancelButton}>
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.timePickerTitle}>Select Time</Text>
+            <TouchableOpacity onPress={handleConfirm} style={styles.confirmButton}>
+              <Text style={styles.confirmButtonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Time Display Preview */}
+          <View style={styles.timeDisplayPreview}>
+            <Text style={styles.previewTime}>
+              {hour.toString().padStart(2, '0')}:{minute.toString().padStart(2, '0')}
+            </Text>
+            <Text style={styles.previewPeriod}>
+              {isAM ? 'AM' : 'PM'}
+            </Text>
+          </View>
+
+          {/* iOS-style Wheel Picker - Fixed Alignment */}
+          <View style={styles.iosWheelContainer}>
+            {renderWheel(hours, hour, 'hour')}
+            
+            <View style={styles.wheelSeparator}>
+              <Text style={styles.wheelSeparatorText}>:</Text>
+            </View>
+            
+            {renderWheel(minutes, minute, 'minute')}
+            
+            <View style={styles.emptySeparator}>
+              <Text style={styles.wheelSeparatorText} />
+            </View>
+            
+            {renderWheel(ampm, isAM ? 'AM' : 'PM', 'ampm')}
+          </View>
+
+          {/* Bottom button for confirm */}
+          <TouchableOpacity
+            style={styles.iosConfirmButton}
+            onPress={handleConfirm}
+          >
+            <Text style={styles.iosConfirmButtonText}>
+              Set Time
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+};
+
+// Card Component for sections
+const Card = ({ children, style }: { children: React.ReactNode; style?: any }) => (
+  <View style={[styles.card, style]}>
+    {children}
+  </View>
+);
+
+// Section Header Component
+const SectionHeader = ({ 
+  icon, 
+  title, 
+  subtitle,
+  rightElement 
+}: { 
+  icon: string; 
+  title: string; 
+  subtitle?: string;
+  rightElement?: React.ReactNode;
+}) => (
+  <View style={styles.sectionHeader}>
+    <View style={styles.iconCircle}>
+      <Icon name={icon} size={22} color="#15803d" />
+    </View>
+    <View style={styles.sectionHeaderText}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {subtitle && <Text style={styles.sectionSubtitle}>{subtitle}</Text>}
+    </View>
+    {rightElement}
+  </View>
+);
 
 const MealPreferencesScreen = () => {
   const navigation = useNavigation<MealPreferencesScreenNavigationProp>();
+  const router = useRouter();
+  const params = useLocalSearchParams();
   const dispatch = useAppDispatch();
   
   const provider = useAppSelector((state) => state.provider);
@@ -327,7 +449,6 @@ const MealPreferencesScreen = () => {
     }
   );
 
-  // 🔥 GET UPI STATE
   const upi = useAppSelector((state) => state.upi);
 
   const [mealService, setMealService] = useState<MealService>({
@@ -343,12 +464,63 @@ const MealPreferencesScreen = () => {
     },
   });
 
-  // 🔥 UPI STATE
   const [localUpiId, setLocalUpiId] = useState('');
   const [savingUpi, setSavingUpi] = useState(false);
-
   const [timePickerVisible, setTimePickerVisible] = useState(false);
   const [currentEditingMeal, setCurrentEditingMeal] = useState<MealType | null>(null);
+  const [hasJustSaved, setHasJustSaved] = useState(false);
+
+  // Get parameters for redirect
+  const isRequiredSetup = params.requireSetup === 'true';
+  const redirectFrom = params.redirectFrom as string;
+
+
+  useEffect(() => {
+  const isRequiredSetup = params.requireSetup === 'true';
+  const redirectFrom = params.redirectFrom as string;
+
+  // Handle redirect after successful save when required setup ONLY
+  if (preferences?.mealService && isRequiredSetup && hasJustSaved) {
+    const hasMealPreferences = preferences.mealService && 
+      (preferences.mealService.lunch?.enabled || 
+       preferences.mealService.dinner?.enabled);
+    
+    if (hasMealPreferences) {
+      console.log('Initial setup complete, redirecting...');
+      // Small delay to show success message
+      setTimeout(() => {
+        if (redirectFrom) {
+          router.replace(redirectFrom);
+        } else {
+          router.replace('/dashboard');
+        }
+      }, 1500);
+    }
+    setHasJustSaved(false);
+  }
+}, [preferences, params, router, hasJustSaved]);
+  // Handle redirect after successful save when required setup
+  useEffect(() => {
+    if (preferences?.mealService && isRequiredSetup && hasJustSaved) {
+      // Check if any meal service is enabled after save
+      const hasMealPreferences = preferences.mealService && 
+        (preferences.mealService.lunch?.enabled || 
+         preferences.mealService.dinner?.enabled);
+      
+      if (hasMealPreferences) {
+        console.log('Meal preferences set, redirecting...');
+        // After successful setup, redirect back
+        setTimeout(() => {
+          if (redirectFrom && redirectFrom !== '/providerseetingscreen') {
+            router.replace(redirectFrom);
+          } else {
+            router.replace('/dashboard');
+          }
+        }, 1500); // Small delay to show success message
+      }
+      setHasJustSaved(false);
+    }
+  }, [preferences, isRequiredSetup, redirectFrom, router, hasJustSaved]);
 
   useEffect(() => {
     if (error) {      
@@ -369,7 +541,7 @@ const MealPreferencesScreen = () => {
   useEffect(() => {
     if (providerId) {
       dispatch(fetchMealPreferences());
-      dispatch(fetchUpiId()); // 🔥 FETCH UPI ID
+      dispatch(fetchUpiId());
     } else {
       Alert.alert('Error', 'Provider information not found. Please login again.');
     }
@@ -394,7 +566,6 @@ const MealPreferencesScreen = () => {
     }
   }, [preferences]);
 
-  // 🔥 UPDATE LOCAL UPI ID WHEN FETCHED
   useEffect(() => {
     if (upi.upiId) {
       setLocalUpiId(upi.upiId);
@@ -446,14 +617,12 @@ const MealPreferencesScreen = () => {
     setCurrentEditingMeal(null);
   };
 
-  // 🔥 HANDLE UPI ID SAVE
   const handleSaveUpiId = async () => {
     if (!localUpiId.trim()) {
       Alert.alert('Error', 'Please enter your UPI ID');
       return;
     }
 
-    // Basic format validation
     const upiRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+$/;
     if (!upiRegex.test(localUpiId)) {
       Alert.alert('Invalid Format', 'Please enter a valid UPI ID (e.g., username@oksbi)');
@@ -509,88 +678,11 @@ const MealPreferencesScreen = () => {
       
       if (result) {
         Alert.alert('Success', 'Meal preferences updated successfully!');
+        setHasJustSaved(true);
       }
     } catch (error: any) {
+      // Error handled by reducer
     }
-  };
-
-  // 🔥 RENDER UPI SECTION
-  const renderUpiSection = () => {
-    const isValidFormat = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+$/.test(localUpiId);
-    const hasExistingUpi = !!upi.upiId;
-    const isChanged = localUpiId !== upi.upiId;
-
-    return (
-      <View style={styles.upiSection}>
-        <View style={styles.upiHeader}>
-          <Icon name="payment" size={24} color="#8B5CF6" />
-          <View style={styles.upiTitleContainer}>
-            <Text style={styles.upiTitle}>UPI Payments</Text>
-            <Text style={styles.upiSubtitle}>Accept digital payments from customers</Text>
-          </View>
-          {hasExistingUpi && !isChanged && (
-            <View style={styles.upiVerifiedBadge}>
-              <Icon name="check-circle" size={16} color="#10B981" />
-              <Text style={styles.upiVerifiedText}>Saved</Text>
-            </View>
-          )}
-        </View>
-
-        <View style={styles.upiInputContainer}>
-          <Text style={styles.upiLabel}>Your UPI ID</Text>
-          <View style={[
-            styles.upiInputWrapper,
-            localUpiId && !isValidFormat && styles.upiInputError
-          ]}>
-            <Icon name="account-balance-wallet" size={20} color="#666" />
-            <TextInput
-              style={styles.upiInput}
-              value={localUpiId}
-              onChangeText={setLocalUpiId}
-              placeholder="username@upi"
-              placeholderTextColor="#94A3B8"
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!savingUpi}
-            />
-            {localUpiId && !savingUpi && (
-              <TouchableOpacity onPress={() => setLocalUpiId('')}>
-                <Icon name="clear" size={20} color="#999" />
-              </TouchableOpacity>
-            )}
-          </View>
-          {localUpiId && !isValidFormat && (
-            <Text style={styles.upiErrorText}>
-              Invalid format. Example: username@oksbi
-            </Text>
-          )}
-          <Text style={styles.upiHelperText}>
-            Example: username@oksbi, username@okicici
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          style={[
-            styles.upiSaveButton, 
-            savingUpi && styles.upiSaveButtonDisabled,
-            (!localUpiId.trim() || !isValidFormat || (!isChanged && hasExistingUpi)) && styles.upiSaveButtonDisabled
-          ]}
-          onPress={handleSaveUpiId}
-          disabled={savingUpi || !localUpiId.trim() || !isValidFormat || (!isChanged && hasExistingUpi)}
-        >
-          {savingUpi ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <>
-              <Icon name="save" size={18} color="#fff" />
-              <Text style={styles.upiSaveButtonText}>
-                {hasExistingUpi ? (isChanged ? 'Update UPI ID' : 'Saved') : 'Save UPI ID'}
-              </Text>
-            </>
-          )}
-        </TouchableOpacity>
-      </View>
-    );
   };
 
   const renderMealSection = (mealType: MealType, mealName: string) => {
@@ -598,67 +690,103 @@ const MealPreferencesScreen = () => {
     if (!meal) return null;
 
     return (
-      <View style={styles.mealSection}>
-        <View style={styles.mealHeader}>
-          <View style={styles.mealTitleContainer}>
-            <Icon 
-              name={mealType === 'lunch' ? "lunch-dining" : "dinner-dining"} 
-              size={24} 
-              color={meal.enabled ? "#007AFF" : "#666"} 
+      <Card style={styles.mealCard}>
+        <SectionHeader
+          icon={mealType === 'lunch' ? "restaurant" : "restaurant"}
+          title={`${mealName} Service`}
+          subtitle={meal.enabled ? "Active" : "Inactive"}
+          rightElement={
+            <Switch
+              value={meal.enabled}
+              onValueChange={() => toggleMealEnabled(mealType)}
+              trackColor={{ false: '#E5E7EB', true: '#d3f4dbff' }}
+              thumbColor={meal.enabled ? '#15803d' : '#9CA3AF'}
+              ios_backgroundColor="#E5E7EB"
             />
-            <Text style={styles.mealTitle}>{mealName} Service</Text>
-          </View>
-          <Switch
-            value={meal.enabled}
-            onValueChange={() => toggleMealEnabled(mealType)}
-            trackColor={{ false: '#E5E7EB', true: '#BBDEFB' }}
-            thumbColor={meal.enabled ? '#007AFF' : '#9CA3AF'}
-            ios_backgroundColor="#E5E7EB"
-          />
-        </View>
-
+          }
+        />
+        
         {meal.enabled && (
-          <View style={styles.mealOptions}>
-            <View style={styles.priceSection}>
-              <Text style={styles.sectionLabel}>Price</Text>
-              <PriceInput
-                label={`${mealName} Price`}
-                value={meal.price}
-                onChange={(value) => updatePrice(mealType, value)}
-                placeholder="70"
-              />
-            </View>
-
-            <View style={styles.timeSection}>
-              <Text style={styles.sectionLabel}>Cutoff Time</Text>
-              <TouchableOpacity 
-                style={styles.timeInputContainer}
-                onPress={() => openTimePicker(mealType)}
-              >
-                <Icon name="access-time" size={20} color="#007AFF" />
-                <View style={styles.timeInputContent}>
-                  <Text style={styles.timeDisplay}>
-                    {meal.cutoffTime}
-                  </Text>
-                  <Text style={styles.timeNote}>
-                    Tap to set cutoff time
-                  </Text>
+          <>
+            <View style={styles.formRow}>
+              <View style={styles.formColumn}>
+                <Text style={styles.inputLabel}>Daily Price</Text>
+                <View style={styles.inputContainer}>
+                  <Icon name="currency-rupee" size={20} color="#666" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    value={meal.price}
+                    onChangeText={(value) => updatePrice(mealType, value)}
+                    placeholder="70"
+                    placeholderTextColor="#94A3B8"
+                    keyboardType="numeric"
+                  />
                 </View>
-                <Icon name="chevron-right" size={24} color="#666" />
-              </TouchableOpacity>
+              </View>
+              
+              <View style={styles.formColumn}>
+                <Text style={styles.inputLabel}>Cutoff Time</Text>
+                <TouchableOpacity 
+                  style={styles.timeSelector}
+                  onPress={() => openTimePicker(mealType)}
+                >
+                  <Icon name="access-time" size={20} color="#15803d" />
+                  <View style={styles.timeSelectorContent}>
+                    <Text style={styles.timeDisplay}>{meal.cutoffTime}</Text>
+                  </View>
+                  <Icon name="chevron-right" size={20} color="#666" />
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+            
+            <View style={styles.mealInfo}>
+              <Icon name="info" size={16} color="#15803d" />
+              <Text style={styles.mealInfoText}>
+                Orders will auto-confirm after this time
+              </Text>
+            </View>
+          </>
         )}
-      </View>
+      </Card>
     );
   };
+
+  const renderInfoCard = () => (
+    <Card style={styles.infoCard}>
+      <SectionHeader
+        icon="lightbulb"
+        title="How It Works"
+      />
+      
+      <View style={styles.infoList}>
+        <View style={styles.infoItem}>
+          <Icon name="check-circle" size={18} color="#4CAF50" />
+          <Text style={styles.infoText}>Enable meals you want to offer</Text>
+        </View>
+        <View style={styles.infoItem}>
+          <Icon name="check-circle" size={18} color="#4CAF50" />
+          <Text style={styles.infoText}>Set competitive prices for each meal</Text>
+        </View>
+        <View style={styles.infoItem}>
+          <Icon name="check-circle" size={18} color="#4CAF50" />
+          <Text style={styles.infoText}>Configure cutoff times for order management</Text>
+        </View>
+        <View style={styles.infoItem}>
+          <Icon name="check-circle" size={18} color="#4CAF50" />
+          <Text style={styles.infoText}>System automatically confirms orders after cutoff</Text>
+        </View>
+      </View>
+    </Card>
+  );
 
   if (loading && !preferences) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Loading preferences...</Text>
+      
+        <View style={styles.loadingContent}>
+          <ActivityIndicator size="large" color="#15803d" />
+          <Text style={styles.loadingText}>Loading your preferences...</Text>
+        </View>
       </SafeAreaView>
     );
   }
@@ -669,86 +797,48 @@ const MealPreferencesScreen = () => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-        
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-            disabled={saving || savingUpi}
-          >
-            <Icon name="arrow-back" size={24} color="#050000ff" />
-          </TouchableOpacity>
-          
-          <View style={styles.headerTitleContainer}>
-            <Text style={styles.headerTitle}>Provider Settings</Text>
-            <Text style={styles.headerSubtitle}>Configure your services</Text>
-          </View>
-          
-          <View style={styles.headerSpacer} />
-        </View>
-
+         <StatusBar barStyle="light-content" />
         <ScrollView 
           style={styles.scrollView} 
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.form}>
-            {/* 🔥 UPI SECTION FIRST */}
-            {renderUpiSection()}
-            
-            {/* MEAL SECTIONS */}
-            {renderMealSection('lunch', 'Lunch')}
-            {renderMealSection('dinner', 'Dinner')}
-
-            <View style={styles.infoCard}>
-              <View style={styles.infoHeader}>
-                <Icon name="info" size={20} color="#1976d2" />
-                <Text style={styles.infoTitle}>How it works</Text>
-              </View>
-              <View style={styles.infoList}>
-                <View style={styles.infoItem}>
-                  <Icon name="check-circle" size={16} color="#4CAF50" />
-                  <Text style={styles.infoText}>Enable meals you want to offer</Text>
-                </View>
-                <View style={styles.infoItem}>
-                  <Icon name="check-circle" size={16} color="#4CAF50" />
-                  <Text style={styles.infoText}>Set price for each meal</Text>
-                </View>
-                <View style={styles.infoItem}>
-                  <Icon name="check-circle" size={16} color="#4CAF50" />
-                  <Text style={styles.infoText}>Set cutoff times for each meal</Text>
-                </View>
-                <View style={styles.infoItem}>
-                  <Icon name="check-circle" size={16} color="#4CAF50" />
-                  <Text style={styles.infoText}>System auto-confirms orders after cutoff</Text>
-                </View>
-              </View>
-            </View>
-          </View>
+          {renderMealSection('lunch', 'Lunch')}
+          {renderMealSection('dinner', 'Dinner')}
+          {renderInfoCard()}
+          
+          <View style={styles.spacer} />
         </ScrollView>
 
-        <ClockTimePicker
+        <TimePickerModal
           visible={timePickerVisible}
           onClose={() => setTimePickerVisible(false)}
           onTimeSelect={handleTimeSelect}
           currentTime={currentEditingMeal ? mealService[currentEditingMeal]!.cutoffTime : '10:30 AM'}
         />
 
+        {/* Fixed Save Button */}
         <View style={styles.footer}>
           <TouchableOpacity 
-            style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+            style={[styles.saveButton, (saving || savingUpi) && styles.saveButtonDisabled]}
             onPress={handleSavePreferences}
             disabled={saving || savingUpi}
           >
-            {saving ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <>
-                <Icon name="save" size={20} color="#fff" />
-                <Text style={styles.saveButtonText}>Save Meal Settings</Text>
-              </>
-            )}
+            <LinearGradient
+              colors={['#15803d', '#15803d']}
+              style={[styles.saveButtonGradient, (saving || savingUpi) && styles.saveButtonGradientDisabled]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              {saving ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                  <Icon name="save" size={20} color="#fff" />
+                  <Text style={styles.saveButtonText}>Save All Settings</Text>
+                </>
+              )}
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -759,543 +849,392 @@ const MealPreferencesScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#F8FAFC',
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
     backgroundColor: '#F8FAFC',
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#666',
-    fontFamily: 'System',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitleContainer: {
+  loadingContent: {
     flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#050000ff',
-    fontFamily: 'System',
-  },
-  headerSubtitle: {
-    fontSize: 14,
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
     color: '#6B7280',
     fontFamily: 'System',
-    marginTop: 2,
-  },
-  headerSpacer: {
-    width: 40,
+    fontWeight: '500',
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 100,
+    padding: 16,
   },
-  form: {
-    padding: 20,
+  spacer: {
+    height: 20,
   },
-  // 🔥 UPI STYLES
-  upiSection: {
+  // Card Styles
+  card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 3,
   },
-  upiHeader: {
+  // Section Header
+  sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
-    gap: 12,
+    marginBottom: 20,
   },
-  upiTitleContainer: {
+  iconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#d3f4dbff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  sectionHeaderText: {
     flex: 1,
   },
-  upiTitle: {
+  sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#1F2937',
     fontFamily: 'System',
   },
-  upiSubtitle: {
+  sectionSubtitle: {
     fontSize: 14,
     color: '#6B7280',
     fontFamily: 'System',
     marginTop: 2,
   },
-  upiVerifiedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#D1FAE5',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  upiVerifiedText: {
-    fontSize: 12,
-    color: '#065F46',
-    fontWeight: '600',
-  },
-  upiInputContainer: {
-    marginBottom: 20,
-  },
-  upiLabel: {
+  // Form Styles
+  inputLabel: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#4B5563',
     marginBottom: 8,
     fontFamily: 'System',
   },
-  upiInputWrapper: {
+  inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F8FAFC',
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
+    borderColor: '#E2E8F0',
     paddingHorizontal: 16,
+    height: 52,
   },
-  upiInputError: {
-    borderColor: '#EF4444',
-    backgroundColor: '#FEF2F2',
+  inputIcon: {
+    marginRight: 12,
   },
-  upiInput: {
+  input: {
     flex: 1,
-    paddingVertical: 14,
     fontSize: 16,
     color: '#1F2937',
     fontFamily: 'System',
-    marginLeft: 8,
-    marginRight: 8,
+    paddingVertical: 0,
   },
-  upiErrorText: {
-    fontSize: 12,
-    color: '#EF4444',
-    marginTop: 6,
-    fontFamily: 'System',
-  },
-  upiHelperText: {
-    fontSize: 12,
-    color: '#94A3B8',
-    fontFamily: 'System',
-    marginTop: 6,
-    fontStyle: 'italic',
-  },
-  upiSaveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#8B5CF6',
-    paddingVertical: 14,
-    borderRadius: 12,
-  },
-  upiSaveButtonDisabled: {
-    backgroundColor: '#C7D2FE',
-  },
-  upiSaveButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'System',
-  },
-  // EXISTING MEAL STYLES
-  mealSection: {
+  // Meal Card
+  mealCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
   },
-  mealHeader: {
+  formRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  mealTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  mealTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-    fontFamily: 'System',
-  },
-  mealOptions: {
-    marginTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    paddingTop: 16,
-  },
-  sectionLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#4B5563',
-    marginBottom: 8,
-    fontFamily: 'System',
-  },
-  priceSection: {
-    marginBottom: 20,
-  },
-  priceInputContainer: {
+    gap: 16,
     marginBottom: 16,
   },
-  priceLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6B7280',
-    marginBottom: 8,
-    fontFamily: 'System',
-  },
-  priceInputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 16,
-  },
-  priceInput: {
+  formColumn: {
     flex: 1,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: '#1F2937',
-    fontFamily: 'System',
-    marginLeft: 8,
   },
-  priceInputDisabled: {
-    color: '#9CA3AF',
-  },
-  timeSection: {
-    marginBottom: 8,
-  },
-  timeInputContainer: {
+  timeSelector: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    padding: 16,
+    backgroundColor: '#F8FAFC',
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 16,
+    height: 52,
   },
-  timeInputContent: {
+  timeSelectorContent: {
     flex: 1,
     marginLeft: 12,
   },
   timeDisplay: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#007AFF',
+    color: '#15803d',
     fontFamily: 'System',
   },
-  timeNote: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontFamily: 'System',
-    marginTop: 2,
+  mealInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#edf4efff',
+    padding: 12,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#15803d',
   },
+  mealInfoText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#15803d',
+    fontFamily: 'System',
+  },
+  // Info Card
+  infoCard: {
+    backgroundColor: '#f0fff4ff',
+    borderWidth: 1,
+    borderColor: '#d3f4dbff',
+  },
+  infoList: {
+    gap: 12,
+  },
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#15803d',
+    fontFamily: 'System',
+    lineHeight: 20,
+  },
+  // Footer
   footer: {
     padding: 20,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: '#F1F5F9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 5,
   },
   saveButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  saveButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#007AFF',
     paddingVertical: 16,
-    borderRadius: 12,
+  },
+  saveButtonGradientDisabled: {
+    opacity: 0.7,
   },
   saveButtonDisabled: {
-    backgroundColor: '#9CA3AF',
+    opacity: 0.7,
   },
   saveButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     fontFamily: 'System',
   },
-  infoCard: {
-    backgroundColor: '#E3F2FD',
-    borderRadius: 16,
-    padding: 20,
-    marginTop: 8,
-  },
-  infoHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  infoTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1976d2',
-    fontFamily: 'System',
-  },
-  infoList: {
-    gap: 8,
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#424242',
-    fontFamily: 'System',
+  // Time Picker Modal Styles
+  modalContainer: {
     flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
   },
-  // Clock Time Picker Styles
   modalOverlay: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  modalBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  clockPickerContainer: {
+  modalContent: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 24,
-    width: width * 0.9,
-    maxWidth: 400,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.25,
     shadowRadius: 20,
     elevation: 10,
   },
-  clockPickerHeader: {
+  timePickerHeader: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  clockPickerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1F2937',
-    fontFamily: 'System',
-  },
-  closeButton: {
-    padding: 4,
-  },
-  clockDisplay: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  currentTimeDisplay: {
-    fontSize: 36,
-    fontWeight: '700',
-    color: '#007AFF',
-    fontFamily: 'System',
-    marginBottom: 8,
-  },
-  ampmSelector: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  ampmOption: {
     paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  selectedAmpmOption: {
-    backgroundColor: '#007AFF',
-    borderColor: '#0056CC',
-  },
-  ampmText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6B7280',
-    fontFamily: 'System',
-  },
-  selectedAmpmText: {
-    color: '#FFFFFF',
-  },
-  clockContainer: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  clockFace: {
-    width: width * 0.6,
-    height: width * 0.6,
-    borderRadius: width * 0.3,
-    backgroundColor: '#F9FAFB',
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    position: 'relative',
-  },
-  clockCenter: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#007AFF',
-    marginLeft: -5,
-    marginTop: -5,
-    zIndex: 10,
-  },
-  hourHand: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    width: 4,
-    height: width * 0.15,
-    backgroundColor: '#007AFF',
-    borderRadius: 2,
-    marginLeft: -2,
-    marginTop: -width * 0.15,
-    transformOrigin: 'bottom center',
-    zIndex: 5,
-  },
-  minuteHand: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    width: 3,
-    height: width * 0.2,
-    backgroundColor: '#666',
-    borderRadius: 1.5,
-    marginLeft: -1.5,
-    marginTop: -width * 0.2,
-    transformOrigin: 'bottom center',
-    zIndex: 6,
-  },
-  hourMarker: {
-    position: 'absolute',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  hourText: {
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'System',
-  },
-  minuteSection: {
-    marginBottom: 24,
-  },
-  minuteLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4B5563',
-    marginBottom: 12,
-    fontFamily: 'System',
-    textAlign: 'center',
-  },
-  minuteSelector: {
-    maxHeight: 50,
-  },
-  minuteSelectorContent: {
-    paddingHorizontal: 10,
-  },
-  minuteOption: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-    marginHorizontal: 4,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  selectedMinuteOption: {
-    backgroundColor: '#007AFF',
-    borderColor: '#0056CC',
-  },
-  minuteOptionText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6B7280',
-    fontFamily: 'System',
-  },
-  selectedMinuteOptionText: {
-    color: '#FFFFFF',
-  },
-  clockPickerActions: {
-    flexDirection: 'row',
-    gap: 12,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
   cancelButton: {
-    flex: 1,
-    padding: 16,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
-    alignItems: 'center',
+    padding: 8,
   },
   cancelButtonText: {
-    fontSize: 16,
+    fontSize: 17,
+    color: '#15803d',
+    fontWeight: '400',
+    fontFamily: 'System',
+  },
+  timePickerTitle: {
+    fontSize: 17,
     fontWeight: '600',
-    color: '#4B5563',
+    color: '#000000',
     fontFamily: 'System',
   },
   confirmButton: {
-    flex: 1,
-    padding: 16,
-    backgroundColor: '#007AFF',
+    padding: 8,
+  },
+  confirmButtonText: {
+    fontSize: 17,
+    color: '#15803d',
+    fontWeight: '600',
+    fontFamily: 'System',
+  },
+  timeDisplayPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+    backgroundColor: '#F8F8F8',
+    marginHorizontal: 20,
+    marginTop: 20,
+    borderRadius: 12,
+  },
+  previewTime: {
+    fontSize: 48,
+    fontWeight: '700',
+    color: '#000000',
+    fontFamily: 'System',
+    letterSpacing: 1,
+  },
+  previewPeriod: {
+    fontSize: 24,
+    fontWeight: '500',
+    color: '#666666',
+    fontFamily: 'System',
+    marginLeft: 12,
+    marginTop: 12,
+  },
+  iosWheelContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: 240,
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  wheelContainer: {
+    height: 240,
+    flex:1,
+    maxWidth: 90,
+    width: 80,
+    position: 'relative',
+  },
+  ampmWheelContainer: {
+    height: 240,
+    width: 70,
+    position: 'relative',
+  },
+  wheelItem: {
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ampmWheelItem: {
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+  wheelItemText: {
+    fontSize: 24,
+    color: '#666666',
+    fontWeight: '400',
+    fontFamily: 'System',
+    textAlign: 'center',
+  },
+  ampmWheelItemText: {
+    fontSize: 22,
+    color: '#666666',
+    fontWeight: '400',
+    fontFamily: 'System',
+    textAlign: 'center',
+    width: '100%',
+  },
+  wheelItemTextSelected: {
+    color: '#000000',
+    fontWeight: '500',
+    fontSize: 26,
+  },
+  selectionHighlight: {
+    position: 'absolute',
+    top: '50%',
+    left: 16,
+    right: 16,
+    height: 44,
+    marginTop: -22,
+    justifyContent: 'space-between',
+    pointerEvents: 'none',
+  },
+  ampmSelectionHighlight: {
+    position: 'absolute',
+    top: '50%',
+    left: 8,
+    right: 8,
+    height: 44,
+    marginBottom:20,
+    justifyContent: 'space-between',
+    pointerEvents: 'none',
+  },
+  selectionHighlightLine: {
+    height: 2,
+    backgroundColor: '#898484',
+    marginHorizontal: 8,
+  },
+  wheelSeparator: {
+    height: 240,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  emptySeparator: {
+    height: 240,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    minWidth: 10,
+  },
+  wheelSeparatorText: {
+    fontSize: 24,
+    color: '#000000',
+    fontWeight: '500',
+    fontFamily: 'System',
+  },
+  iosConfirmButton: {
+    backgroundColor: '#15803d',
+    marginHorizontal: 20,
+    marginBottom: 30,
+    paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
   },
-  confirmButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+  iosConfirmButtonText: {
     color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '600',
     fontFamily: 'System',
   },
 });

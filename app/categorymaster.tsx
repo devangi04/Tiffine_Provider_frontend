@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import axios from 'axios';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import { Save, X, Edit2, Trash2 } from 'lucide-react-native';
+import { Save, X, Edit2, Trash2,Check } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppSelector } from './store/hooks';
 import BottomNavBar from '@/components/navbar';
@@ -67,7 +67,7 @@ const handleAddCategory = async () => {
 
   // ✅ Prevent API call if limit is reached
   if (categories.length >= 10) {
-    return Alert.alert('Limit Reached', 'You can only add up to 10 categories.');
+    return Alert.alert('Limit Reached', 'You can only add Total 10 categories.');
   }
 
   try {
@@ -130,7 +130,7 @@ const handleAddCategory = async () => {
   };
 
   if (loading && categories.length === 0) {
-    return <View style={styles.loading}><ActivityIndicator size="large" color="#2c95f8" /></View>;
+    return <View style={styles.loading}><ActivityIndicator size="large" color="#15803d" /></View>;
   }
 
   return (
@@ -153,7 +153,7 @@ const handleAddCategory = async () => {
           returnKeyType="done"
           onSubmitEditing={handleAddCategory}
         />
-        <TouchableOpacity style={styles.saveButton} onPress={handleAddCategory}><Save size={20} color="#fff"/></TouchableOpacity>
+        <TouchableOpacity style={styles.saveButton} onPress={handleAddCategory}><Check size={20} color="#fff"/></TouchableOpacity>
       </View>
 
       {/* Categories List */}
@@ -198,10 +198,10 @@ const handleAddCategory = async () => {
 const styles = StyleSheet.create({
   container:{ flex:1, backgroundColor:'#f8fafc' },
   loading:{ flex:1, justifyContent:'center', alignItems:'center', backgroundColor:'#F8FAFC' },
-  sectionTitle:{ fontSize:18, fontWeight:'600', marginBottom:8, color:'#1E293B',  marginTop:10},
+  sectionTitle:{ fontSize:18, fontWeight:'600', marginBottom:10, color:'#1E293B',  marginTop:14},
   addRow:{ flexDirection:'row', gap:8, alignItems:'center' },
   input:{ flex:1, borderWidth:1, borderColor:'#E2E8F0', borderRadius:12, padding:12, backgroundColor:'#fff' },
-  saveButton:{ backgroundColor:'#10B981', padding:12, borderRadius:12 },
+  saveButton:{ backgroundColor:'#15803d', padding:12, borderRadius:12 },
   cancelButton:{ backgroundColor:'#64748B', padding:12, borderRadius:12 },
   categoryCard:{ backgroundColor:'#fff', borderRadius:12, padding:12, marginBottom:12 },
   row:{ flexDirection:'row', alignItems:'center', gap:12 },

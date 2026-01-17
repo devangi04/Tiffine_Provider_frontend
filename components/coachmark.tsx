@@ -282,7 +282,7 @@ const CoachMark = ({
                   style={styles.secondaryButton}
                   activeOpacity={0.7}
                 >
-                  <Ionicons name="arrow-back" size={18} color="#2c95f8" />
+                  <Ionicons name="arrow-back" size={18} color="#15803d" />
                   <Text style={styles.secondaryButtonText}>Back</Text>
                 </TouchableOpacity>
               )}
@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     fontSize: 14,
-    color: '#2c95f8',
+    color: '#15803d',
     fontWeight: '500',
   },
   spacer: {
@@ -448,10 +448,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 20,
-    backgroundColor: '#2c95f8',
+    backgroundColor: '#15803d',
     borderRadius: 12,
     gap: 8,
-    shadowColor: '#2c95f8',
+    shadowColor: '#15803d',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -473,7 +473,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   activeProgressDot: {
-    backgroundColor: '#2c95f8',
+    backgroundColor: '#15803d',
     width: 24,
   },
   completedProgressDot: {

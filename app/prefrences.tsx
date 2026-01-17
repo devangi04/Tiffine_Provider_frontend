@@ -16,8 +16,7 @@ import {
   Platform,
   Animated,
 } from 'react-native';
-import {Text,TextStyles} from '@/components/ztext';
-
+import { Text } from '@/components/ztext';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useNavigation } from '@react-navigation/native';
 import { useAppSelector, useAppDispatch } from './store/hooks';
@@ -30,7 +29,7 @@ import {
 import { MealService, MealType } from './store/types/meals';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 type RootStackParamList = {
   MealPreferences: undefined;
@@ -42,7 +41,7 @@ type MealPreferencesScreenNavigationProp = StackNavigationProp<
   'MealPreferences'
 >;
 
-// Clock Time Picker Component
+// Enhanced Clock Time Picker Component
 const ClockTimePicker = ({ 
   visible, 
   onClose, 
@@ -57,7 +56,8 @@ const ClockTimePicker = ({
   const [hour, setHour] = useState(10);
   const [minute, setMinute] = useState(30);
   const [isAM, setIsAM] = useState(true);
-  const clockSize = Math.min(width * 0.7, 350);
+  const clockSize = Math.min(width * 0.7, 320);
+  const pulseAnim = new Animated.Value(1);
 
   useEffect(() => {
     if (currentTime) {
@@ -69,10 +69,27 @@ const ClockTimePicker = ({
         setMinute(m);
         setIsAM(period === 'AM');
       } catch (error) {
-     
+        // Handle error silently
       }
     }
   }, [currentTime]);
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
 
   const handleHourSelect = (selectedHour: number) => {
     setHour(selectedHour);
@@ -83,15 +100,19 @@ const ClockTimePicker = ({
   };
 
   const handleConfirm = () => {
-    const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')} ${isAM ? 'AM' : 'PM'}`;
-    onTimeSelect(timeString);
+    const militaryHour = isAM 
+      ? (hour === 12 ? 0 : hour)
+      : (hour === 12 ? 12 : hour + 12);
+    const timeString = `${militaryHour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+    const displayTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')} ${isAM ? 'AM' : 'PM'}`;
+    onTimeSelect(displayTime);
     onClose();
   };
 
   const renderClockFace = () => {
     const hours = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
     const center = clockSize / 2;
-    const markerRadius = clockSize / 2 - 35;
+    const markerRadius = clockSize / 2 - 40;
 
     return (
       <View style={[styles.clockFace, { 
@@ -99,10 +120,42 @@ const ClockTimePicker = ({
         height: clockSize,
         borderRadius: clockSize / 2 
       }]}>
+        {/* Clock ticks */}
+        {Array.from({ length: 60 }).map((_, index) => {
+          const angle = index * 6 * (Math.PI / 180);
+          const isHourTick = index % 5 === 0;
+          const tickLength = isHourTick ? 12 : 6;
+          const tickWidth = isHourTick ? 3 : 1;
+          const radius = clockSize / 2 - 20;
+          
+          return (
+            <View
+              key={index}
+              style={[
+                styles.clockTick,
+                {
+                  position: 'absolute',
+                  top: center - tickLength / 2,
+                  left: center - tickWidth / 2,
+                  width: tickWidth,
+                  height: tickLength,
+                  backgroundColor: isHourTick ? '#007AFF' : '#CBD5E1',
+                  transform: [
+                    { rotate: `${index * 6}deg` },
+                    { translateY: -radius },
+                  ],
+                  transformOrigin: 'center',
+                },
+              ]}
+            />
+          );
+        })}
+
+        {/* Hour markers */}
         {hours.map((h, index) => {
           const angle = (index * 30) * (Math.PI / 180);
-          const x = center + markerRadius * Math.sin(angle) - 22;
-          const y = center - markerRadius * Math.cos(angle) - 22;
+          const x = center + markerRadius * Math.sin(angle) - 20;
+          const y = center - markerRadius * Math.cos(angle) - 20;
 
           return (
             <TouchableOpacity
@@ -112,8 +165,7 @@ const ClockTimePicker = ({
                 {
                   left: x,
                   top: y,
-                  backgroundColor: hour === h ? '#007AFF' : '#FFFFFF',
-                  borderColor: hour === h ? '#0056CC' : '#E5E7EB',
+                  backgroundColor: hour === h ? '#007AFF' : 'transparent',
                 },
               ]}
               onPress={() => handleHourSelect(h)}
@@ -121,7 +173,7 @@ const ClockTimePicker = ({
               <Text
                 style={[
                   styles.hourText,
-                  { color: hour === h ? '#FFFFFF' : '#1F2937' },
+                  { color: hour === h ? '#FFFFFF' : '#334155' },
                 ]}
               >
                 {h}
@@ -131,19 +183,25 @@ const ClockTimePicker = ({
         })}
 
         {/* Center dot */}
-        <View style={[styles.clockCenter, { 
-          left: center - 6, 
-          top: center - 6 
-        }]} />
+        <Animated.View 
+          style={[
+            styles.clockCenter, 
+            { 
+              left: center - 8, 
+              top: center - 8,
+              transform: [{ scale: pulseAnim }],
+            }
+          ]} 
+        />
         
         {/* Hour hand */}
-        <Animated.View
+        <View
           style={[
             styles.hourHand,
             {
               transform: [
                 { rotate: `${(hour % 12) * 30 + minute * 0.5}deg` },
-                { translateX: -2.5 },
+                { translateX: -3 },
               ],
               left: center,
               top: center,
@@ -152,13 +210,13 @@ const ClockTimePicker = ({
         />
         
         {/* Minute hand */}
-        <Animated.View
+        <View
           style={[
             styles.minuteHand,
             {
               transform: [
                 { rotate: `${minute * 6}deg` },
-                { translateX: -1.5 },
+                { translateX: -2 },
               ],
               left: center,
               top: center,
@@ -173,12 +231,7 @@ const ClockTimePicker = ({
     const minutes = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
     return (
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.minuteSelector}
-        contentContainerStyle={styles.minuteSelectorContent}
-      >
+      <View style={styles.minuteGrid}>
         {minutes.map((m) => (
           <TouchableOpacity
             key={m}
@@ -198,7 +251,7 @@ const ClockTimePicker = ({
             </Text>
           </TouchableOpacity>
         ))}
-      </ScrollView>
+      </View>
     );
   };
 
@@ -206,78 +259,81 @@ const ClockTimePicker = ({
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType="slide"
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
-        <TouchableOpacity
-          style={styles.modalBackground}
-          activeOpacity={1}
-          onPress={onClose}
-        />
-        
-        <View style={styles.clockPickerContainer}>
-          <View style={styles.clockPickerHeader}>
-            <Text style={styles.clockPickerTitle}>Select Time</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Icon name="close" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
+      <SafeAreaView style={styles.modalContainer}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.clockPickerContainer}>
+            <View style={styles.clockPickerHeader}>
+              <Text style={styles.clockPickerTitle}>Select Time</Text>
+              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                <Icon name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
 
-          <View style={styles.clockDisplay}>
-            <Text style={styles.currentTimeDisplay}>
-              {hour.toString().padStart(2, '0')}:{minute.toString().padStart(2, '0')}
-            </Text>
-            <View style={styles.ampmSelector}>
-              <TouchableOpacity
-                style={[styles.ampmOption, isAM && styles.selectedAmpmOption]}
-                onPress={() => setIsAM(true)}
-              >
-                <Text style={[styles.ampmText, isAM && styles.selectedAmpmText]}>
-                  AM
+            <View style={styles.clockDisplay}>
+              <View style={styles.timeDisplayContainer}>
+                <Text style={styles.currentTimeDisplay}>
+                  {hour.toString().padStart(2, '0')}
                 </Text>
+                <Text style={styles.timeSeparator}>:</Text>
+                <Text style={styles.currentTimeDisplay}>
+                  {minute.toString().padStart(2, '0')}
+                </Text>
+              </View>
+              <View style={styles.ampmSelector}>
+                <TouchableOpacity
+                  style={[styles.ampmOption, isAM && styles.selectedAmpmOption]}
+                  onPress={() => setIsAM(true)}
+                >
+                  <Text style={[styles.ampmText, isAM && styles.selectedAmpmText]}>
+                    AM
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.ampmOption, !isAM && styles.selectedAmpmOption]}
+                  onPress={() => setIsAM(false)}
+                >
+                  <Text style={[styles.ampmText, !isAM && styles.selectedAmpmText]}>
+                    PM
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.clockContainer}>
+              {renderClockFace()}
+            </View>
+
+            <View style={styles.minuteSection}>
+              <Text style={styles.minuteLabel}>Select Minutes</Text>
+              {renderMinuteSelector()}
+            </View>
+
+            <View style={styles.clockPickerActions}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={onClose}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.ampmOption, !isAM && styles.selectedAmpmOption]}
-                onPress={() => setIsAM(false)}
+                style={styles.confirmButton}
+                onPress={handleConfirm}
               >
-                <Text style={[styles.ampmText, !isAM && styles.selectedAmpmText]}>
-                  PM
-                </Text>
+                <Icon name="check" size={20} color="#FFFFFF" />
+                <Text style={styles.confirmButtonText}>Set Time</Text>
               </TouchableOpacity>
             </View>
           </View>
-
-          <View style={styles.clockContainer}>
-            {renderClockFace()}
-          </View>
-
-          <View style={styles.minuteSection}>
-            <Text style={styles.minuteLabel}>Select Minutes</Text>
-            {renderMinuteSelector()}
-          </View>
-
-          <View style={styles.clockPickerActions}>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={onClose}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.confirmButton}
-              onPress={handleConfirm}
-            >
-              <Text style={styles.confirmButtonText}>Set Time</Text>
-            </TouchableOpacity>
-          </View>
         </View>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 };
 
-// Price Input Component
+// Enhanced Price Input Component
 const PriceInput = ({ 
   label, 
   value, 
@@ -294,8 +350,10 @@ const PriceInput = ({
   return (
     <View style={styles.priceInputContainer}>
       <Text style={styles.priceLabel}>{label}</Text>
-      <View style={styles.priceInputWrapper}>
-        <Icon name="currency-rupee" size={20} color="#666" />
+      <View style={[styles.priceInputWrapper, disabled && styles.priceInputWrapperDisabled]}>
+        <View style={styles.currencyIcon}>
+          <Icon name="currency-rupee" size={18} color="#64748B" />
+        </View>
         <TextInput
           style={[styles.priceInput, disabled && styles.priceInputDisabled]}
           value={value}
@@ -305,7 +363,37 @@ const PriceInput = ({
           keyboardType="numeric"
           editable={!disabled}
         />
+        <Text style={styles.perMealText}>per meal</Text>
       </View>
+    </View>
+  );
+};
+
+// Time Input Component
+const TimeInput = ({ 
+  label, 
+  value, 
+  onPress 
+}: {
+  label: string;
+  value: string;
+  onPress: () => void;
+}) => {
+  return (
+    <View style={styles.timeInputContainer}>
+      <Text style={styles.timeLabel}>{label}</Text>
+      <TouchableOpacity 
+        style={styles.timeInputWrapper}
+        onPress={onPress}
+        activeOpacity={0.7}
+      >
+        <Icon name="access-time" size={20} color="#007AFF" />
+        <View style={styles.timeInputContent}>
+          <Text style={styles.timeDisplay}>{value}</Text>
+          <Text style={styles.timeDescription}>Orders accepted until this time</Text>
+        </View>
+        <Icon name="chevron-right" size={24} color="#94A3B8" />
+      </TouchableOpacity>
     </View>
   );
 };
@@ -341,6 +429,15 @@ const MealPreferencesScreen = () => {
 
   const [timePickerVisible, setTimePickerVisible] = useState(false);
   const [currentEditingMeal, setCurrentEditingMeal] = useState<MealType | null>(null);
+  const fadeAnim = new Animated.Value(0);
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, []);
 
   useEffect(() => {
     if (error) {      
@@ -470,6 +567,7 @@ const MealPreferencesScreen = () => {
         Alert.alert('Success', 'Meal preferences updated successfully!');
       }
     } catch (error: any) {
+      // Error is handled by the slice
     }
   };
 
@@ -478,67 +576,81 @@ const MealPreferencesScreen = () => {
     if (!meal) return null;
 
     return (
-      <View style={styles.mealSection}>
+      <Animated.View 
+        style={[
+          styles.mealSection,
+          { opacity: fadeAnim, transform: [{ translateY: fadeAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [20, 0]
+          })}] }
+        ]}
+      >
         <View style={styles.mealHeader}>
-          <View style={styles.mealTitleContainer}>
-            <Icon 
-              name={mealType === 'lunch' ? "lunch-dining" : "dinner-dining"} 
-              size={24} 
-              color={meal.enabled ? "#007AFF" : "#666"} 
-            />
-            <Text style={styles.mealTitle}>{mealName} Service</Text>
+          <View style={styles.mealIconContainer}>
+            <View style={[
+              styles.mealIconWrapper,
+              meal.enabled && styles.mealIconWrapperActive
+            ]}>
+              <Icon 
+                name={mealType === 'lunch' ? "restaurant" : "restaurant-menu"} 
+                size={24} 
+                color={meal.enabled ? "#FFFFFF" : "#64748B"} 
+              />
+            </View>
+            <View style={styles.mealTitleContainer}>
+              <Text style={styles.mealTitle}>{mealName} Service</Text>
+              <Text style={styles.mealSubtitle}>
+                {meal.enabled ? 'Available for booking' : 'Currently disabled'}
+              </Text>
+            </View>
           </View>
           <Switch
             value={meal.enabled}
             onValueChange={() => toggleMealEnabled(mealType)}
-            trackColor={{ false: '#E5E7EB', true: '#BBDEFB' }}
-            thumbColor={meal.enabled ? '#007AFF' : '#9CA3AF'}
-            ios_backgroundColor="#E5E7EB"
+            trackColor={{ false: '#E2E8F0', true: '#B3E0FF' }}
+            thumbColor={meal.enabled ? '#007AFF' : '#F8FAFC'}
+            ios_backgroundColor="#E2E8F0"
           />
         </View>
 
         {meal.enabled && (
           <View style={styles.mealOptions}>
-            <View style={styles.priceSection}>
-              <Text style={styles.sectionLabel}>Price</Text>
-              <PriceInput
-                label={`${mealName} Price`}
-                value={meal.price}
-                onChange={(value) => updatePrice(mealType, value)}
-                placeholder="70"
-              />
-            </View>
-
-            <View style={styles.timeSection}>
-              <Text style={styles.sectionLabel}>Cutoff Time</Text>
-              <TouchableOpacity 
-                style={styles.timeInputContainer}
-                onPress={() => openTimePicker(mealType)}
-              >
-                <Icon name="access-time" size={20} color="#007AFF" />
-                <View style={styles.timeInputContent}>
-                  <Text style={styles.timeDisplay}>
-                    {meal.cutoffTime}
-                  </Text>
-                  <Text style={styles.timeNote}>
-                    Tap to set cutoff time
-                  </Text>
-                </View>
-                <Icon name="chevron-right" size={24} color="#666" />
-              </TouchableOpacity>
+            <View style={styles.optionsGrid}>
+              <View style={styles.priceCard}>
+                <Icon name="attach-money" size={20} color="#10B981" style={styles.cardIcon} />
+                <Text style={styles.cardTitle}>Price</Text>
+                <PriceInput
+                  label="Price per meal"
+                  value={meal.price}
+                  onChange={(value) => updatePrice(mealType, value)}
+                  placeholder="70"
+                />
+              </View>
+              
+              <View style={styles.timeCard}>
+                <Icon name="schedule" size={20} color="#3B82F6" style={styles.cardIcon} />
+                <Text style={styles.cardTitle}>Cutoff Time</Text>
+                <TimeInput
+                  label="Last order time"
+                  value={meal.cutoffTime}
+                  onPress={() => openTimePicker(mealType)}
+                />
+              </View>
             </View>
           </View>
         )}
-      </View>
+      </Animated.View>
     );
   };
 
   if (loading && !preferences) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <StatusBar barStyle="light-content" backgroundColor="#FFFFFF" />
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Loading preferences...</Text>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <View style={styles.loadingContent}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.loadingText}>Loading your preferences...</Text>
+        </View>
       </SafeAreaView>
     );
   }
@@ -547,9 +659,10 @@ const MealPreferencesScreen = () => {
     <KeyboardAvoidingView 
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
       <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
         
         <View style={styles.header}>
           <TouchableOpacity 
@@ -557,50 +670,34 @@ const MealPreferencesScreen = () => {
             onPress={() => navigation.goBack()}
             disabled={saving}
           >
-            <Icon name="arrow-back" size={24} color="#050000ff" />
+            <Icon name="arrow-back-ios" size={20} color="#475569" />
           </TouchableOpacity>
           
-          <View style={styles.headerTitleContainer}>
+          <View style={styles.headerContent}>
             <Text style={styles.headerTitle}>Meal Preferences</Text>
-            <Text style={styles.headerSubtitle}>Configure your meal services</Text>
+            <Text style={styles.headerSubtitle}>Manage your meal service settings</Text>
           </View>
-          
-          <View style={styles.headerSpacer} />
         </View>
 
         <ScrollView 
           style={styles.scrollView} 
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          bounces={true}
         >
-          <View style={styles.form}>
-            {renderMealSection('lunch', 'Lunch')}
-            {renderMealSection('dinner', 'Dinner')}
-
+          <View style={styles.content}>
             <View style={styles.infoCard}>
-              <View style={styles.infoHeader}>
-                <Icon name="info" size={20} color="#1976d2" />
+              <Icon name="info" size={24} color="#3B82F6" />
+              <View style={styles.infoContent}>
                 <Text style={styles.infoTitle}>How it works</Text>
-              </View>
-              <View style={styles.infoList}>
-                <View style={styles.infoItem}>
-                  <Icon name="check-circle" size={16} color="#4CAF50" />
-                  <Text style={styles.infoText}>Enable meals you want to offer</Text>
-                </View>
-                <View style={styles.infoItem}>
-                  <Icon name="check-circle" size={16} color="#4CAF50" />
-                  <Text style={styles.infoText}>Set price for each meal</Text>
-                </View>
-                <View style={styles.infoItem}>
-                  <Icon name="check-circle" size={16} color="#4CAF50" />
-                  <Text style={styles.infoText}>Set cutoff times for each meal</Text>
-                </View>
-                <View style={styles.infoItem}>
-                  <Icon name="check-circle" size={16} color="#4CAF50" />
-                  <Text style={styles.infoText}>System auto-confirms orders after cutoff</Text>
-                </View>
+                <Text style={styles.infoText}>
+                  Enable meals you want to offer, set prices and cutoff times. Orders will be auto-confirmed after cutoff.
+                </Text>
               </View>
             </View>
+
+            {renderMealSection('lunch', 'Lunch')}
+            {renderMealSection('dinner', 'Dinner')}
           </View>
         </ScrollView>
 
@@ -616,13 +713,14 @@ const MealPreferencesScreen = () => {
             style={[styles.saveButton, saving && styles.saveButtonDisabled]}
             onPress={handleSavePreferences}
             disabled={saving}
+            activeOpacity={0.9}
           >
             {saving ? (
               <ActivityIndicator color="#fff" size="small" />
             ) : (
               <>
-                <Icon name="save" size={20} color="#fff" />
-                <Text style={styles.saveButtonText}>Save Preferences</Text>
+                <Icon name="check-circle" size={20} color="#fff" />
+                <Text style={styles.saveButtonText}>Save Changes</Text>
               </>
             )}
           </TouchableOpacity>
@@ -635,19 +733,22 @@ const MealPreferencesScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#F8FAFC',
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
     backgroundColor: '#F8FAFC',
   },
+  loadingContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   loadingText: {
-    marginTop: 12,
+    marginTop: 16,
     fontSize: 16,
-    color: '#666',
-    fontFamily: 'System',
+    color: '#64748B',
+    fontWeight: '500',
   },
   header: {
     flexDirection: 'row',
@@ -656,124 +757,199 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#F1F5F9',
   },
   backButton: {
     padding: 8,
+    marginRight: 8,
   },
-  headerTitleContainer: {
+  headerContent: {
     flex: 1,
-    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#050000ff',
-    fontFamily: 'System',
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#0F172A',
+    letterSpacing: -0.5,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: '#6B7280',
-    fontFamily: 'System',
+    color: '#64748B',
     marginTop: 2,
-  },
-  headerSpacer: {
-    width: 40,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 100,
+    flexGrow: 1,
   },
-  form: {
+  content: {
     padding: 20,
+  },
+  infoCard: {
+    flexDirection: 'row',
+    backgroundColor: '#EFF6FF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    alignItems: 'flex-start',
+  },
+  infoContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  infoTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1E40AF',
+    marginBottom: 4,
+  },
+  infoText: {
+    fontSize: 14,
+    color: '#475569',
+    lineHeight: 20,
   },
   mealSection: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 20,
+    padding: 0,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 8,
+    shadowRadius: 12,
     elevation: 3,
+    overflow: 'hidden',
   },
   mealHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
-  mealTitleContainer: {
+  mealIconContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    flex: 1,
+  },
+  mealIconWrapper: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  mealIconWrapperActive: {
+    backgroundColor: '#007AFF',
+  },
+  mealTitleContainer: {
+    flex: 1,
   },
   mealTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1F2937',
-    fontFamily: 'System',
+    color: '#0F172A',
+  },
+  mealSubtitle: {
+    fontSize: 14,
+    color: '#64748B',
+    marginTop: 2,
   },
   mealOptions: {
-    marginTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    paddingTop: 16,
+    padding: 20,
   },
-  sectionLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#4B5563',
-    marginBottom: 8,
-    fontFamily: 'System',
+  optionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -8,
   },
-  priceSection: {
-    marginBottom: 20,
+  priceCard: {
+    flex: 1,
+    minWidth: width > 400 ? '48%' : '100%',
+    backgroundColor: '#F0FDF4',
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 8,
+    marginBottom: 16,
+  },
+  timeCard: {
+    flex: 1,
+    minWidth: width > 400 ? '48%' : '100%',
+    backgroundColor: '#EFF6FF',
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 8,
+    marginBottom: 16,
+  },
+  cardIcon: {
+    marginBottom: 12,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0F172A',
+    marginBottom: 16,
   },
   priceInputContainer: {
-    marginBottom: 16,
+    marginBottom: 0,
   },
   priceLabel: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#6B7280',
+    color: '#475569',
     marginBottom: 8,
-    fontFamily: 'System',
   },
   priceInputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 16,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 12,
+  },
+  priceInputWrapperDisabled: {
+    backgroundColor: '#F8FAFC',
+  },
+  currencyIcon: {
+    marginRight: 8,
   },
   priceInput: {
     flex: 1,
-    paddingVertical: 14,
+    paddingVertical: 12,
     fontSize: 16,
-    color: '#1F2937',
-    fontFamily: 'System',
-    marginLeft: 8,
+    fontWeight: '600',
+    color: '#0F172A',
   },
   priceInputDisabled: {
-    color: '#9CA3AF',
+    color: '#94A3B8',
   },
-  timeSection: {
-    marginBottom: 8,
+  perMealText: {
+    fontSize: 12,
+    color: '#64748B',
+    marginLeft: 8,
   },
   timeInputContainer: {
+    marginBottom: 0,
+  },
+  timeLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#475569',
+    marginBottom: 8,
+  },
+  timeInputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    padding: 16,
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#E2E8F0',
+    padding: 16,
   },
   timeInputContent: {
     flex: 1,
@@ -783,19 +959,22 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#007AFF',
-    fontFamily: 'System',
+    marginBottom: 4,
   },
-  timeNote: {
+  timeDescription: {
     fontSize: 12,
-    color: '#6B7280',
-    fontFamily: 'System',
-    marginTop: 2,
+    color: '#64748B',
   },
   footer: {
     padding: 20,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: '#F1F5F9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 5,
   },
   saveButton: {
     flexDirection: 'row',
@@ -803,73 +982,41 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     backgroundColor: '#007AFF',
-    paddingVertical: 16,
-    borderRadius: 12,
+    paddingVertical: 18,
+    borderRadius: 16,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   saveButtonDisabled: {
-    backgroundColor: '#9CA3AF',
+    backgroundColor: '#94A3B8',
+    shadowColor: 'transparent',
   },
   saveButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
-    fontFamily: 'System',
-  },
-  infoCard: {
-    backgroundColor: '#E3F2FD',
-    borderRadius: 16,
-    padding: 20,
-    marginTop: 8,
-  },
-  infoHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  infoTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1976d2',
-    fontFamily: 'System',
-  },
-  infoList: {
-    gap: 8,
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#424242',
-    fontFamily: 'System',
-    flex: 1,
   },
   // Clock Time Picker Styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  },
   modalOverlay: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
   },
   clockPickerContainer: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
     padding: 24,
-    width: width * 0.9,
-    maxWidth: 400,
+    maxHeight: height * 0.85,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
     shadowRadius: 20,
     elevation: 10,
   },
@@ -877,39 +1024,47 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   clockPickerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1F2937',
-    fontFamily: 'System',
+    color: '#0F172A',
   },
   closeButton: {
-    padding: 4,
+    padding: 8,
   },
   clockDisplay: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 32,
+  },
+  timeDisplayContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   currentTimeDisplay: {
-    fontSize: 36,
+    fontSize: 48,
     fontWeight: '700',
     color: '#007AFF',
-    fontFamily: 'System',
-    marginBottom: 8,
+  },
+  timeSeparator: {
+    fontSize: 48,
+    fontWeight: '700',
+    color: '#CBD5E1',
+    marginHorizontal: 4,
   },
   ampmSelector: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 16,
+    marginTop: 12,
   },
   ampmOption: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#F8FAFC',
     borderWidth: 2,
-    borderColor: 'transparent',
+    borderColor: '#E2E8F0',
   },
   selectedAmpmOption: {
     backgroundColor: '#007AFF',
@@ -918,107 +1073,107 @@ const styles = StyleSheet.create({
   ampmText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#6B7280',
-    fontFamily: 'System',
+    color: '#64748B',
   },
   selectedAmpmText: {
     color: '#FFFFFF',
   },
   clockContainer: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 32,
   },
   clockFace: {
-    width: width * 0.6,
-    height: width * 0.6,
-    borderRadius: width * 0.3,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F8FAFC',
     borderWidth: 2,
-    borderColor: '#E5E7EB',
+    borderColor: '#E2E8F0',
     position: 'relative',
+  },
+  clockTick: {
+    position: 'absolute',
   },
   clockCenter: {
     position: 'absolute',
-    top: '50%',
-    left: '50%',
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     backgroundColor: '#007AFF',
-    marginLeft: -5,
-    marginTop: -5,
     zIndex: 10,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
+    elevation: 4,
   },
   hourHand: {
     position: 'absolute',
-    top: '50%',
-    left: '50%',
-    width: 4,
-    height: width * 0.15,
+    width: 6,
+    height: '35%',
     backgroundColor: '#007AFF',
-    borderRadius: 2,
-    marginLeft: -2,
-    marginTop: -width * 0.15,
+    borderRadius: 3,
+    marginLeft: -3,
+    marginTop: '-35%',
     transformOrigin: 'bottom center',
     zIndex: 5,
-  },
-  minuteHand: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    width: 3,
-    height: width * 0.2,
-    backgroundColor: '#666',
-    borderRadius: 1.5,
-    marginLeft: -1.5,
-    marginTop: -width * 0.2,
-    transformOrigin: 'bottom center',
-    zIndex: 6,
-  },
-  hourMarker: {
-    position: 'absolute',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-
-    justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowRadius: 4,
     elevation: 2,
+  },
+  minuteHand: {
+    position: 'absolute',
+    width: 4,
+    height: '45%',
+    backgroundColor: '#475569',
+    borderRadius: 2,
+    marginLeft: -2,
+    marginTop: '-45%',
+    transformOrigin: 'bottom center',
+    zIndex: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  hourMarker: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
   },
   hourText: {
     fontSize: 16,
     fontWeight: '600',
-    fontFamily: 'System',
   },
   minuteSection: {
-    marginBottom: 24,
+    marginBottom: 32,
   },
   minuteLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#4B5563',
-    marginBottom: 12,
-    fontFamily: 'System',
+    color: '#475569',
+    marginBottom: 16,
     textAlign: 'center',
   },
-  minuteSelector: {
-    maxHeight: 50,
-  },
-  minuteSelectorContent: {
-    paddingHorizontal: 10,
+  minuteGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
   },
   minuteOption: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-    marginHorizontal: 4,
+    width: 60,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
     borderWidth: 2,
-    borderColor: 'transparent',
+    borderColor: '#E2E8F0',
   },
   selectedMinuteOption: {
     backgroundColor: '#007AFF',
@@ -1027,8 +1182,7 @@ const styles = StyleSheet.create({
   minuteOptionText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#6B7280',
-    fontFamily: 'System',
+    color: '#64748B',
   },
   selectedMinuteOptionText: {
     color: '#FFFFFF',
@@ -1039,29 +1193,37 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     flex: 1,
-    padding: 16,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
+    padding: 18,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
   },
   cancelButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#4B5563',
-    fontFamily: 'System',
+    color: '#475569',
   },
   confirmButton: {
     flex: 1,
-    padding: 16,
-    backgroundColor: '#007AFF',
-    borderRadius: 12,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 18,
+    backgroundColor: '#007AFF',
+    borderRadius: 16,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   confirmButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
-    fontFamily: 'System',
   },
 });
 

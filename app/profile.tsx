@@ -1,8 +1,7 @@
-// ProfileScreen.tsx - Updated design with round transparent circles
-import React, { useState, useEffect } from 'react';
+// ProfileScreen.tsx - Updated with double-tap prevention
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   View, 
-
   StyleSheet, 
   TouchableOpacity, 
   ActivityIndicator,
@@ -12,8 +11,7 @@ import {
 } from 'react-native';
 import { useRouter, useNavigation } from 'expo-router';
 import axios from 'axios';
-import {Text,TextStyles} from '@/components/ztext';
-
+import { Text } from '@/components/ztext';
 import { AntDesign, Feather, MaterialIcons, Ionicons, FontAwesome6, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppSelector, useAppDispatch } from './store/hooks';
@@ -49,6 +47,20 @@ const ProfileScreen = () => {
   const [provider, setProvider] = useState<Provider | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
+  
+  // Use ref to track navigation state without re-renders
+  const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastNavigationTimeRef = useRef<number>(0);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (navigationTimeoutRef.current) {
+        clearTimeout(navigationTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     navigation.setOptions({
@@ -58,7 +70,6 @@ const ProfileScreen = () => {
 
   // Fixed useEffect with logout detection
   useEffect(() => {
-    // Skip if logout is in progress
     if (isLoggingOut) {
       return;
     }
@@ -67,14 +78,12 @@ const ProfileScreen = () => {
       try {
         setLoading(true);
         
-        // Check if user is logged out or has invalid data
         if (!reduxProvider || !reduxProvider.id || reduxProvider.id === '') {
           setProvider(null);
           setLoading(false);
           return;
         }
 
-        // If we have valid provider data in Redux, use it
         if (reduxProvider.id && reduxProvider.email) {
           setProvider({
             id: reduxProvider.id,
@@ -84,7 +93,6 @@ const ProfileScreen = () => {
             subscription: reduxProvider.subscription || null,
           });
         } else {
-          // Fallback to API call if Redux data is incomplete
           await fetchProviderProfile();
         }
       } catch (error) {
@@ -101,7 +109,6 @@ const ProfileScreen = () => {
     try {
       setLoading(true);
       
-      // Additional safety check - skip if logout in progress
       if (isLoggingOut || !reduxProvider || !reduxProvider.id) {
         setLoading(false);
         return;
@@ -121,8 +128,6 @@ const ProfileScreen = () => {
         throw new Error(response.data.error || 'Failed to fetch profile');
       }
     } catch (error) {
-      
-      // Don't show alert for network errors during logout
       if (!isLoggingOut && error.response?.status !== 401) {
         Alert.alert('Error', 'Failed to load profile. Please try again.');
       }
@@ -131,44 +136,40 @@ const ProfileScreen = () => {
     }
   };
 
-  // Improved logout function - prevent multiple calls
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to log out?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Logout',
-          onPress: async () => {
-            try {
-              // 1. Dispatch logout thunk (clears Redux & calls API)
-              await dispatch(logoutProvider()).unwrap();
-              
-              // 2. Clear persisted storage
-              await persistor.purge();
-              
-              // 3. Navigate to login screen
-              router.replace('/');
-              
-            } catch (error) {
-              console.log('Logout completed locally:', error);
-              // Even if there's an error, navigate to login
-              router.replace('/');
-            }
-          }
-        }
-      ]
-    );
-  };
+  // Safe navigation handler with debounce
+  const safeNavigate = useCallback((navigateFunction: () => void, screenName: string) => {
+    const now = Date.now();
+    const timeSinceLastNav = now - lastNavigationTimeRef.current;
+    
+    // Prevent navigation if already navigating, logging out, or clicked too recently
+    if (isNavigating || isLoggingOut || timeSinceLastNav < 500) {
+      return;
+    }
+    
+    // Update last navigation time
+    lastNavigationTimeRef.current = now;
+    setIsNavigating(true);
+    
+    // Clear any existing timeout
+    if (navigationTimeoutRef.current) {
+      clearTimeout(navigationTimeoutRef.current);
+    }
+    
+    try {
+      navigateFunction();
+    } catch (error) {
+      setIsNavigating(false);
+      return;
+    }
+    
+    // Reset navigation state after delay (500ms should be enough for navigation to start)
+    navigationTimeoutRef.current = setTimeout(() => {
+      setIsNavigating(false);
+    }, 500);
+  }, [isNavigating, isLoggingOut]);
 
   // Navigation functions with safety checks
-  const navigateToMenu = () => {
-    if (isLoggingOut) return;
-    
+  const navigateToMenu = useCallback(() => {
     if (!provider?.id && !reduxProvider?.id) {
       Alert.alert('Error', 'Please login again');
       router.replace('/');
@@ -179,11 +180,9 @@ const ProfileScreen = () => {
       pathname: '/menu',
       params: { providerId: provider?.id || reduxProvider?.id }
     });
-  };
+  }, [provider, reduxProvider, router]);
 
-  const navigateToDishMaster = () => {
-    if (isLoggingOut) return;
-    
+  const navigateToDishMaster = useCallback(() => {
     if (!provider?.id && !reduxProvider?.id) {
       Alert.alert('Error', 'Please login again');
       router.replace('/');
@@ -194,11 +193,9 @@ const ProfileScreen = () => {
       pathname: '/dishmaster',
       params: { providerId: provider?.id || reduxProvider?.id }
     });
-  };
+  }, [provider, reduxProvider, router]);
 
-  const navigateToCustomer = () => {
-    if (isLoggingOut) return;
-    
+  const navigateToCustomer = useCallback(() => {
     if (!provider?.id && !reduxProvider?.id) {
       Alert.alert('Error', 'Please login again');
       router.replace('/');
@@ -209,11 +206,9 @@ const ProfileScreen = () => {
       pathname: '/customer',
       params: { providerId: provider?.id || reduxProvider?.id }
     });
-  };
+  }, [provider, reduxProvider, router]);
 
-  const navigateToSavedMenu = () => {
-    if (isLoggingOut) return;
-    
+  const navigateToSavedMenu = useCallback(() => {
     if (!provider?.id && !reduxProvider?.id) {
       Alert.alert('Error', 'Please login again');
       router.replace('/');
@@ -224,13 +219,62 @@ const ProfileScreen = () => {
       pathname: '/savedmenu',
       params: { providerId: provider?.id || reduxProvider?.id }
     });
-  };
+  }, [provider, reduxProvider, router]);
+
+const handleLogout = () => {
+  Alert.alert(
+    'Logout',
+    'Are you sure you want to log out?',
+    [
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+      {
+        text: 'Logout',
+        onPress: async () => {
+          try {
+            setIsLoggingOut(true);
+            
+            // Clear any pending navigation timeout
+            if (navigationTimeoutRef.current) {
+              clearTimeout(navigationTimeoutRef.current);
+            }
+            
+            // 1. Dispatch logout thunk - DON'T AWAIT IT
+            dispatch(logoutProvider());
+            
+            // 2. Immediately clear navigation stack and navigate
+            // This prevents the ProfileScreen from showing again
+            router.dismissAll();
+            router.replace('/login');
+            
+            // 3. DO NOT wait for Redux state to update
+            // AuthChecker will handle it automatically
+            
+          } catch (error) {
+            console.error('Logout error:', error);
+            // Still navigate to root
+            router.dismissAll();
+            router.replace('/login');
+          } finally {
+            setIsLoggingOut(false);
+          }
+        }
+      }
+    ]
+  );
+};
+  // Helper for direct router pushes (without provider check)
+  const navigateToScreen = useCallback((path: string) => {
+    router.push(path);
+  }, [router]);
 
   // Show loading during logout or initial load
   if (loading || isLoggingOut) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2c95f8" />
+        <ActivityIndicator size="large" color="#15803d" />
         {isLoggingOut && <Text style={styles.loggingOutText}>Logging out...</Text>}
       </View>
     );
@@ -251,10 +295,16 @@ const ProfileScreen = () => {
     );
   }
 
+  // Check if any button should be disabled
+  const isDisabled = isLoggingOut || isNavigating;
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
           {/* Profile Card */}
           <View style={styles.profileCard}>
             <View style={styles.profileInfo}>
@@ -264,25 +314,25 @@ const ProfileScreen = () => {
                 </Text>
               </View>
               <View style={styles.profileDetails}>
-                <Text  weight='bold'style={styles.profileName}>{provider.name}</Text>
-                {/* <Text style={styles.profileEmail}>{provider.email}</Text> */}
+                <Text weight='bold' style={styles.profileName}>{provider.name}</Text>
               </View>
             </View>
             <TouchableOpacity 
-              style={styles.editButton}
-              onPress={() => !isLoggingOut && router.push('/edit')}
-              disabled={isLoggingOut}
+              style={[styles.editButton, isDisabled && styles.disabledButton]}
+              onPress={() => !isDisabled && router.push('/edit')}
+              disabled={isDisabled}
             >
-              <MaterialIcons name="edit" size={20} color="#004C99" />
+              <MaterialIcons name="edit" size={20} color="#15803d" />
             </TouchableOpacity>
           </View>
 
           {/* Menu Items */}
           <View style={styles.menuList}>
             <TouchableOpacity 
-              style={[styles.menuItem, isLoggingOut && styles.disabledMenuItem]}
-              onPress={navigateToCustomer}
-              disabled={isLoggingOut}
+              style={[styles.menuItem, isDisabled && styles.disabledMenuItem]}
+              onPress={() => safeNavigate(navigateToCustomer, 'customer')}
+              disabled={isDisabled}
+              activeOpacity={0.7}
             >
               <View style={[styles.menuIconCircle, { backgroundColor: 'rgba(0, 122, 255, 0.1)' }]}>
                 <FontAwesome6 name="users" size={20} color="#007aff" />
@@ -292,33 +342,36 @@ const ProfileScreen = () => {
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={[styles.menuItem, isLoggingOut && styles.disabledMenuItem]}
-              onPress={navigateToDishMaster}
-              disabled={isLoggingOut}
+              style={[styles.menuItem, isDisabled && styles.disabledMenuItem]}
+              onPress={() => safeNavigate(navigateToDishMaster, 'dishmaster')}
+              disabled={isDisabled}
+              activeOpacity={0.7}
             >
               <View style={[styles.menuIconCircle, { backgroundColor: 'rgba(255, 149, 0, 0.1)' }]}>
-              <FontAwesome6 name="plate-wheat" size={24} color="#ff9500" />
+                <FontAwesome6 name="plate-wheat" size={24} color="#ff9500" />
               </View>
               <Text weight='semiBold' style={styles.menuText}>Categories & Dishes</Text>
               <Feather name="chevron-right" size={20} color="#c7c7cc" />
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={[styles.menuItem, isLoggingOut && styles.disabledMenuItem]}
-              onPress={navigateToMenu}
-              disabled={isLoggingOut}
+              style={[styles.menuItem, isDisabled && styles.disabledMenuItem]}
+              onPress={() => safeNavigate(navigateToMenu, 'menu')}
+              disabled={isDisabled}
+              activeOpacity={0.7}
             >
               <View style={[styles.menuIconCircle, { backgroundColor: 'rgba(52, 199, 89, 0.1)' }]}>
-              <MaterialIcons name="restaurant-menu" size={24} color="#34c759" />
+                <MaterialIcons name="restaurant-menu" size={24} color="#34c759" />
               </View>
               <Text weight='semiBold' style={styles.menuText}>Create Menu</Text>
               <Feather name="chevron-right" size={20} color="#c7c7cc" />
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={[styles.menuItem, isLoggingOut && styles.disabledMenuItem]}
-              onPress={navigateToSavedMenu}
-              disabled={isLoggingOut}
+              style={[styles.menuItem, isDisabled && styles.disabledMenuItem]}
+              onPress={() => safeNavigate(navigateToSavedMenu, 'savedmenu')}
+              disabled={isDisabled}
+              activeOpacity={0.7}
             >
               <View style={[styles.menuIconCircle, { backgroundColor: 'rgba(175, 82, 222, 0.1)' }]}>
                 <MaterialIcons name="menu-book" size={24} color="#d656c1ff" />
@@ -328,9 +381,10 @@ const ProfileScreen = () => {
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={[styles.menuItem, isLoggingOut && styles.disabledMenuItem]}
-              onPress={() => !isLoggingOut && router.push('/providerseetingscreen')}
-              disabled={isLoggingOut}
+              style={[styles.menuItem, isDisabled && styles.disabledMenuItem]}
+              onPress={() => !isDisabled && safeNavigate(() => router.push('/providerseetingscreen'), 'providerseetingscreen')}
+              disabled={isDisabled}
+              activeOpacity={0.7}
             >
               <View style={[styles.menuIconCircle, { backgroundColor: 'rgba(235, 77, 60, 0.1)' }]}>
                 <MaterialIcons name="food-bank" size={26} color="#c92b03ff" />
@@ -339,22 +393,24 @@ const ProfileScreen = () => {
               <Feather name="chevron-right" size={20} color="#c7c7cc" />
             </TouchableOpacity>
 
- <TouchableOpacity 
-              style={[styles.menuItem, isLoggingOut && styles.disabledMenuItem]}
-              onPress={() => !isLoggingOut && router.push('/payment')}
-              disabled={isLoggingOut}
+            <TouchableOpacity 
+              style={[styles.menuItem, isDisabled && styles.disabledMenuItem]}
+              onPress={() => !isDisabled && safeNavigate(() => router.push('/payment'), 'payment')}
+              disabled={isDisabled}
+              activeOpacity={0.7}
             >
               <View style={[styles.menuIconCircle, { backgroundColor: 'rgba(88, 86, 214, 0.1)' }]}>
                 <MaterialIcons name="payments" size={24} color="#5856d6" />
               </View>
-              <Text  weight='semiBold' style={styles.menuText}>Customer Payment</Text>
+              <Text weight='semiBold' style={styles.menuText}>Customer Payment</Text>
               <Feather name="chevron-right" size={20} color="#c7c7cc" />
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={[styles.menuItem, isLoggingOut && styles.disabledMenuItem]}
-              onPress={() => !isLoggingOut && router.push('/subscriptionmanagement')}
-              disabled={isLoggingOut}
+              style={[styles.menuItem, isDisabled && styles.disabledMenuItem]}
+              onPress={() => !isDisabled && safeNavigate(() => router.push('/subscriptionmanagement'), 'subscriptionmanagement')}
+              disabled={isDisabled}
+              activeOpacity={0.7}
             >
               <View style={[styles.menuIconCircle, { backgroundColor: 'rgba(159, 193, 8, 0.1)' }]}>
                 <MaterialIcons name="subscriptions" size={24} color="#9f9709ff" />
@@ -363,10 +419,11 @@ const ProfileScreen = () => {
               <Feather name="chevron-right" size={20} color="#c7c7cc" />
             </TouchableOpacity>
 
- <TouchableOpacity 
-              style={[styles.menuItem, isLoggingOut && styles.disabledMenuItem]}
-              onPress={() => !isLoggingOut && router.push('/legalmenu')}
-              disabled={isLoggingOut}
+            <TouchableOpacity 
+              style={[styles.menuItem, isDisabled && styles.disabledMenuItem]}
+              onPress={() => !isDisabled && safeNavigate(() => router.push('/legalmenu'), 'legalmenu')}
+              disabled={isDisabled}
+              activeOpacity={0.7}
             >
               <View style={[styles.menuIconCircle, { backgroundColor: 'rgba(52, 152, 219, 0.1)' }]}>
                 <Ionicons name="information-circle-outline" size={24} color="#3498db" />
@@ -375,16 +432,16 @@ const ProfileScreen = () => {
               <Feather name="chevron-right" size={20} color="#c7c7cc" />
             </TouchableOpacity>
 
-        
             <TouchableOpacity 
-              style={[styles.menuItem, isLoggingOut && styles.disabledMenuItem]}
+              style={[styles.menuItem, isDisabled && styles.disabledMenuItem]}
               onPress={handleLogout}
-              disabled={isLoggingOut}
+              disabled={isDisabled}
+              activeOpacity={0.7}
             >
               <View style={[styles.menuIconCircle, { backgroundColor: 'rgba(255, 59, 48, 0.1)' }]}>
                 <AntDesign name="logout" size={24} color="#ff3b30" />
               </View>
-              <Text  weight='semiBold' style={[styles.menuText, { color: '#ff3b30' }]}>
+              <Text weight='semiBold' style={[styles.menuText, { color: '#ff3b30' }]}>
                 {isLoggingOut ? 'Logging out...' : 'Log out'}
               </Text>
               <Feather name="chevron-right" size={20} color="#ff3b30" />
@@ -402,6 +459,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   container: {
+    // paddingTop:70,
     flex: 1,
     backgroundColor: '#fff',
   },
@@ -441,7 +499,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   scrollContent: {
-    paddingBottom: 80,
+    paddingBottom: 120,
     flexGrow: 1,
   },
   profileCard: {
@@ -468,7 +526,7 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#004C99',
+    color: '#15803d',
   },
   profileDetails: {
     flex: 1,
@@ -476,7 +534,7 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 22,
     fontWeight: '600',
-    color: '#004C99',
+    color: '#15803d',
     marginBottom: 2,
   },
   profileEmail: {
@@ -496,6 +554,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
+     marginBottom: 2,
+  },
+  disabledButton: {
+    opacity: 0.5,
   },
   menuList: {
     marginHorizontal: 20,
@@ -510,16 +572,13 @@ const styles = StyleSheet.create({
   disabledMenuItem: {
     opacity: 0.5,
   },
-  // Updated: Round transparent circle for icons
   menuIconCircle: {
     width: 44,
     height: 44,
-    borderRadius: 22, // Perfect circle
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 15,
-    // Transparent background with slight tint
-    backgroundColor: 'rgba(0, 122, 255, 0.1)', // Default color, will be overridden
   },
   menuText: {
     flex: 1,

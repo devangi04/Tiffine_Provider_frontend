@@ -206,7 +206,7 @@ const MenuDetailsScreen = () => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2c95f8" />
+        <ActivityIndicator size="large" color="#15803d" />
         <Text style={styles.loadingText}>Loading menu details...</Text>
       </View>
     );
@@ -230,12 +230,12 @@ const MenuDetailsScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* <StatusBar barStyle="light-content" backgroundColor="#2c95f8" />
+      {/* <StatusBar barStyle="light-content" backgroundColor="#15803d" />
       
       <Header
         title="Menu Details"
         subtitle={menu.name}
-        backgroundColor="#2c95f8"
+        backgroundColor="#15803d"
         onBackPress={() => router.back()}
         showUserButton={false}
       /> */}
@@ -275,7 +275,7 @@ const MenuDetailsScreen = () => {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              colors={['#2c95f8']}
+              colors={['#15803d']}
             />
           }
         >
@@ -389,7 +389,7 @@ const MenuDetailsScreen = () => {
                 <RefreshControl
                   refreshing={refreshing}
                   onRefresh={handleRefresh}
-                  colors={['#2c95f8']}
+                  colors={['#15803d']}
                 />
               }
             />
@@ -428,7 +428,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   retryButton: {
-    backgroundColor: '#2c95f8',
+    backgroundColor: '#15803d',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
@@ -451,7 +451,7 @@ const styles = StyleSheet.create({
   },
   activeTab: {
     borderBottomWidth: 3,
-    borderBottomColor: '#2c95f8',
+    borderBottomColor: '#15803d',
   },
   tabText: {
     fontSize: 16,
@@ -459,14 +459,14 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   activeTabText: {
-    color: '#2c95f8',
+    color: '#15803d',
   },
   tabWithBadge: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   customerCountBadge: {
-    backgroundColor: '#2c95f8',
+    backgroundColor: '#15803d',
     borderRadius: 10,
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -530,7 +530,7 @@ const styles = StyleSheet.create({
   categoryTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2c95f8',
+    color: '#15803d',
     marginBottom: 8,
   },
   dishesContainer: {
@@ -545,7 +545,7 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#2c95f8',
+    backgroundColor: '#15803d',
     marginRight: 8,
   },
   dishName: {
@@ -557,7 +557,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     borderLeftWidth: 3,
-    borderLeftColor: '#2c95f8',
+    borderLeftColor: '#15803d',
   },
   noteText: {
     fontSize: 14,
@@ -569,7 +569,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2c95f8',
+    backgroundColor: '#15803d',
     padding: 16,
     borderRadius: 12,
     marginTop: 8,

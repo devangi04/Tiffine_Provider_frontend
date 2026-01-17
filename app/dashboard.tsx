@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   View, 
   ScrollView, 
@@ -14,18 +14,20 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
-  FlatList
+  FlatList,
+  Image
 } from 'react-native';
+
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons, Feather } from '@expo/vector-icons';
-import { useRouter, useNavigation } from 'expo-router';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter, useNavigation, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import axios from 'axios';
 import { useAppSelector, useAppDispatch } from './store/hooks';
 import { clearSearchQuery } from './store/slices/searchslice';
 import DashboardHeader from '@/components/dahsboardheader';
 import SearchBar from '@/components/searchbar';
-import Text, {TextStyles} from '@/components/ztext';
+import Text from '@/components/ztext';
 import { API_URL } from './config/env';
 const { width, height } = Dimensions.get('window');
 
@@ -44,6 +46,9 @@ interface ProviderData {
 interface MenuItem {
   type: string;
   dish: string;
+  categoryId?: string;
+  categoryName?: string;
+  dishes?: Array<{ dishName: string }>;
 }
 
 interface Order {
@@ -84,13 +89,77 @@ interface SearchResultItem {
   isActive?: boolean;
 }
 
+// Define the desired category order
+const CATEGORY_ORDER = ['sabji', 'roti', 'rice', 'dal', 'extra', 'special'];
+
+// Function to sort categories in specific order
+const sortCategories = (categories: MenuItem[]): MenuItem[] => {
+  if (!categories || !Array.isArray(categories)) return [];
+  
+  return [...categories].sort((a, b) => {
+    const aCategory = a.type?.toLowerCase() || a.categoryName?.toLowerCase() || '';
+    const bCategory = b.type?.toLowerCase() || b.categoryName?.toLowerCase() || '';
+    
+    const aIndex = CATEGORY_ORDER.indexOf(aCategory);
+    const bIndex = CATEGORY_ORDER.indexOf(bCategory);
+    
+    if (aIndex !== -1 && bIndex !== -1) {
+      return aIndex - bIndex;
+    }
+    
+    if (aIndex !== -1) return -1;
+    if (bIndex !== -1) return 1;
+    
+    return (a.type || a.categoryName || '').localeCompare(b.type || b.categoryName || '');
+  });
+};
+
+// Category Icon Component
+interface CategoryIconProps {
+  categoryName: string;
+  size?: number;
+  color?: string;
+}
+
+const CategoryIcon: React.FC<CategoryIconProps> = ({ 
+  categoryName, 
+  size = 16, 
+  color = "#6B7280" 
+}) => {
+  if (!categoryName) {
+    return <Ionicons name="restaurant-outline" size={size} color={color} />;
+  }
+
+  const lowerName = categoryName.toLowerCase();
+  
+  switch (lowerName) {
+    case 'sabji':
+    case 'vegetable':
+      return <Ionicons name="leaf-outline" size={size} color={color} />;
+    case 'roti':
+    case 'bread':
+      return <MaterialCommunityIcons name="food-fork-drink" size={size} color={color} />;
+    case 'rice':
+      return <MaterialCommunityIcons name="rice" size={size} color={color} />;
+    case 'dal':
+    case 'curry':
+      return <Ionicons name="water-outline" size={size} color={color} />;
+    case 'extra':
+      return <Ionicons name="add-circle-outline" size={size} color={color} />;
+    case 'special':
+      return <Ionicons name="star-outline" size={size} color={color} />;
+    default:
+      return <Ionicons name="restaurant-outline" size={size} color={color} />;
+  }
+};
+
 const TiffinDashboard = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const [activeNav, setActiveNav] = useState('Home');
   const [loading, setLoading] = useState(true);
   const [providerData, setProviderData] = useState<ProviderData | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
 
   // Redux
   const provider = useAppSelector((state) => state.provider);
@@ -99,20 +168,45 @@ const TiffinDashboard = () => {
   const searchResults = searchState.results;
   const searchLoading = searchState.loading;
   const searchError = searchState.error;
-  const searchQuery = searchState.query; // Get search query from Redux
+  const searchQuery = searchState.query;
 
   const navbarOpacity = new Animated.Value(1);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const providerId = provider.id;
   const [currentTime, setCurrentTime] = useState(new Date());
+  const searchBarRef = useRef<any>(null);
+
+    useEffect(() => {
+    const handleTouchOutside = () => {
+      if (isSearchFocused && searchQuery.trim().length === 0) {
+        Keyboard.dismiss();
+        setIsSearchFocused(false);
+      }
+    };
+
+    // Add touch event listener
+    const subscription = TouchableOpacity.TOUCH_TARGET_DEBUG && 
+      TouchableOpacity.TOUCH_TARGET_DEBUG.addListener(handleTouchOutside);
+
+    return () => {
+      if (subscription) {
+        subscription.remove();
+      }
+    };
+  }, [isSearchFocused, searchQuery]);
+
+    const handleBackFromSearch = () => {
+    Keyboard.dismiss();
+    dispatch(clearSearchQuery());
+    setIsSearchFocused(false);
+  };
 
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(new Date());
-    }, 1000); // update every second
-
-    return () => clearInterval(interval); // cleanup when unmounting
+    }, 1000);
+    return () => clearInterval(interval);
   }, []);
   
   const navigation = useNavigation();
@@ -161,27 +255,36 @@ const TiffinDashboard = () => {
     };
   }, []);
 
+  // Clear search when returning to dashboard
+ useFocusEffect(
+  useCallback(() => {
+    // Don't clear on focus - only clear on unmount
+    return () => {
+      // Clear when leaving the screen (not when coming back)
+      dispatch(clearSearchQuery());
+      setIsSearchFocused(false);
+    };
+  }, [dispatch])
+);
+
+  // Optimized data fetching (parallel requests)
   const fetchProviderData = async () => {
     try {
       setLoading(true);
       
-      // Fetch provider details
-      const providerResponse = await axios.get(
-        `${API_BASE_URL}/api/providers/${providerId}`,
-        {
-          timeout: 10000,
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
+      // Make both requests in parallel
+      const [providerResponse, dashboardResponse] = await Promise.all([
+        axios.get(
+          `${API_BASE_URL}/api/providers/${providerId}`,
+          {
+            timeout: 10000,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            }
           }
-        }
-      );
-
-      if (providerResponse.data.success) {
-        setProviderData(providerResponse.data.data);
-        
-        // Fetch dashboard data
-        const dashboardResponse = await axios.get(
+        ),
+        axios.get(
           `${API_BASE_URL}/api/providers/${providerId}/dashboard`,
           {
             timeout: 10000,
@@ -190,15 +293,14 @@ const TiffinDashboard = () => {
               'Accept': 'application/json'
             }
           }
-        );
+        )
+      ]);
 
-        if (dashboardResponse.data.success) {
-          setDashboardData(dashboardResponse.data.data);
-        } else {
-          throw new Error(dashboardResponse.data.error || 'Failed to fetch dashboard data');
-        }
+      if (providerResponse.data.success && dashboardResponse.data.success) {
+        setProviderData(providerResponse.data.data);
+        setDashboardData(dashboardResponse.data.data);
       } else {
-        throw new Error(providerResponse.data.error || 'Failed to fetch provider data');
+        throw new Error(providerResponse.data.error || dashboardResponse.data.error || 'Failed to fetch data');
       }
     } catch (error: any) {
       let errorMessage = 'Failed to fetch data. Please try again.';
@@ -226,44 +328,42 @@ const TiffinDashboard = () => {
     });
   };
 
-  const handleSearchItemClick = (item: SearchResultItem, category: string) => {
-    switch (category) {
-      case 'customers':
-        // Navigate to customer details page
-        router.push({
-          pathname: '/serachcustomerdetails',
-          params: {
-            id: item._id,
-            name: item.name || item.customerName,
-            phone: item.phone,
-            tiffinType: item.tiffinType
-          }
-        });
-        break;
-      case 'bills':
-        // Navigate to bill page
-        router.push({
-          pathname: '/bill',
-          params: { 
-            billId: item._id,
-            searchQuery: searchQuery 
-          }
-        });
-        break;
-      default:
-        console.log('Unknown category:', category);
+  // Clear search before navigation
+const handleSearchItemClick = (item: SearchResultItem, category: string) => {
+  // Dismiss keyboard
+  Keyboard.dismiss();
+  
+  // Store the target route details first
+  const targetRoute = {
+    pathname: '/serachcustomerdetails',
+    params: {
+      id: item._id,
+      name: item.name || item.customerName,
+      phone: item.phone,
+      tiffinType: item.tiffinType
     }
-    
-    // DO NOT clear search here - let user see their search results when they come back
   };
+  
+  // Clear search and navigate in the same tick
+  dispatch(clearSearchQuery());
+  setIsSearchFocused(false);
+  
+  // Navigate immediately without delay
+  router.push(targetRoute);
+};
 
   const handleSearch = (text: string) => {
-    // Empty function - SearchBar handles Redux updates
-    // Keep it for compatibility if needed
+    // This is handled by SearchBar component
+  };
+
+  const handleSearchFocus = () => {
+    setIsSearchFocused(true);
   };
 
   const clearSearch = () => {
     dispatch(clearSearchQuery());
+    setIsSearchFocused(false);
+    Keyboard.dismiss();
   };
 
   // Helper function to get display name for search results
@@ -315,12 +415,28 @@ const TiffinDashboard = () => {
     searchResults.responses.length +
     searchResults.bills.length;
 
+  // Get sorted menu
+  const sortedMenu = sortCategories(dashboardData?.menu || []);
+
   // Render search results
   const renderSearchResults = () => {
+    if (searchQuery.trim().length === 0 && isSearchFocused) {
+      // Show empty search state when focused but no query
+      return (
+        <View style={styles.searchResultsEmpty}>
+          <Ionicons name="search-outline" size={64} color="#ccc" />
+          <Text weight="medium" style={styles.emptySearchText}>Start typing to search</Text>
+          <Text style={styles.emptySearchSubtext}>
+            Search for customers, dishes, menus, responses, or bills
+          </Text>
+        </View>
+      );
+    }
+
     if (searchLoading) {
       return (
         <View style={styles.searchResultsLoading}>
-          <ActivityIndicator size="large" color="#2c95f8" />
+          <ActivityIndicator size="large" color="#15803d" />
           <Text style={styles.loadingText}>Searching...</Text>
         </View>
       );
@@ -357,15 +473,16 @@ const TiffinDashboard = () => {
         ]}
         keyExtractor={(item) => `${item.category}-${item._id}`}
         renderItem={({ item }) => (
-          <View style={styles.searchItem}>
-            <TouchableOpacity 
-              style={styles.searchItemContent}
-              onPress={() => handleSearchItemClick(item, item.category)}
-            >
-              <Text style={styles.searchItemName}>{getDisplayName(item)}</Text>
+          <TouchableOpacity 
+            style={styles.searchItem}
+            onPress={() => handleSearchItemClick(item, item.category)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.searchItemContent}>
+              <Text weight="semiBold" style={styles.searchItemName}>{getDisplayName(item)}</Text>
               <Text style={styles.searchItemType}>{getDisplayType(item, item.category)}</Text>
               <Text style={styles.searchItemInfo}>{getAdditionalInfo(item, item.category)}</Text>
-            </TouchableOpacity>
+            </View>
             <View style={[
               styles.categoryBadge,
               { backgroundColor: getCategoryColor(item.category) }
@@ -374,12 +491,12 @@ const TiffinDashboard = () => {
                 {item.category.charAt(0).toUpperCase() + item.category.slice(1)}
               </Text>
             </View>
-          </View>
+          </TouchableOpacity>
         )}
         ListHeaderComponent={() => (
           <View style={styles.searchResultsHeader}>
             <View style={styles.searchHeaderContent}>
-              <Text style={styles.searchTitle}>Search Results</Text>
+              <Text weight="bold" style={styles.searchTitle}>Search Results</Text>
               <Text style={styles.searchSubtitle}>{totalSearchResults} results found</Text>
             </View>
             <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
@@ -387,8 +504,10 @@ const TiffinDashboard = () => {
             </TouchableOpacity>
           </View>
         )}
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.searchResultsContainer}
+        onScrollBeginDrag={() => Keyboard.dismiss()}
       />
     );
   };
@@ -405,9 +524,137 @@ const TiffinDashboard = () => {
     return colors[category as keyof typeof colors] || '#6b7280';
   };
 
+  // Helper function to capitalize first letter
+  const capitalizeFirst = (str: string) => {
+    if (!str) return '';
+    return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+  };
+
+  // Render Today's Menu Card (Updated design)
+  const renderTodaysMenuCard = () => {
+    const hasMenu = sortedMenu.length > 0;
+    
+    return (
+      <TouchableOpacity 
+        style={styles.menuCard}
+        onPress={() => router.push('/schedule')}
+        activeOpacity={0.9}
+      >
+        <View style={styles.menuCardHeader}>
+          <View style={styles.menuHeaderLeft}>
+            <Ionicons name="restaurant" size={24} color="#FF3B30" />
+            <View style={styles.menuHeaderCenter}>
+              <Text weight="extraBold" style={styles.menuTitle}>
+                Today's Menu
+              </Text>
+              <Text weight="bold" style={styles.menuSubtitle}>
+                {new Date().toLocaleString('en-US', { weekday: 'long' })} Special
+              </Text>
+            </View>
+          </View>
+          <View style={styles.menuHeaderRight}>
+            <View style={styles.menuStatusBadge}>
+              <Ionicons 
+                name={hasMenu ? "checkmark-circle" : "time-outline"} 
+                size={14} 
+                color={hasMenu ? "#10B981" : "#F59E0B"} 
+              />
+              <Text weight="bold" style={[
+                styles.menuStatusText,
+                { color: hasMenu ? "#10B981" : "#F59E0B" }
+              ]}>
+                {hasMenu ? 'Ready' : 'Pending'}
+              </Text>
+            </View>
+          </View>
+        </View>
+        
+        {!hasMenu ? (
+          <View style={styles.emptyMenu}>
+            <Ionicons name="fast-food-outline" size={48} color="#D1D5DB" />
+            <Text weight="bold" style={styles.emptyMenuTitle}>No Menu Available</Text>
+            <Text weight="bold" style={styles.emptyMenuText}>
+              Today's menu hasn't been send yet. Tap to add menu items.
+            </Text>
+          </View>
+        ) : (
+          <>
+            {/* Compact Menu Preview */}
+            <View style={styles.compactMenu}>
+              {sortedMenu.slice(0, 4).map((item, index) => {
+                const categoryName = item.type || item.categoryName || 'Category';
+                const dishName = item.dish || item.dishes?.[0]?.dishName || 'No dish';
+                
+                return (
+                  <View 
+                    key={item.type || index} 
+                    style={[
+                      styles.compactCategory,
+                      index >= 3 && styles.blurredCategory
+                    ]}
+                  >
+                    <View style={styles.categoryHeader}>
+                      <CategoryIcon 
+                        categoryName={categoryName} 
+                        size={16} 
+                        color={index >= 3 ? "#D1D5DB" : "#6B7280"} 
+                      />
+                      <Text weight="bold" style={[
+                        styles.compactCategoryName,
+                        index >= 3 && styles.blurredText
+                      ]}>
+                        {capitalizeFirst(categoryName)}
+                      </Text>
+                    </View>
+                    <Text weight="bold" style={[
+                      styles.compactDish,
+                      index >= 3 && styles.blurredText
+                    ]}>
+                      {capitalizeFirst(dishName)}
+                    </Text>
+                  </View>
+                );
+              })}
+              
+              {/* View Details Button */}
+              {sortedMenu.length > 3 && (
+                <TouchableOpacity 
+                  style={styles.viewDetailsButton}
+                  onPress={() => router.push('/schedule')}
+                >
+                  <Text weight="bold" style={styles.viewDetailsText}>View Sent menu</Text>
+                  <Ionicons name="chevron-forward" size={16} color="#FF3B30" />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Quick Actions */}
+            {/* <View style={styles.quickActions}>
+              <TouchableOpacity 
+                style={styles.quickActionButton}
+                onPress={() => router.push('/schedule')}
+              >
+                <Ionicons name="pencil" size={16} color="#3B82F6" />
+                <Text weight="bold" style={styles.quickActionText}>Edit Menu</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.quickActionButton}
+                onPress={() => router.push('/response')}
+              >
+                <Ionicons name="eye" size={16} color="#10B981" />
+                <Text weight="bold" style={styles.quickActionText}>View Responses</Text>
+              </TouchableOpacity>
+            </View> */}
+          </>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
   // Render dashboard content
   const renderDashboardContent = () => (
-    <ScrollView 
+    <ScrollView  
       style={styles.scrollView}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={[
@@ -419,28 +666,50 @@ const TiffinDashboard = () => {
         <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
-          colors={['#2c95f8']}
-          tintColor={'#2c95f8'}
+          colors={['#15803d']}
+          tintColor={'#15803d'}
         />
       }
     >
       {/* Search Bar - Inside ScrollView so it scrolls */}
-      <SearchBar onSearch={handleSearch} />
+      <SearchBar 
+        onSearch={handleSearch} 
+        autoFocus={false}
+        onFocus={handleSearchFocus}
+        onBlur={() => {
+          // Only blur if there's no text
+          if (searchQuery.trim().length === 0) {
+            setTimeout(() => {
+              setIsSearchFocused(false);
+            }, 200);
+          }
+        }}
+      />
       
       {/* Hero Card */}
-      <LinearGradient
-        colors={['#004C99', '#4694e2ff']}
-        style={styles.heroCard}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        <View style={styles.heroContent}>
-          <Text weight='extraBold'  style={styles.heroTitle}>Today's Orders</Text>
-          <Text style={styles.heroValue}>{dashboardData?.todayOrders || 0}</Text>
-        </View>
+     <LinearGradient
+  colors={['#15803d', '#17b751ff']}
+  style={styles.heroCard}
+  start={{ x: 0, y: 0 }}
+  end={{ x: 1, y: 1 }}
+>
+  <View style={styles.heroContent}>
+    <Text weight="extraBold" style={styles.heroTitle}>
+      Today's Tiffin Count
+    </Text>
+    <Text weight="extraBold" style={styles.heroValue}>
+      {dashboardData?.todayOrders || 0}
+    </Text>
+  </View>
 
-        <Ionicons name="fast-food-outline" size={42} color="#faf8f8ff" style={styles.heroIcon} />
-      </LinearGradient>
+  {/* Image instead of Icon */}
+  <Image
+    source={require('../assets/images/Single_Logo_Trans.png')}
+    style={styles.heroImage}
+    resizeMode="contain"
+  />
+</LinearGradient>
+
 
       {/* Stats Section */}
       <View style={styles.section}>
@@ -469,7 +738,7 @@ const TiffinDashboard = () => {
             <View style={styles.statHeader}>
               <View style={styles.statInfo}>
                 <Text weight='bold' style={styles.statInfoTitle}>Response</Text>
-                <Text weight='bold' style={styles.statInfoSubtitle}>Yes Count</Text>
+                <Text weight='bold' style={styles.statInfoSubtitle}>Will Take Tiffin</Text>
               </View>
               <View style={[styles.statIcon, { backgroundColor: '#10b981' }]} />
             </View>
@@ -480,7 +749,7 @@ const TiffinDashboard = () => {
             <View style={styles.statHeader}>
               <View style={styles.statInfo}>
                 <Text weight='bold' style={styles.statInfoTitle}>Response</Text>
-                <Text weight='bold' style={styles.statInfoSubtitle}>No Count</Text>
+                <Text weight='bold' style={styles.statInfoSubtitle}>Will Not Take Tiffin</Text>
               </View>
               <View style={[styles.statIcon, { backgroundColor: '#eb1b1b' }]} />
             </View>
@@ -493,15 +762,12 @@ const TiffinDashboard = () => {
       <View style={styles.actionsGrid}>
         <TouchableOpacity 
           style={styles.actionCard}
-          onPress={() => router.push('/menu')}
+          onPress={() => router.push('/schedule')}
         >
           <View style={styles.actionHeader}>
-            <View>
-              <Text weight='bold' style={styles.actionTitle}>Menu</Text>
-              <Text weight='bold' style={styles.actionSubtitle}>Create Today's</Text>
-            </View>
-            <View style={[styles.actionStatus, styles.statusActive]}>
-              <Text  weight='bold' style={styles.actionStatusText}>Ready</Text>
+           <View>
+              <Text weight='bold' style={styles.actionTitle}>Today’s Menu</Text>
+              <Text weight='bold' style={styles.actionSubtitle}>Add or Update</Text>
             </View>
           </View>
         </TouchableOpacity>
@@ -510,52 +776,20 @@ const TiffinDashboard = () => {
           <View style={styles.actionHeader}>
             <View>
               <Text weight='bold' style={styles.actionTitle}>Responses</Text>
-              <Text style={styles.actionSubtitle}>View All</Text>
-            </View>
-            <View style={[styles.actionStatus, styles.statusActive]}>
-              <Text weight='bold' style={styles.actionStatusText}>Check</Text>
-            </View>
-          </View>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/custmorelist')}>
-          <View style={styles.actionHeader}>
-            <View>
-              <Text  weight='bold'style={styles.actionTitle}>Customer</Text>
               <Text weight='bold' style={styles.actionSubtitle}>View All</Text>
-            </View>
-            <View style={[styles.actionStatus, styles.statusActive]}>
-              <Text weight='bold' style={styles.actionStatusText}>{dashboardData?.todayOrders || 0} new</Text>
             </View>
           </View>
         </TouchableOpacity>
       </View>
 
-      {/* Today's Menu */}
-      <View style={styles.menuCard}>
-        <View style={styles.menuHeader}>
-          <Text weight='extraBold' style={styles.menuTitle}>Today's Menu</Text>
-          <Text  weight='bold' style={styles.menuSubtitle}>
-            {new Date().toLocaleString('en-US', { weekday: 'long' })} Special
-          </Text>
-        </View>
-        {dashboardData?.menu && dashboardData.menu.length > 0 ? (
-          dashboardData.menu.map((item, index) => (
-            <View key={index} style={styles.menuItem}>
-              <Text style={styles.menuType}>{item.type}</Text>
-              <Text style={styles.menuDish}>{item.dish}</Text>
-            </View>
-          ))
-        ) : (
-          <Text style={styles.noMenuText}>No menu available for today</Text>
-        )}
-      </View>
+      {/* Today's Menu Card - UPDATED DESIGN */}
+      {renderTodaysMenuCard()}
 
       {/* Recent Orders */}
       <View style={styles.ordersCard}>
-        <View style={styles.menuHeader}>
-          <Text weight='extraBold' style={styles.menuTitle}>Recent Orders</Text>
-          <Text  weight='bold' style={styles.menuSubtitle}>Latest customer orders</Text>
+        <View style={styles.ordersHeader}>
+          <Text weight='extraBold' style={styles.ordersTitle}>Recent Orders</Text>
+          <Text weight='bold' style={styles.ordersSubtitle}>Latest customer orders</Text>
         </View>
         {dashboardData?.recentOrders && dashboardData.recentOrders.length > 0 ? (
           dashboardData.recentOrders.map((order, index) => (
@@ -585,7 +819,7 @@ const TiffinDashboard = () => {
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2c95f8" />
+        <ActivityIndicator size="large" color="#15803d" />
         <Text style={styles.loadingText}>Loading dashboard...</Text>
       </SafeAreaView>
     );
@@ -593,11 +827,11 @@ const TiffinDashboard = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar
+      {/* <StatusBar
         translucent
         backgroundColor="transparent"
         barStyle="light-content"
-      />
+      /> */}
       
       <KeyboardAvoidingView 
         style={styles.keyboardAvoid}
@@ -611,14 +845,23 @@ const TiffinDashboard = () => {
         
         {/* Content Area - Different layout for search vs dashboard */}
         <View style={styles.contentArea}>
-          {searchQuery.trim().length > 0 ? (
+          {searchQuery.trim().length > 0 || isSearchFocused ? (
             // Search Mode: SearchBar fixed, results scroll
             <View style={styles.searchModeContainer}>
               {/* Fixed SearchBar in search mode */}
               <View style={styles.searchBarFixed}>
                 <SearchBar 
                   onSearch={handleSearch} 
-                  autoFocus={true} 
+                  autoFocus={true}
+                  onFocus={() => setIsSearchFocused(true)}
+                  onBlur={() => {
+                    if (searchQuery.trim().length === 0) {
+                      // Small delay before hiding search mode
+                      setTimeout(() => {
+                        setIsSearchFocused(false);
+                      }, 200);
+                    }
+                  }}
                 />
               </View>
               {/* Scrollable Search Results */}
@@ -711,11 +954,20 @@ const styles = StyleSheet.create({
   heroValue: {
     color: 'white',
     fontSize: 36,
-    fontWeight: '700',
   },
   heroIcon: {
     fontSize: 48,
   },
+  heroImage: {
+  marginBottom:20,
+  width: 48,
+  height: 48,
+  position: 'absolute',
+  right: 16,
+  bottom: 16,
+  opacity: 0.95,
+},
+
   section: {
     marginBottom: 24,
     width: 'auto',
@@ -729,17 +981,10 @@ const styles = StyleSheet.create({
   sectionDate: {
     color: 'black',
     fontSize: 14,
-    fontWeight: '900',
   },
   sectionTime: {
     color: '#555',
     fontSize: 14,
-  },
-  sectionTitle: {
-    color: 'black',
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 16,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -771,7 +1016,6 @@ const styles = StyleSheet.create({
   statInfoTitle: {
     fontSize: 14,
     color: '#333',
-    fontWeight: '600',
     marginBottom: 4,
   },
   statInfoSubtitle: {
@@ -785,7 +1029,6 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: 20,
-    fontWeight: '700',
     color: '#333',
   },
   actionsGrid: {
@@ -815,7 +1058,6 @@ const styles = StyleSheet.create({
   actionTitle: {
     fontSize: 14,
     color: '#333',
-    fontWeight: '600',
     marginBottom: 4,
   },
   actionSubtitle: {
@@ -830,63 +1072,160 @@ const styles = StyleSheet.create({
   statusActive: {
     backgroundColor: '#dcfce7',
   },
-  statusInactive: {
-    backgroundColor: '#fef3c7',
-  },
   actionStatusText: {
     fontSize: 11,
-    fontWeight: '500',
   },
+  
+  // Updated Menu Card Styles (Matching customer dashboard design)
   menuCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 20,
-    padding: 20,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 0,
     marginBottom: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 20,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    overflow: 'hidden',
   },
-  menuHeader: {
-    marginBottom: 16,
+  menuCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  menuHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  menuHeaderCenter: {
+    marginLeft: 10,
   },
   menuTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
+    color: '#111827',
   },
   menuSubtitle: {
     fontSize: 12,
     color: '#666',
+    marginTop: 2,
   },
-  menuItem: {
+  menuHeaderRight: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
   },
-  menuType: {
+  menuStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    gap: 4,
+  },
+  menuStatusText: {
+    fontSize: 12,
     fontWeight: '600',
-    color: '#3b82f6',
-    fontSize: 13,
-    minWidth: 60,
   },
-  menuDish: {
-    color: '#333',
+  
+  // Empty Menu
+  emptyMenu: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyMenuTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  emptyMenuText: {
     fontSize: 14,
-    flex: 1,
-    textAlign: 'right',
-  },
-  noMenuText: {
+    color: '#9CA3AF',
     textAlign: 'center',
-    color: '#666',
-    padding: 20,
-    fontStyle: 'italic',
+    lineHeight: 20,
   },
+  
+  // Compact Menu with Blur Effect
+  compactMenu: {
+    padding: 20,
+    paddingBottom: 0,
+  },
+  compactCategory: {
+    marginBottom: 12,
+  },
+  blurredCategory: {
+    opacity: 0.5,
+  },
+  categoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    gap: 8,
+  },
+  compactCategoryName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  compactDish: {
+    fontSize: 13,
+    color: '#6B7280',
+    lineHeight: 18,
+    marginLeft: 24,
+  },
+  blurredText: {
+    color: '#D1D5DB',
+  },
+  
+  // View Details Button
+  viewDetailsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 7,
+    marginTop: -6,
+    marginBottom: 4,
+    gap: 2,
+  },
+  viewDetailsText: {
+    fontSize: 14,
+    color: '#FF3B30',
+    fontWeight: '600',
+  },
+  
+  // Quick Actions
+  quickActions: {
+    flexDirection: 'row',
+    padding: 20,
+    paddingTop: 10,
+    gap: 12,
+  },
+  quickActionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    gap: 8,
+  },
+  quickActionText: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '600',
+  },
+
+  // Orders Card
   ordersCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 20,
@@ -897,6 +1236,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 20,
     elevation: 3,
+  },
+  ordersHeader: {
+    marginBottom: 16,
+  },
+  ordersTitle: {
+    fontSize: 16,
+    color: '#333',
+    marginBottom: 4,
+  },
+  ordersSubtitle: {
+    fontSize: 12,
+    color: '#666',
   },
   orderItem: {
     flexDirection: 'row',
@@ -910,7 +1261,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   orderName: {
-    fontWeight: '600',
     color: '#333',
     fontSize: 14,
     marginBottom: 4,
@@ -932,7 +1282,6 @@ const styles = StyleSheet.create({
   },
   orderStatusText: {
     fontSize: 11,
-    fontWeight: '500',
   },
   noOrdersText: {
     textAlign: 'center',
@@ -940,6 +1289,7 @@ const styles = StyleSheet.create({
     padding: 20,
     fontStyle: 'italic',
   },
+
   // Search Results Styles
   searchResultsContainer: {
     paddingHorizontal: 20,
@@ -958,7 +1308,6 @@ const styles = StyleSheet.create({
   },
   searchTitle: {
     fontSize: 18,
-    fontWeight: '600',
     color: '#333',
   },
   searchSubtitle: {
@@ -970,8 +1319,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   clearButtonText: {
-    color: '#2c95f8',
-    fontWeight: '500',
+    color: '#15803d',
   },
   searchItem: {
     backgroundColor: 'white',
@@ -992,7 +1340,6 @@ const styles = StyleSheet.create({
   },
   searchItemName: {
     fontSize: 16,
-    fontWeight: '600',
     color: '#333',
     marginBottom: 4,
   },
@@ -1000,7 +1347,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#3b82f6',
     marginBottom: 4,
-    fontWeight: '500',
   },
   searchItemInfo: {
     fontSize: 12,
@@ -1013,7 +1359,6 @@ const styles = StyleSheet.create({
   },
   categoryBadgeText: {
     fontSize: 10,
-    fontWeight: '600',
     color: 'white',
   },
   searchResultsLoading: {
@@ -1022,11 +1367,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 40,
   },
+  searchResultsEmpty: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptySearchText: {
+    textAlign: 'center',
+    color: '#333',
+    fontSize: 18,
+    marginTop: 16,
+  },
+  emptySearchSubtext: {
+    textAlign: 'center',
+    color: '#666',
+    fontSize: 14,
+    marginTop: 8,
+    paddingHorizontal: 20,
+  },
   noResultsText: {
     textAlign: 'center',
     color: '#333',
     fontSize: 18,
-    fontWeight: '600',
     marginTop: 16,
   },
   noResultsSubtext: {
@@ -1042,7 +1405,7 @@ const styles = StyleSheet.create({
     marginTop: 40,
   },
   retryButton: {
-    backgroundColor: '#2c95f8',
+    backgroundColor: '#15803d',
     padding: 12,
     borderRadius: 8,
     marginTop: 16,
@@ -1050,8 +1413,8 @@ const styles = StyleSheet.create({
   },
   retryButtonText: {
     color: 'white',
-    fontWeight: '500',
   },
+  
 });
 
 export default TiffinDashboard;

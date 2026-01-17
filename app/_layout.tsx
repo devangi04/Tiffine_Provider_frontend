@@ -1,11 +1,12 @@
 // app/_layout.tsx
 import { useEffect } from 'react';
 import { Provider } from 'react-redux';
-import { store } from './store';
+import { store,persistor } from './store';
 import { Stack, usePathname } from 'expo-router';
+import { PersistGate } from 'redux-persist/integration/react'; // ✅ Import PersistGate
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { View, StyleSheet, Text } from 'react-native';
+import { View, StyleSheet, Text,ActivityIndicator } from 'react-native';
 import 'react-native-reanimated';
 import { useFonts } from "expo-font";
 import * as SplashScreen from 'expo-splash-screen';
@@ -59,11 +60,11 @@ import {
 import Header from '../components/header';
 import BottomNavBar from '../components/navbar';
 import DashboardHeader from '../components/dahsboardheader';
+import AuthChecker from '@/components/authcheck';
+import CustomSplashScreen from '@/components/splashscreen';
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
-
-// ... Rest of your LayoutContent component ...
 
 function LayoutContent() {
   const pathname = usePathname();
@@ -99,7 +100,8 @@ function LayoutContent() {
     '/subscriptionmanagement': { title: 'Subscription Details', subtitle: 'See your details', showHeader: true, showNavbar: true, headerType: 'default' },
     '/menu': { title: 'Weekly Menu', subtitle: 'Create Menus', showHeader: true, showNavbar: false, headerType: 'default' },
      '/legalmenu': { title: 'About us', subtitle: 'Terms & Privacy Policy', showHeader: true, showNavbar: false, headerType: 'default' },
-    
+         '/providerseetingscreen': { title: 'Provider setting', subtitle: 'Configure your services', showHeader: true, showNavbar: false, headerType: 'default' },
+
     '/categorymaster': { title: 'Category Master', subtitle: 'Manage Categories', showHeader: true, showNavbar: true, headerType: 'default' },
     '/edit': { title: 'Personal Details', subtitle: 'Manage Details', showHeader: true, showNavbar: false, headerType: 'default' },
     
@@ -148,13 +150,15 @@ function LayoutContent() {
         <Stack
           screenOptions={{
             headerShown: false,
+            animationDuration: 300,
             animation: 'none',
             gestureEnabled: true,
-            presentation: 'card',
           }}
         >
+           {/* <Stack.Screen name="index" /> */}
           <Stack.Screen name="welcome" />
           <Stack.Screen name="login" />
+          <Stack.Screen name="auth" />
           <Stack.Screen name="forgotpassword" />
           <Stack.Screen name="dashboard" />
           <Stack.Screen name="profile" />
@@ -167,10 +171,9 @@ function LayoutContent() {
           <Stack.Screen name="savedmenu" />
           <Stack.Screen name="subscriptionmanagement" />
           <Stack.Screen name="menu" />
-           <Stack.Screen  name="customer-details" options={{ headerShown: false,presentation: 'modal' }} />
           <Stack.Screen name="categorymaster" />
           <Stack.Screen name="edit" />
-          <Stack.Screen name="(tabs)" />
+          {/* <Stack.Screen name="(tabs)" /> */}
           <Stack.Screen name="+not-found" />
         </Stack>
       </View>
@@ -237,10 +240,24 @@ export default function RootLayout() {
   }
 
   return (
-    <Provider store={store}>
-      <SafeAreaProvider>
-        <LayoutContent />
-      </SafeAreaProvider>
+  <Provider store={store}>
+      {/* ✅ Wrap with PersistGate for Redux Persist */}
+      <PersistGate 
+        loading={
+          <CustomSplashScreen/>
+        }
+        persistor={persistor}
+        onBeforeLift={() => {
+          console.log('Redux persistence is about to lift');
+        }}
+      >
+        <SafeAreaProvider>
+          {/* ✅ Wrap with AuthChecker for automatic auth redirection */}
+          <AuthChecker>
+            <LayoutContent />
+         </AuthChecker>
+        </SafeAreaProvider>
+      </PersistGate>
     </Provider>
   );
 }
@@ -256,5 +273,11 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
   },
 });

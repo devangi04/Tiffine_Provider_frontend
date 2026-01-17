@@ -43,7 +43,6 @@ const PrivacyPolicyScreen = () => {
         url: 'https://triospheretech.com/contact.html',
       });
     } catch (error) {
-      console.error('Error sharing:', error);
     }
   };
 
@@ -66,7 +65,6 @@ const PrivacyPolicyScreen = () => {
       title: 'Information We Collect',
       items: [
         'Full name, phone number, email address',
-        'Business details and GST information',
         'Menu and dish information',
         'Customer data collected through your services',
         'Payment information via Razorpay',
@@ -151,7 +149,7 @@ const PrivacyPolicyScreen = () => {
         return (
           <View style={styles.sectionCard} key={section.id}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="person" size={20} color="#2c95f8" />
+              <Ionicons name="person" size={20} color="#15803d" />
               <Text style={styles.sectionTitle}>{section.title}</Text>
             </View>
             <View style={styles.contactCard}>
@@ -186,7 +184,7 @@ const PrivacyPolicyScreen = () => {
         return (
           <View style={styles.sectionCard} key={section.id}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="document-text" size={20} color="#2c95f8" />
+              <Ionicons name="document-text" size={20} color="#15803d" />
               <Text style={styles.sectionTitle}>{section.title}</Text>
             </View>
             {section.content && (
@@ -273,7 +271,7 @@ const PrivacyPolicyScreen = () => {
       >
         {/* Hero Section */}
         <LinearGradient
-          colors={['#2c95f8', '#4694e2']}
+          colors={['#15803d', '#4694e2']}
           style={styles.heroCard}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -293,7 +291,7 @@ const PrivacyPolicyScreen = () => {
             {stats.map((stat, index) => (
               <View key={index} style={styles.statItem}>
                 <View style={styles.statIconWrapper}>
-                  <Ionicons name={stat.icon as any} size={20} color="#2c95f8" />
+                  <Ionicons name={stat.icon as any} size={20} color="#15803d" />
                 </View>
                 <Text style={styles.statValue}>{stat.value}</Text>
                 <Text style={styles.statLabel}>{stat.label}</Text>
@@ -327,7 +325,7 @@ const PrivacyPolicyScreen = () => {
                 activeOpacity={0.7}
               >
                 <View style={styles.contactIconWrapper}>
-                  <Ionicons name={contact.icon as any} size={20} color="#2c95f8" />
+                  <Ionicons name={contact.icon as any} size={20} color="#15803d" />
                 </View>
                 <View style={styles.contactInfo}>
                   <Text style={styles.contactLabel}>{contact.label}</Text>
@@ -342,7 +340,7 @@ const PrivacyPolicyScreen = () => {
         {/* Provider Responsibilities */}
         <View style={styles.responsibilitiesCard}>
           <View style={styles.responsibilitiesHeader}>
-            <Ionicons name="briefcase" size={24} color="#2c95f8" />
+            <Ionicons name="briefcase" size={24} color="#15803d" />
             <Text style={styles.responsibilitiesTitle}>Your Responsibilities as a Provider</Text>
           </View>
           <View style={styles.responsibilitiesList}>
@@ -401,19 +399,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     height: 60,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
+   backButton: {width: 40,height: 40,borderRadius: 22,backgroundColor: 'white',alignItems: 'center',justifyContent: 'center',shadowColor: '#000',shadowOffset: { width: 0, height: 2 },shadowOpacity: 0.08,shadowRadius: 8,elevation: 3,},
+
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
@@ -600,7 +587,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   linkText: {
-    color: '#2c95f8',
+    color: '#15803d',
     textDecorationLine: 'underline',
   },
   procedureCard: {

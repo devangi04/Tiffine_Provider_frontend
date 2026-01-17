@@ -43,7 +43,6 @@ const TermsConditionsScreen = () => {
         url: 'https://www.tiffine.com/terms',
       });
     } catch (error) {
-      console.error('Error sharing:', error);
     }
   };
 
@@ -206,7 +205,7 @@ const TermsConditionsScreen = () => {
   const renderSection = (section: any) => (
     <View style={styles.sectionCard} key={section.id}>
       <View style={styles.sectionHeader}>
-        <Ionicons name="document-text" size={20} color="#2c95f8" />
+        <Ionicons name="document-text" size={20} color="#15803d" />
         <Text style={styles.sectionTitle}>{section.title}</Text>
       </View>
       
@@ -393,7 +392,6 @@ const TermsConditionsScreen = () => {
             <Text style={styles.legalText}>
               <Text style={styles.legalBold}>Company:</Text> Techtriosphere{'\n'}
               <Text style={styles.legalBold}>Address:</Text> 1205, Phoenix building, Vijay Cross Road to Commerce Six Road, Gujarat, India{'\n'}
-              <Text style={styles.legalBold}>GST:</Text> [Your GST Number]{'\n'}
               <Text style={styles.legalBold}>Legal Jurisdiction:</Text> Ahmedabad, Gujarat, India
             </Text>
           </View>
@@ -446,19 +444,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     height: 60,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
+   backButton: {width: 40,height: 40,borderRadius: 22,backgroundColor: 'white',alignItems: 'center',justifyContent: 'center',shadowColor: '#000',shadowOffset: { width: 0, height: 2 },shadowOpacity: 0.08,shadowRadius: 8,elevation: 3,},
+
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',

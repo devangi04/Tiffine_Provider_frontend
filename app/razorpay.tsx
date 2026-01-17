@@ -67,7 +67,7 @@ const RazorpayScreen = () => {
         startInLoadingState
         renderLoading={() => (
           <ActivityIndicator
-            color="#2c95f8"
+            color="#15803d"
             size="large"
             style={{ flex: 1, justifyContent: 'center' }}
           />

@@ -68,7 +68,7 @@ const HelpButton = ({
     >
       <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
         <LinearGradient
-          colors={['#2c95f8', '#1a73e8']}
+          colors={['#15803d', '#1a73e8']}
           style={styles.gradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}

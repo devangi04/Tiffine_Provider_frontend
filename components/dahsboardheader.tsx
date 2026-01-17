@@ -1,10 +1,11 @@
 // DashboardHeader.tsx - Header without search
 import React from 'react';
-import { View, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Platform ,StatusBar} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAppSelector } from '../app/store/hooks';
 import { Text } from '@/components/ztext';
+import { ArrowLeft, User } from "lucide-react-native";
 
 interface DashboardHeaderProps {
   profileImage?: string;
@@ -22,13 +23,14 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ profileImage }) => {
   };
 
   return (
+    <>
+    <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
     <View style={styles.container}>
       <View style={styles.topSection}>
         <View style={styles.profileSection}>
           {/* Moved initial display to the left side */}
           <TouchableOpacity 
             style={styles.initialContainer}
-            onPress={() => router.push('./profile')}
           >
             <Text weight='bold' style={styles.initialText}>
               {getInitial()}
@@ -46,17 +48,19 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ profileImage }) => {
           style={styles.profileButton}
           onPress={() => router.push('./profile')}
         >
-          <Ionicons name="person-outline" size={24} color="#004C99" />
+       <User size={24} color="#15803d" />
+        
         </TouchableOpacity>
       </View>
     </View>
+    </>
   );
 };
 
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#004C99',
+    backgroundColor: '#15803d',
     paddingTop: Platform.OS === 'ios' ? 80 : 50,
     paddingHorizontal: 20,
     paddingBottom: 20,
@@ -86,7 +90,7 @@ const styles = StyleSheet.create({
   },
   initialText: {
     fontSize: 22,
-    color: '#004C99',
+    color: '#15803d',
   },
   nameContainer: {
     marginLeft: 12,
@@ -98,7 +102,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   userName: {
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: '600',
     color: '#fff',
   },

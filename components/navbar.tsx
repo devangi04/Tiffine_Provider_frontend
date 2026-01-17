@@ -155,11 +155,11 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ navbarOpacity }) => {
           <Ionicons 
             name="home" 
             size={24} 
-            color={activeNav === 'Home' ? '#004C99' : '#64748b'} 
+            color={activeNav === 'Home' ? '#15803d' : '#64748b'} 
           />
           <Text style={[
             styles.navText, 
-            { color: activeNav === 'Home' ? '#004C99' : '#64748b' }
+            { color: activeNav === 'Home' ? '#15803d' : '#64748b' }
           ]}>
             Home
           </Text>
@@ -172,11 +172,11 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ navbarOpacity }) => {
           <FontAwesome5 
             name="list-alt" 
             size={24} 
-            color={activeNav === 'Menu' ? '#004C99' : '#64748b'} 
+            color={activeNav === 'Menu' ? '#15803d' : '#64748b'} 
           />
           <Text style={[
             styles.navText, 
-            { color: activeNav === 'Menu' ? '#004C99' : '#64748b' }
+            { color: activeNav === 'Menu' ? '#15803d' : '#64748b' }
           ]}>
             Customer
           </Text>
@@ -200,7 +200,7 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ navbarOpacity }) => {
             style={{
               width: 38,
               height: 38,
-              tintColor: activeNav === 'Schedule' ? '#004C99' : '#fff',
+              tintColor: activeNav === 'Schedule' ? '#15803d' : '#fff',
             }}
             resizeMode="contain" 
           />
@@ -221,11 +221,11 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ navbarOpacity }) => {
           <MaterialIcons 
             name="swap-horiz" 
             size={24} 
-            color={activeNav === 'Response' ? '#004C99' : '#64748b'} 
+            color={activeNav === 'Response' ? '#15803d' : '#64748b'} 
           />
           <Text style={[
             styles.navText, 
-            { color: activeNav === 'Response' ? '#004C99' : '#64748b' }
+            { color: activeNav === 'Response' ? '#15803d' : '#64748b' }
           ]}>
             Response
           </Text>
@@ -238,11 +238,11 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ navbarOpacity }) => {
           <Feather 
             name="user" 
             size={24} 
-            color={activeNav === 'Profile' ? '#004C99' : '#64748b'} 
+            color={activeNav === 'Profile' ? '#15803d' : '#64748b'} 
           />
           <Text style={[
             styles.navText, 
-            { color: activeNav === 'Profile' ? '#004C99' : '#64748b' }
+            { color: activeNav === 'Profile' ? '#15803d' : '#64748b' }
           ]}>
             Profile
           </Text>
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
     flex: 2,
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingLeft: 50,
+    paddingLeft: 20,
   },
   navItem: {
     alignItems: 'center',
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#004C99',
+    backgroundColor: '#15803d',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
     borderColor: 'white',
   },
   centerBtnActive: {
-    shadowColor: '#004C99',
+    shadowColor: '#15803d',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 10,
@@ -327,13 +327,13 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: '#004C99',
+    backgroundColor: '#15803d',
     justifyContent: 'center',
     alignItems: 'center',
   },
   centerBtnInnerActive: {
     backgroundColor: '#fff',
-    shadowColor: '#004C99',
+    shadowColor: '#15803d',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
     shadowRadius: 6,
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
     bottom: -5,
     borderRadius: 35,
     borderWidth: 2,
-    borderColor: '#004C99',
+    borderColor: '#15803d',
     opacity: 0.5,
   },
 });

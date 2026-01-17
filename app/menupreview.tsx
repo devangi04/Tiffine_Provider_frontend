@@ -185,7 +185,7 @@ const MenuPreviewScreen: React.FC = () => {
           onBackPress={() => router.back()}
         /> */}
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2c95f8" />
+          <ActivityIndicator size="large" color="#15803d" />
           <Text style={styles.loadingText}>Loading menu...</Text>
         </View>
       </View>
@@ -253,7 +253,7 @@ const MenuPreviewScreen: React.FC = () => {
           disabled={sending}
         >
           <LinearGradient
-            colors={['#2c95f8', '#0022ff']}
+            colors={['#15803d', '#15803d']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.sendGradient}
@@ -340,7 +340,7 @@ const styles = StyleSheet.create({
   categoryName: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#2c95f8',
+    color: '#15803d',
     flex: 1,
     marginRight: 8,
   },
@@ -357,12 +357,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     borderLeftWidth: 3,
-    borderLeftColor: '#2c95f8',
+    borderLeftColor: '#15803d',
   },
   noteLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#2c95f8',
+    color: '#15803d',
     marginBottom: 4,
   },
   noteText: {

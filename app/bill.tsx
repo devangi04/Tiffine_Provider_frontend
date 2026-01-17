@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -9,8 +9,9 @@ import {
   RefreshControl,
   TextInput,
   Modal,
+  StatusBar,
 } from 'react-native';
-import {Text,TextStyles} from '@/components/ztext';
+import { Text } from '@/components/ztext';
 import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
 import { 
   ChevronLeft, 
@@ -128,7 +129,7 @@ const BillScreen = () => {
   const router = useRouter();
   
   const [bill, setBill] = useState<Bill | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Start with loading true for first load
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(moment().month() + 1);
@@ -138,43 +139,92 @@ const BillScreen = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [billNotFound, setBillNotFound] = useState(false);
   const [generatingBill, setGeneratingBill] = useState(false);
+  const [isFetching, setIsFetching] = useState(false); // Separate state for fetching
+
+const [sendingEmail, setSendingEmail] = useState(false);
+const [sendingPayment, setSendingPayment] = useState(false);
+  // Refs to prevent race conditions
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const isMountedRef = useRef(true);
+  const currentMonthYearRef = useRef(`${currentYear}-${currentMonth}`);
+  const previousBillRef = useRef<Bill | null>(null); // Track previous bill
 
   const navigation = useNavigation();
-   
+  
   useEffect(() => {
     navigation.setOptions({
       headerShown: false,
     });
+    
+    return () => {
+      isMountedRef.current = false;
+      // Abort any pending requests on unmount
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [navigation]);
 
   // Add proper type checking
   if (!customerId) {
     return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Customer ID is required</Text>
-        <TouchableOpacity
-          style={styles.retryButton}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.retryButtonText}>Go Back</Text>
-        </TouchableOpacity>
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Customer ID is required</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.retryButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
 
-  const fetchBill = async () => {
+  const fetchBill = async (forceRefresh = false) => {
+    const monthYearKey = `${currentYear}-${currentMonth}`;
+    
+    // Don't fetch if we're already fetching for this month
+    if (currentMonthYearRef.current === monthYearKey && !forceRefresh && !loading) {
+      return;
+    }
+    
+    // Abort previous request if it exists
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // Create new AbortController
+    abortControllerRef.current = new AbortController();
+    currentMonthYearRef.current = monthYearKey;
+    
     try {
-      setLoading(true);
+      // Set fetching state to true
+      setIsFetching(true);
+      
+      // Clear previous bill data BEFORE fetching new data
+      // This is the key fix - clear immediately when month changes
+      setBill(null);
       setError(null);
       setBillNotFound(false);
       
-
+      // Only show main loading on first load
+      if (forceRefresh || !previousBillRef.current) {
+        setLoading(true);
+      }
 
       const response = await axios.get(
-        `${API_BASE_URL}/bills/customers/${customerId}/${currentYear}/${currentMonth}`
+        `${API_BASE_URL}/bills/customers/${customerId}/${currentYear}/${currentMonth}`,
+        { 
+          signal: abortControllerRef.current.signal,
+          timeout: 10000 // Add timeout
+        }
       );
 
-    
+      if (!isMountedRef.current) return;
+
       if (response.data.success) {
         const billData = response.data.data;
         
@@ -224,17 +274,25 @@ const BillScreen = () => {
         };
         
         setBill(safeBillData);
+        previousBillRef.current = safeBillData;
       } else {
-
         setError(response.data.message || 'Failed to fetch bill details');
       }
     } catch (err: any) {
+      // Ignore abort errors
+      if (err.name === 'AbortError' || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
+        return;
+      }
+      
+      if (!isMountedRef.current) return;
       
       if (err.response?.status === 404) {
         setBillNotFound(true);
-        setError(`Bill not generated for ${moment().month(currentMonth - 1).format('MMMM YYYY')}`);
-      } else if (err.code === 'NETWORK_ERROR') {
+        setBill(null); // Ensure bill is null
+      } else if (err.code === 'NETWORK_ERROR' || err.message?.includes('Network')) {
         setError('Network error. Please check your connection and try again.');
+      } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        setError('Request timeout. Please try again.');
       } else {
         setError(
           err.response?.data?.message || 
@@ -243,8 +301,11 @@ const BillScreen = () => {
         );
       }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+        setIsFetching(false);
+        setRefreshing(false);
+      }
     }
   };
 
@@ -253,6 +314,12 @@ const BillScreen = () => {
   }, [currentMonth, currentYear]);
 
   const handleMonthChange = (direction: 'prev' | 'next') => {
+    // Clear all states immediately when month changes
+    setBill(null);
+    setError(null);
+    setBillNotFound(false);
+    setLoading(true); // Show loading immediately
+    
     if (direction === 'prev') {
       if (currentMonth === 1) {
         setCurrentMonth(12);
@@ -272,83 +339,55 @@ const BillScreen = () => {
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchBill();
+    fetchBill(true);
   };
 
   const downloadBill = async () => {
     Alert.alert('Download', 'Bill download functionality would be implemented here');
   };
 
-  const handlePayment = async () => {
-    if (!bill) {
-      Alert.alert('Error', 'No bill data available');
-      return;
-    }
+const handlePayment = async () => {
+  if (!bill) {
+    Alert.alert('Error', 'No bill data available');
+    return;
+  }
 
-    try {
-      const amount = parseFloat(paymentAmount) || bill.remainingAmount;
+  try {
+    setSendingPayment(true); // Start loading for payment
+    
+    const amount = parseFloat(paymentAmount) || bill.remainingAmount;
+    
+    const customerId = bill.customer.id;
+    const year = bill.period.year;
+    const month = bill.period.month;
+
+    const response = await axios.post(
+      `${API_BASE_URL}/bills/customers/${customerId}/${year}/${month}/payments`,
+      {
+        amount,
+        method: paymentMethod
+      },
+      { timeout: 10000 } // Add timeout
+    );
+    
+    if (response.data.success) {
+      // ... rest of your existing success handling ...
       
-      const customerId = bill.customer.id;
-      const year = bill.period.year;
-      const month = bill.period.month;
-
-      const response = await axios.post(
-        `${API_BASE_URL}/bills/customers/${customerId}/${year}/${month}/payments`,
-        {
-          amount,
-          method: paymentMethod
-        }
-      );
-      
-      if (response.data.success) {
-        const updatedBillData = response.data.data;
-        
-        // Recalculate stats for updated bill
-        const billingBreakdown = updatedBillData.billing?.breakdown || [];
-        const lunchItems = billingBreakdown.filter((item: MealBreakdown) => item.mealType === 'lunch');
-        const dinnerItems = billingBreakdown.filter((item: MealBreakdown) => item.mealType === 'dinner');
-        const specialPriceItems = billingBreakdown.filter((item: MealBreakdown) => item.isSpecialPrice);
-        
-        const safeBillData: Bill = {
-          id: updatedBillData.id || bill.id,
-          customer: updatedBillData.customer || bill.customer,
-          providerId: updatedBillData.providerId || bill.providerId,
-          period: updatedBillData.period || bill.period,
-          stats: {
-            totalMeals: updatedBillData.stats?.totalMeals || billingBreakdown.length,
-            lunchCount: updatedBillData.stats?.lunchCount || lunchItems.length,
-            dinnerCount: updatedBillData.stats?.dinnerCount || dinnerItems.length,
-            regularPriceCount: updatedBillData.stats?.regularPriceCount || (billingBreakdown.length - specialPriceItems.length),
-            specialPriceCount: updatedBillData.stats?.specialPriceCount || specialPriceItems.length,
-            lunchAmount: updatedBillData.stats?.lunchAmount || lunchItems.reduce((sum: number, item: MealBreakdown) => sum + item.price, 0),
-            dinnerAmount: updatedBillData.stats?.dinnerAmount || dinnerItems.reduce((sum: number, item: MealBreakdown) => sum + item.price, 0),
-            specialPriceAmount: updatedBillData.stats?.specialPriceAmount || specialPriceItems.reduce((sum: number, item: MealBreakdown) => sum + item.price, 0)
-          },
-          billing: updatedBillData.billing || bill.billing,
-          payments: updatedBillData.payments || bill.payments,
-          paidAmount: updatedBillData.paidAmount || bill.paidAmount,
-          remainingAmount: updatedBillData.remainingAmount || bill.remainingAmount,
-          isFullyPaid: updatedBillData.isFullyPaid || bill.isFullyPaid,
-          emailSent: updatedBillData.emailSent || bill.emailSent,
-          emailSentAt: updatedBillData.emailSentAt || bill.emailSentAt,
-          autoGenerated: updatedBillData.autoGenerated || bill.autoGenerated
-        };
-        
-        setBill(safeBillData);
-        setShowPaymentModal(false);
-        setPaymentAmount('');
-        Alert.alert('Success', 'Payment recorded successfully');
-      } else {
-        throw new Error(response.data.message || 'Payment failed');
-      }
-    } catch (err: any) {
-      Alert.alert(
-        'Payment Error',
-        err.message || 'Failed to record payment'
-      );
+      setShowPaymentModal(false);
+      setPaymentAmount('');
+      Alert.alert('Success', 'Payment recorded successfully');
+    } else {
+      throw new Error(response.data.message || 'Payment failed');
     }
-  };
-
+  } catch (err: any) {
+    Alert.alert(
+      'Payment Error',
+      err.message || 'Failed to record payment'
+    );
+  } finally {
+    setSendingPayment(false); // Stop loading
+  }
+};
   const generateBillForCurrentMonth = async () => {
     try {
       setGeneratingBill(true);
@@ -363,7 +402,7 @@ const BillScreen = () => {
           `Generated ${response.data.data.billsGenerated} bills for ${moment().month(currentMonth - 1).format('MMMM YYYY')}`
         );
         // Refresh the bill
-        fetchBill();
+        fetchBill(true);
       } else {
         throw new Error(response.data.message || 'Failed to generate bills');
       }
@@ -377,30 +416,37 @@ const BillScreen = () => {
     }
   };
 
-  const sendBillEmail = async () => {
-    if (!bill?.id) {
-      Alert.alert('Error', 'No bill available to send');
-      return;
-    }
+const sendBillEmail = async () => {
+  if (!bill?.id) {
+    Alert.alert('Error', 'No bill available to send');
+    return;
+  }
 
-    try {
-      const response = await axios.post(
-        `${API_BASE_URL}/bills/send-email/${bill.id}`
-      );
-      if (response.data.success) {
-        Alert.alert('Success', 'Bill email sent successfully');
-        // Refresh bill to update email status
-        fetchBill();
-      } else {
-        throw new Error(response.data.message || 'Failed to send email');
-      }
-    } catch (err: any) {
-      Alert.alert(
-        'Email Error',
-        err.message || 'Failed to send bill email'
-      );
+  try {
+    setSendingEmail(true); // Start loading
+    
+    const response = await axios.post(
+      `${API_BASE_URL}/bills/send-email/${bill.id}`,
+      {}, // Add empty object if needed
+      { timeout: 15000 } // Add timeout
+    );
+    
+    if (response.data.success) {
+      Alert.alert('Success', 'Bill email sent successfully');
+      // Refresh bill to update email status
+      fetchBill(true);
+    } else {
+      throw new Error(response.data.message || 'Failed to send email');
     }
-  };
+  } catch (err: any) {
+    Alert.alert(
+      'Email Error',
+      err.message || 'Failed to send bill email'
+    );
+  } finally {
+    setSendingEmail(false); // Stop loading
+  }
+};
 
   // Check if current month is in the future or bill not generated yet
   const isCurrentMonth = currentMonth === moment().month() + 1 && currentYear === moment().year();
@@ -430,82 +476,91 @@ const BillScreen = () => {
 
     return (
       <View style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#fff" />
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <ChevronLeft size={24} color="#1E293B" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Monthly Bill</Text>
+          <View style={{ width: 24 }} />
         </View>
 
-        {/* Month Selector */}
-        <View style={styles.monthSelector}>
-          <TouchableOpacity onPress={() => handleMonthChange('prev')}>
-            <ArrowLeft size={24} color="#4F46E5" />
-          </TouchableOpacity>
-          
-          <Text style={styles.monthText}>
-            {moment().month(currentMonth - 1).format('MMMM YYYY')}
-          </Text>
-          
-          <TouchableOpacity 
-            onPress={() => handleMonthChange('next')}
-            disabled={isCurrentMonth}
-          >
-            <ArrowRight 
-              size={24} 
-              color={isCurrentMonth ? '#CBD5E1' : '#4F46E5'} 
-            />
-          </TouchableOpacity>
-        </View>
-
-        {/* Bill Not Generated Card */}
-        <View style={styles.emptyCard}>
-          <Calendar size={48} color="#94A3B8" />
-          <Text style={styles.emptyTitle}>Bill Not Available</Text>
-          <Text style={styles.emptyText}>
-            {message}
-          </Text>
-          
-          {actionText && (
-            <View style={styles.statusBadge}>
-              <Text style={styles.statusText}>{actionText}</Text>
-            </View>
-          )}
-          
-          <View style={styles.infoCard}>
-            <Text style={styles.infoTitle}>Automatic Billing System</Text>
-            <Text style={styles.infoText}>• Bills generate automatically on last day of month</Text>
-            <Text style={styles.infoText}>• Email notifications are sent to customers</Text>
-            <Text style={styles.infoText}>• Payments can be made after bill generation</Text>
-            <Text style={styles.infoText}>• Previous bills are always available</Text>
+        <ScrollView
+          contentContainerStyle={[styles.contentContainer, { paddingTop: 0 }]}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          {/* Month Selector */}
+          <View style={styles.monthSelector}>
+            <TouchableOpacity onPress={() => handleMonthChange('prev')}>
+              <ArrowLeft size={24} color="#4F46E5" />
+            </TouchableOpacity>
+            
+            <Text style={styles.monthText}>
+              {moment().month(currentMonth - 1).format('MMMM YYYY')}
+            </Text>
+            
+            <TouchableOpacity 
+              onPress={() => handleMonthChange('next')}
+              disabled={isCurrentMonth}
+            >
+              <ArrowRight 
+                size={24} 
+                color={isCurrentMonth ? '#CBD5E1' : '#4F46E5'} 
+              />
+            </TouchableOpacity>
           </View>
 
-          {!isFutureMonth && (
-            <TouchableOpacity 
-              style={styles.generateBillButton}
-              onPress={generateBillForCurrentMonth}
-              disabled={generatingBill}
-            >
-              {generatingBill ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  <Calendar size={18} color="#fff" />
-                  <Text style={styles.generateBillButtonText}>Generate Bill Now</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          )}
+          {/* Bill Not Generated Card */}
+          <View style={styles.emptyCard}>
+            <Calendar size={48} color="#94A3B8" />
+            <Text style={styles.emptyTitle}>Bill Not Available</Text>
+            <Text style={styles.emptyText}>
+              {message}
+            </Text>
+            
+            {actionText && (
+              <View style={styles.statusBadge}>
+                <Text style={styles.statusText}>{actionText}</Text>
+              </View>
+            )}
+            
+            <View style={styles.infoCard}>
+              <Text style={styles.infoTitle}>Automatic Billing System</Text>
+              <Text style={styles.infoText}>• Bills generate automatically on last day of month</Text>
+              <Text style={styles.infoText}>• Email notifications are sent to customers</Text>
+              <Text style={styles.infoText}>• Payments can be made after bill generation</Text>
+              <Text style={styles.infoText}>• Previous bills are always available</Text>
+            </View>
 
-          <TouchableOpacity 
-            style={styles.viewPreviousButton}
-            onPress={() => handleMonthChange('prev')}
-          >
-            <ArrowLeft size={18} color="#4F46E5" />
-            <Text style={styles.viewPreviousButtonText}>View Previous Month Bill</Text>
-          </TouchableOpacity>
-        </View>
+            {!isFutureMonth && (
+              <TouchableOpacity 
+                style={styles.generateBillButton}
+                onPress={generateBillForCurrentMonth}
+                disabled={generatingBill}
+              >
+                {generatingBill ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Calendar size={18} color="#fff" />
+                    <Text style={styles.generateBillButtonText}>Generate Bill Now</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity 
+              style={styles.viewPreviousButton}
+              onPress={() => handleMonthChange('prev')}
+            >
+              <ArrowLeft size={18} color="#4F46E5" />
+              <Text style={styles.viewPreviousButtonText}>View Previous Month Bill</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </View>
     );
   };
@@ -523,15 +578,24 @@ const BillScreen = () => {
       <View style={styles.paymentCard}>
         <View style={styles.paymentHeader}>
           <Text style={styles.cardTitle}>Payment Status</Text>
-          {!bill.emailSent && bill.id && (
-            <TouchableOpacity 
-              style={styles.emailButton}
-              onPress={sendBillEmail}
-            >
-              <Mail size={16} color="#4F46E5" />
-              <Text style={styles.emailButtonText}>Send Email</Text>
-            </TouchableOpacity>
-          )}
+        {!bill.emailSent && bill.id && (
+  <TouchableOpacity 
+    style={[styles.emailButton, sendingEmail && styles.disabledButton]}
+    onPress={sendBillEmail}
+    disabled={sendingEmail}
+  >
+    {sendingEmail ? (
+      <ActivityIndicator size={16} color="#4F46E5" />
+    ) : (
+      <>
+        <Mail size={16} color="#4F46E5" />
+        <Text style={styles.emailButtonText}>
+          {sendingEmail ? 'Sending...' : 'Send Email'}
+        </Text>
+      </>
+    )}
+  </TouchableOpacity>
+)}
         </View>
         
         {/* Email Status */}
@@ -595,47 +659,148 @@ const BillScreen = () => {
     );
   };
 
-  // Show loading
+  // **FIXED: Show loading when loading and no bill (for month changes)**
   if (loading && !bill) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2c95f8" />
-        <Text style={styles.loadingText}>Loading bill details...</Text>
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <ChevronLeft size={24} color="#1E293B" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Monthly Bill</Text>
+          <View style={{ width: 24 }} />
+        </View>
+        
+        <View style={styles.contentContainer}>
+          {/* Month Selector should still be visible during loading */}
+          <View style={styles.monthSelector}>
+            <TouchableOpacity onPress={() => handleMonthChange('prev')}>
+              <ArrowLeft size={24} color="#4F46E5" />
+            </TouchableOpacity>
+            
+            <Text style={styles.monthText}>
+              {moment().month(currentMonth - 1).format('MMMM YYYY')}
+            </Text>
+            
+            <TouchableOpacity 
+              onPress={() => handleMonthChange('next')}
+              disabled={isCurrentMonth}
+            >
+              <ArrowRight 
+                size={24} 
+                color={isCurrentMonth ? '#CBD5E1' : '#4F46E5'} 
+              />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#2c95f8" />
+            <Text style={styles.loadingText}>Loading bill details...</Text>
+          </View>
+        </View>
       </View>
     );
   }
 
-  // Show bill not generated view
+  // **FIXED: Show bill not generated view immediately when billNotFound is true**
   if (billNotFound) {
     return renderBillNotGenerated();
   }
 
   // Show other errors
-  if (error && !billNotFound) {
+  if (error && !billNotFound && !bill) {
     return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity
-          style={styles.retryButton}
-          onPress={fetchBill}
-        >
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <ChevronLeft size={24} color="#1E293B" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Monthly Bill</Text>
+          <View style={{ width: 24 }} />
+        </View>
+        
+        <View style={styles.contentContainer}>
+          <View style={styles.monthSelector}>
+            <TouchableOpacity onPress={() => handleMonthChange('prev')}>
+              <ArrowLeft size={24} color="#4F46E5" />
+            </TouchableOpacity>
+            
+            <Text style={styles.monthText}>
+              {moment().month(currentMonth - 1).format('MMMM YYYY')}
+            </Text>
+            
+            <TouchableOpacity 
+              onPress={() => handleMonthChange('next')}
+              disabled={isCurrentMonth}
+            >
+              <ArrowRight 
+                size={24} 
+                color={isCurrentMonth ? '#CBD5E1' : '#4F46E5'} 
+              />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={() => fetchBill(true)}
+            >
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
     );
   }
 
-  // Show no bill data
+  // **FIXED: This condition should not happen if we handle all cases above**
+  if (!bill && !loading && !billNotFound) {
+    return renderBillNotGenerated();
+  }
+
+  // **ONLY render normal bill view when bill exists AND loading is false**
   if (!bill) {
+    // This should not happen, but as a fallback
     return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>No bill data available</Text>
-        <TouchableOpacity
-          style={styles.retryButton}
-          onPress={fetchBill}
-        >
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <ChevronLeft size={24} color="#1E293B" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Monthly Bill</Text>
+          <View style={{ width: 24 }} />
+        </View>
+        
+        <View style={styles.contentContainer}>
+          <View style={styles.monthSelector}>
+            <TouchableOpacity onPress={() => handleMonthChange('prev')}>
+              <ArrowLeft size={24} color="#4F46E5" />
+            </TouchableOpacity>
+            
+            <Text style={styles.monthText}>
+              {moment().month(currentMonth - 1).format('MMMM YYYY')}
+            </Text>
+            
+            <TouchableOpacity 
+              onPress={() => handleMonthChange('next')}
+              disabled={isCurrentMonth}
+            >
+              <ArrowRight 
+                size={24} 
+                color={isCurrentMonth ? '#CBD5E1' : '#4F46E5'} 
+              />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#2c95f8" />
+            <Text style={styles.loadingText}>Loading...</Text>
+          </View>
+        </View>
       </View>
     );
   }
@@ -643,6 +808,7 @@ const BillScreen = () => {
   // Render normal bill view when bill exists
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -680,6 +846,13 @@ const BillScreen = () => {
             />
           </TouchableOpacity>
         </View>
+
+        {/* Show loading indicator over existing bill if we're refreshing */}
+        {isFetching && bill && (
+          <View style={styles.overlayLoading}>
+            <ActivityIndicator size="large" color="#4F46E5" />
+          </View>
+        )}
 
         {/* Customer Info */}
         <View style={styles.customerCard}>
@@ -843,6 +1016,7 @@ const BillScreen = () => {
         onRequestClose={() => setShowPaymentModal(false)}
       >
         <View style={styles.modalOverlay}>
+          <StatusBar barStyle="light-content" backgroundColor="rgba(0,0,0,0.5)" />
           <View style={styles.modalContainer}>
             <Text style={styles.modalTitle}>Record Payment</Text>
             
@@ -955,22 +1129,35 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: 16,
     paddingBottom: 32,
+    flexGrow: 1,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    minHeight: 200,
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
     color: '#64748B',
   },
+  overlayLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    minHeight: 200,
   },
   errorText: {
     fontSize: 16,
@@ -993,6 +1180,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
+    marginTop: 10,
     paddingHorizontal: 8,
   },
   monthText: {
@@ -1000,18 +1188,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1E293B',
   },
-  // Empty State Styles
   emptyCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 24,
-    margin: 16,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    marginTop: 20,
   },
   emptyTitle: {
     fontSize: 20,
@@ -1058,19 +1245,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-  viewPreviousButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  viewPreviousButtonText: {
-    color: '#4F46E5',
-    fontWeight: '600',
-    marginLeft: 8,
-  },
   generateBillButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1087,7 +1261,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 8,
   },
-  // Customer Card
+  viewPreviousButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  viewPreviousButtonText: {
+    color: '#4F46E5',
+    fontWeight: '600',
+    marginLeft: 8,
+  },
   customerCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -1112,7 +1298,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-  // Stats Card
   statsCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -1124,7 +1309,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  // Bill Card
   billCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -1136,8 +1320,18 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  // Payment Card
   paymentCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  paymentHistoryCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
@@ -1168,17 +1362,18 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginLeft: 4,
   },
-  // Payment History Card
-  paymentHistoryCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  emailStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    padding: 8,
+    borderRadius: 6,
+    marginBottom: 12,
+  },
+  emailStatusText: {
+    color: '#166534',
+    fontSize: 12,
+    marginLeft: 6,
   },
   cardTitle: {
     marginBottom: 12,
@@ -1310,19 +1505,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  emailStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F0FDF4',
-    padding: 8,
-    borderRadius: 6,
-    marginBottom: 12,
-  },
-  emailStatusText: {
-    color: '#166534',
-    fontSize: 12,
-    marginLeft: 6,
-  },
   unpaidBadge: {
     backgroundColor: '#FEE2E2',
   },
@@ -1344,6 +1526,7 @@ const styles = StyleSheet.create({
   dueDateText: {
     fontSize: 14,
     color: '#64748B',
+    marginLeft: 8,
   },
   paymentProgress: {
     marginVertical: 12,
@@ -1427,7 +1610,7 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     borderRadius: 8,
     padding: 12,
-    fontSize: 16
+    fontSize: 16,
   },
   methodButtons: {
     flexDirection: 'row',
