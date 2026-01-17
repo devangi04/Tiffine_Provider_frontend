@@ -47,22 +47,22 @@
           "androidCollapsedTitle": "New Notification"
         }
       ],
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "compileSdkVersion": 35,
-            "targetSdkVersion": 35,
-            "buildToolsVersion": "35.0.0",
-            "enableProguardInReleaseBuilds": true,
-            "extraMavenRepos": [],
-            "enableMinifyInReleaseBuilds": true
-          },
-          "ios": {
-            "deploymentTarget": "15.1"
-          }
-        }
-      ]
+  [
+  "expo-build-properties",
+  {
+    "android": {
+      "compileSdkVersion": 34,
+      "targetSdkVersion": 34,
+      "buildToolsVersion": "34.0.0",
+      "enableProguardInReleaseBuilds": false,
+      "enableMinifyInReleaseBuilds": false
+    },
+    "ios": {
+      "deploymentTarget": "15.1"
+    }
+  }
+]
+
     ],
     "owner": "devangi_04",
     "extra": {
