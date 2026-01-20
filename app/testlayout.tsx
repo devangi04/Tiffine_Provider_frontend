@@ -252,7 +252,6 @@ export default function RootLayout() {
         }
         persistor={persistor}
         onBeforeLift={() => {
-          console.log('Redux persistence is about to lift');
         }}
       >
         <SafeAreaProvider>

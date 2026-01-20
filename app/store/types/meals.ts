@@ -13,6 +13,7 @@ export interface MealService {
 
 export interface ProviderMealPreferences {
   mealService: MealService;
+  hasMealPreferences: boolean;
 }
 
 export interface MealPreferencesState {
@@ -20,4 +21,6 @@ export interface MealPreferencesState {
   loading: boolean;
   saving: boolean;
   error: string | null;
+  justSaved: boolean; 
+  hasMealPreferences: boolean;
 }

@@ -1,5 +1,5 @@
 // app/_layout.tsx
-import { useEffect } from 'react';
+import { useEffect,useState } from 'react';
 import { Provider } from 'react-redux';
 import { store,persistor } from './store';
 import { Stack, usePathname } from 'expo-router';
@@ -187,6 +187,14 @@ function LayoutContent() {
 }
 
 export default function RootLayout() {
+   const [minSplashDone, setMinSplashDone] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMinSplashDone(true);
+    }, 1200); // 👈 guaranteed splash time (1.2s)
+
+    return () => clearTimeout(timer);
+  }, []);
   const [fontsLoaded, fontError] = useFonts({
     // Nunito Sans (existing)
     'NunitoSans-ExtraLight': NunitoSans_200ExtraLight,
@@ -239,24 +247,18 @@ export default function RootLayout() {
     return null;
   }
 
-  return (
-  <Provider store={store}>
-      {/* ✅ Wrap with PersistGate for Redux Persist */}
-      <PersistGate 
-        loading={
-          <CustomSplashScreen/>
-        }
-        persistor={persistor}
-        onBeforeLift={() => {
-          console.log('Redux persistence is about to lift');
-        }}
-      >
-        <SafeAreaProvider>
-          {/* ✅ Wrap with AuthChecker for automatic auth redirection */}
-          <AuthChecker>
-            <LayoutContent />
-         </AuthChecker>
-        </SafeAreaProvider>
+   return (
+    <Provider store={store}>
+      <PersistGate persistor={persistor} loading={<CustomSplashScreen />}>
+        {!minSplashDone ? (
+          <CustomSplashScreen />
+        ) : (
+          <SafeAreaProvider>
+            <AuthChecker>
+              <LayoutContent /> 
+            </AuthChecker>
+          </SafeAreaProvider>
+        )}
       </PersistGate>
     </Provider>
   );

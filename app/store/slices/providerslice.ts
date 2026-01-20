@@ -38,6 +38,7 @@ interface ProviderState {
   name: string | null;
   phone: string | null;
   token: string | null;
+  hasMealPreferences: boolean;
   subscription: Subscription | null;
   trialStatus: TrialStatus | null;
   upiId: string;
@@ -56,6 +57,7 @@ const initialState: ProviderState = {
   subscription: null,
   trialStatus: null,
   upiId: '',
+  hasMealPreferences:false,
   // ✅ INITIALIZE NOTIFICATION SETTINGS
   notificationSettings: {
     notificationsEnabled: true,
@@ -92,28 +94,36 @@ export const fetchTrialStatus = createAsyncThunk(
 // ✅ ADD ASYNC THUNK TO FETCH NOTIFICATION SETTINGS
 export const fetchNotificationSettings = createAsyncThunk(
   'provider/fetchNotificationSettings',
-  async (providerId: string, { rejectWithValue }) => {
+  async (_, { getState, rejectWithValue }) => {
     try {
+      const state = getState() as { provider: ProviderState };
+      const token = state.provider.token;
+
+      if (!token) {
+        return rejectWithValue('No auth token');
+      }
+
       const response = await axios.get(
         `${API_URL}/api/providers/me/notification-settings`,
         {
           headers: {
-            'Authorization': `Bearer ${token}`, // You'll need to get token from state
+            Authorization: `Bearer ${token}`,
           },
           timeout: 10000,
         }
       );
-      
+
       if (response.data.success) {
         return response.data.data;
-      } else {
-        return rejectWithValue(response.data.error || 'Failed to fetch notification settings');
       }
+
+      return rejectWithValue(response.data.error);
     } catch (error: any) {
       return rejectWithValue(error.message || 'Network error');
     }
   }
 );
+
 
 // 🔥 CREATE LOGOUT ASYNC THUNK
 export const logoutProvider = createAsyncThunk(
@@ -152,7 +162,9 @@ const providerSlice = createSlice({
       subscription: Subscription;
       trialStatus?: TrialStatus;
       upiId?: string;
-      notificationsEnabled?: boolean; // ✅ Add this
+      hasMealPreferences: boolean;
+      notificationsEnabled?: boolean; 
+       pushTokenUpdated?: boolean;
     }>) => {
       state.id = action.payload.id;
       state.email = action.payload.email;
@@ -164,7 +176,11 @@ const providerSlice = createSlice({
       state.upiId = action.payload.upiId || '';
       // ✅ SET NOTIFICATION SETTINGS FROM LOGIN
       state.notificationSettings.notificationsEnabled = action.payload.notificationsEnabled || true;
+      state.hasMealPreferences = action.payload.hasMealPreferences;
       state.error = null;
+    },
+     setHasMealPreferences: (state, action: PayloadAction<boolean>) => {
+      state.hasMealPreferences = action.payload;
     },
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.isLoading = action.payload;
@@ -293,6 +309,7 @@ const providerSlice = createSlice({
 
 export const { 
   setProvider, 
+  setHasMealPreferences,
   setLoading, 
   setError, 
   clearProvider, 

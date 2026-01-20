@@ -95,6 +95,10 @@ const SubscriptionManagement = () => {
   const providerId = provider.id;
   const providerEmail = params.providerEmail as string;
 
+  // Add state for days until expiry
+  const [daysUntilExpiry, setDaysUntilExpiry] = useState<number | null>(null);
+  const [showRenewButton, setShowRenewButton] = useState(false);
+
   useEffect(() => {
     fetchSubscriptionData();
   }, [providerId]);
@@ -103,43 +107,67 @@ const SubscriptionManagement = () => {
     try {
       setLoading(true);
       setCheckingTrial(true);
+      setError(null);
       
-      // Fetch trial status first
-      const trialRes = await axios.get(`${API_URL}/api/subscription/trial-status/${providerId}`);
+      // Fetch subscription data FIRST
+      const subscriptionRes = await axios.get(`${API_URL}/api/subscription/provider/${providerId}`);
       
-      if (trialRes.data.success) {
-        setTrialStatus(trialRes.data.trialStatus);
+      if (subscriptionRes.data.success && subscriptionRes.data.subscription) {
+        const subscriptionData = subscriptionRes.data.subscription;
+        setSubscription(subscriptionData);
         
-        // Only fetch subscription data if user doesn't have active trial
-        if (!trialRes.data.trialStatus?.isActive) {
-          const subscriptionRes = await axios.get(`${API_URL}/api/subscription/provider/${providerId}`);
+        // Calculate days until expiry
+        if (subscriptionData.status === 'active' && subscriptionData.endDate) {
+          const endDate = new Date(subscriptionData.endDate);
+          const today = new Date();
+          const timeDiff = endDate.getTime() - today.getTime();
+          const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+          setDaysUntilExpiry(daysDiff);
           
-          if (subscriptionRes.data.success) {
-            setSubscription(subscriptionRes.data.subscription);
-            
-            if (subscriptionRes.data.expiresSoon) {
-              setTimeout(() => {
-                Alert.alert(
-                  'Subscription Renewal Reminder',
-                  `Your subscription expires in ${subscriptionRes.data.daysUntilExpiry} days. Would you like to renew now?`,
-                  [
-                    { text: 'Later', style: 'cancel' },
-                    { text: 'Renew Now', onPress: () => setShowRenewalModal(true) }
-                  ]
-                );
-              }, 1000);
-            }
+          // Show renew button only if subscription expires in 5 days or less
+          setShowRenewButton(daysDiff <= 5);
+          
+          if (daysDiff <= 5 && daysDiff > 0) {
+            setTimeout(() => {
+              Alert.alert(
+                'Subscription Renewal Reminder',
+                `Your subscription expires in ${daysDiff} day${daysDiff === 1 ? '' : 's'}. Would you like to renew now?`,
+                [
+                  { text: 'Later', style: 'cancel' },
+                  { text: 'Renew Now', onPress: () => router.push({
+                    pathname: '/subscription',
+                    params: { 
+                      providerId: providerId,
+                      providerEmail: providerEmail
+                    }
+                  })}
+                ]
+              );
+            }, 1000);
           }
+        } else {
+          setDaysUntilExpiry(null);
+          setShowRenewButton(false);
         }
       }
 
-      // Fetch plans (for renewal modal)
+      // Only fetch trial status if no active subscription
+      if (!subscriptionRes.data.success || !subscriptionRes.data.subscription || subscriptionRes.data.subscription.status !== 'active') {
+        const trialRes = await axios.get(`${API_URL}/api/subscription/trial-status/${providerId}`);
+        if (trialRes.data.success) {
+          setTrialStatus(trialRes.data.trialStatus);
+        }
+      } else {
+        // If active subscription exists, don't show trial
+        setTrialStatus(null);
+      }
+
+      // Fetch plans
       const plansRes = await axios.get(`${API_URL}/api/plans`);
       if (plansRes.data.success) {
         setPlans(plansRes.data.data || []);
       }
 
-      setError(null);
     } catch (err) {
       const message = axios.isAxiosError(err)
         ? err.response?.data?.error || err.message
@@ -155,38 +183,6 @@ const SubscriptionManagement = () => {
   const onRefresh = () => {
     setRefreshing(true);
     fetchSubscriptionData();
-  };
-
-  const handleRenewSubscription = async (planId: string) => {
-    try {
-      setActionLoading('renew');
-      setSelectedRenewalPlan(planId);
-
-      const res = await axios.post(`${API_URL}/api/subscription/renew`, {
-        providerId,
-        planId
-      });
-
-      if (!res.data.success) {
-        throw new Error(res.data.error || 'Renewal failed');
-      }
-
-      const { subscriptionId, key, isRenewal } = res.data;
-      const selectedPlan = plans.find(p => p._id === planId);
-      
-      if (!selectedPlan) throw new Error('Plan not found');
-
-      if (Platform.OS !== 'web') {
-        const razorpayHtml = generateRazorpayHtml(subscriptionId, key, selectedPlan, isRenewal);
-        setPaymentLink(razorpayHtml);
-        setShowRenewalModal(false);
-      }
-
-    } catch (err) {
-      Alert.alert('Renewal Failed', err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setActionLoading(null);
-    }
   };
 
   const handleCancelSubscription = async () => {
@@ -336,7 +332,7 @@ const SubscriptionManagement = () => {
     }
   };
 
-  // Trial Status Card Component
+  // Trial Status Card Component - Only shown when there's NO active subscription
   const TrialStatusCard = () => {
     if (!trialStatus) return null;
 
@@ -365,11 +361,9 @@ const SubscriptionManagement = () => {
           <View style={styles.trialCountdown}>
             <View style={styles.countdownBox}>
               <Text weight='bold' style={styles.countdownNumber}>{daysLeft}</Text>
-              <Text weight='bold' style={styles.countdownLabel}>DAYS</Text>
-            </View>
-            <View style={styles.countdownBox}>
-              <Text weight='bold' style={styles.countdownNumber}>{trialStatus.hoursLeft % 24}</Text>
-              <Text weight='bold' style={styles.countdownLabel}>HOURS</Text>
+              <Text weight='bold' style={styles.countdownLabel}>
+                {daysLeft === 1 ? 'DAY LEFT' : 'DAYS LEFT'}
+              </Text>
             </View>
           </View>
 
@@ -470,96 +464,8 @@ const SubscriptionManagement = () => {
               <Text weight='bold' style={styles.retryButtonText}>Retry</Text>
             </TouchableOpacity>
           </View>
-        ) : trialStatus?.isActive ? (
-          // Show Trial Status when trial is active
-          <>
-            <TrialStatusCard />
-            
-            {/* Action Buttons for Trial Users */}
-            <View style={styles.actionButtons}>
-              <TouchableOpacity
-                style={styles.subscribeNowButton}
-                onPress={() => router.push('/subscription-plans')}
-              >
-                <Ionicons name="card" size={20} color="#fff" />
-                <Text weight='bold' style={styles.buttonText}>Browse Plans</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={styles.continueTrialButton}
-                onPress={() => router.push('/dashboard')}
-              >
-                <Ionicons name="rocket-outline" size={20} color="#15803d" />
-                <Text weight='bold' style={[styles.buttonText, { color: '#15803d' }]}>
-                  Continue with Trial
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Trial Features Section */}
-            <View style={styles.invoiceSection}>
-              <Text weight='bold' style={styles.sectionTitle}>Trial Features</Text>
-              <View style={styles.trialFeaturesList}>
-                <View style={styles.featureItem}>
-                  <Ionicons name="checkmark-circle" size={20} color="#10b981" />
-                  <Text weight='bold' style={styles.featureText}>Full access to all premium features</Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <Ionicons name="checkmark-circle" size={20} color="#10b981" />
-                  <Text weight='bold' style={styles.featureText}>Unlimited customers during trial</Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <Ionicons name="checkmark-circle" size={20} color="#10b981" />
-                  <Text weight='bold' style={styles.featureText}>Advanced analytics dashboard</Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <Ionicons name="checkmark-circle" size={20} color="#10b981" />
-                  <Text weight='bold' style={styles.featureText}>No credit card required for trial</Text>
-                </View>
-              </View>
-            </View>
-          </>
-        ) : trialStatus?.requiresSubscription ? (
-          // Show Trial Expired Status
-          <>
-            <TrialStatusCard />
-            
-            {/* Action Buttons for Expired Trial */}
-            <View style={styles.actionButtons}>
-              <TouchableOpacity
-                style={styles.subscribeNowButton}
-                onPress={() => router.push('/subscription-plans')}
-              >
-                <Ionicons name="card" size={20} color="#fff" />
-                <Text weight='bold' style={styles.buttonText}>Subscribe Now</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Expired Trial Info */}
-            <View style={styles.invoiceSection}>
-              <Text weight='bold' style={styles.sectionTitle}>What happens now?</Text>
-              <View style={styles.trialFeaturesList}>
-                <View style={styles.featureItem}>
-                  <Ionicons name="information-circle" size={20} color="#6b7280" />
-                  <Text weight='bold' style={styles.featureText}>Your account access is currently paused</Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <Ionicons name="information-circle" size={20} color="#6b7280" />
-                  <Text weight='bold' style={styles.featureText}>All your data is safe and preserved</Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <Ionicons name="information-circle" size={20} color="#6b7280" />
-                  <Text weight='bold' style={styles.featureText}>Subscribe anytime to regain full access</Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <Ionicons name="information-circle" size={20} color="#6b7280" />
-                  <Text weight='bold' style={styles.featureText}>Choose from flexible monthly or yearly plans</Text>
-                </View>
-              </View>
-            </View>
-          </>
-        ) : subscription ? (
-          // Show Subscription Data (Existing logic)
+        ) : subscription?.status === 'active' ? (
+          // PRIORITY 1: Show Active Subscription Data ONLY
           <>
             {/* Current Subscription Card */}
             <LinearGradient
@@ -588,11 +494,14 @@ const SubscriptionManagement = () => {
                 </View>
               </View>
 
-              {subscription.status === 'active' && (
+              {subscription.status === 'active' && daysUntilExpiry !== null && (
                 <View style={styles.renewalReminder}>
                   <Ionicons name="notifications-outline" size={20} color="#fff" />
                   <Text weight='bold' style={styles.renewalText}>
-                    Auto-renews on {formatDate(subscription.endDate)}
+                    {daysUntilExpiry > 0 
+                      ? `Expires in ${daysUntilExpiry} day${daysUntilExpiry === 1 ? '' : 's'} (${formatDate(subscription.endDate)})`
+                      : `Expired on ${formatDate(subscription.endDate)}`
+                    }
                   </Text>
                 </View>
               )}
@@ -600,17 +509,44 @@ const SubscriptionManagement = () => {
 
             {/* Action Buttons */}
             <View style={styles.actionButtons}>
-              {subscription.status === 'active' && (
-                <>
-                  <TouchableOpacity
-                    style={styles.renewButton}
-                    onPress={() => setShowRenewalModal(true)}
-                  >
-                    <Ionicons name="refresh" size={20} color="#fff" />
-                    <Text weight='bold' style={styles.buttonText}>Renew Early</Text>
-                  </TouchableOpacity>
-                </>
+              {/* Show renew button only if subscription expires in 5 days or less */}
+              {showRenewButton && subscription.status === 'active' && (
+                <TouchableOpacity
+                  style={styles.renewButton}
+                  onPress={() => router.push({
+                    pathname: '/subscription',
+                    params: { 
+                      providerId: providerId,
+                      providerEmail: providerEmail
+                    }
+                  })}
+                >
+                  <Ionicons name="refresh" size={20} color="#fff" />
+                  <Text weight='bold' style={styles.buttonText}>
+                    {daysUntilExpiry && daysUntilExpiry > 0 
+                      ? `Renew Early (${daysUntilExpiry} day${daysUntilExpiry === 1 ? '' : 's'} left)`
+                      : 'Renew Subscription'
+                    }
+                  </Text>
+                </TouchableOpacity>
               )}
+              
+              {/* {subscription.status === 'active' && (
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={handleCancelSubscription}
+                  disabled={actionLoading === 'cancel'}
+                >
+                  {actionLoading === 'cancel' ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons name="close-circle-outline" size={20} color="#fff" />
+                      <Text weight='bold' style={styles.buttonText}>Cancel Subscription</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )} */}
             </View>
 
             {/* Invoice History */}
@@ -654,8 +590,157 @@ const SubscriptionManagement = () => {
               )}
             </View>
           </>
+        ) : trialStatus?.isActive ? (
+          // PRIORITY 2: Show Trial Status when trial is active but no active subscription
+          <>
+            <TrialStatusCard />
+            
+            {/* Action Buttons for Trial Users */}
+            <View style={styles.actionButtons}>
+              <TouchableOpacity
+                style={styles.subscribeNowButton}
+                onPress={() => router.push({
+                  pathname: '/subscription',
+                  params: { 
+                    providerId: providerId,
+                    providerEmail: providerEmail
+                  }
+                })}
+              >
+                <Ionicons name="card" size={20} color="#fff" />
+                <Text weight='bold' style={styles.buttonText}>Browse Plans</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Trial Features Section */}
+            <View style={styles.invoiceSection}>
+              <Text weight='bold' style={styles.sectionTitle}> Features</Text>
+              <View style={styles.trialFeaturesList}>
+                <View style={styles.featureItem}>
+                  <Ionicons name="checkmark-circle" size={20} color="#10b981" />
+                  <Text weight='bold' style={styles.featureText}>Full access to all premium features</Text>
+                </View>
+                <View style={styles.featureItem}>
+                  <Ionicons name="checkmark-circle" size={20} color="#10b981" />
+                  <Text weight='bold' style={styles.featureText}>Unlimited customers during trial</Text>
+                </View>
+                <View style={styles.featureItem}>
+                  <Ionicons name="checkmark-circle" size={20} color="#10b981" />
+                  <Text weight='bold' style={styles.featureText}>Advanced analytics dashboard</Text>
+                </View>
+                <View style={styles.featureItem}>
+                  <Ionicons name="checkmark-circle" size={20} color="#10b981" />
+                  <Text weight='bold' style={styles.featureText}>No credit card required for trial</Text>
+                </View>
+              </View>
+            </View>
+          </>
+        ) : trialStatus?.requiresSubscription ? (
+          // PRIORITY 3: Show Trial Expired Status
+          <>
+            <TrialStatusCard />
+            
+            {/* Action Buttons for Expired Trial */}
+            <View style={styles.actionButtons}>
+              <TouchableOpacity
+                style={styles.subscribeNowButton}
+                onPress={() => router.push({
+                  pathname: '/subscription-plans',
+                  params: { 
+                    providerId: providerId,
+                    providerEmail: providerEmail
+                  }
+                })}
+              >
+                <Ionicons name="card" size={20} color="#fff" />
+                <Text weight='bold' style={styles.buttonText}>Subscribe Now</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Expired Trial Info */}
+            <View style={styles.invoiceSection}>
+              <Text weight='bold' style={styles.sectionTitle}>What happens now?</Text>
+              <View style={styles.trialFeaturesList}>
+                <View style={styles.featureItem}>
+                  <Ionicons name="information-circle" size={20} color="#6b7280" />
+                  <Text weight='bold' style={styles.featureText}>Your account access is currently paused</Text>
+                </View>
+                <View style={styles.featureItem}>
+                  <Ionicons name="information-circle" size={20} color="#6b7280" />
+                  <Text weight='bold' style={styles.featureText}>All your data is safe and preserved</Text>
+                </View>
+                <View style={styles.featureItem}>
+                  <Ionicons name="information-circle" size={20} color="#6b7280" />
+                  <Text weight='bold' style={styles.featureText}>Subscribe anytime to regain full access</Text>
+                </View>
+                <View style={styles.featureItem}>
+                  <Ionicons name="information-circle" size={20} color="#6b7280" />
+                  <Text weight='bold' style={styles.featureText}>Choose from flexible monthly or yearly plans</Text>
+                </View>
+              </View>
+            </View>
+          </>
+        ) : subscription && subscription.status !== 'active' ? (
+          // PRIORITY 4: Show other subscription states (pending, cancelled, etc.)
+          <>
+            {/* Subscription Card for non-active states */}
+            <LinearGradient
+              colors={['#6b7280', '#6b7280']}
+              style={styles.subscriptionCard}
+            >
+              <View style={styles.cardHeader}>
+                <Text weight='bold' style={styles.cardTitle}>Current Plan</Text>
+                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(subscription.status) }]}>
+                  <Text weight='bold' style={styles.statusText}>{subscription.status.toUpperCase()}</Text>
+                </View>
+              </View>
+              
+              <Text weight='bold' style={styles.planName}>
+                {subscription.planId?.name || 'Plan'}
+              </Text>
+              
+              <View style={styles.datesContainer}>
+                <View style={styles.dateItem}>
+                  <Text weight='bold' style={styles.dateLabel}>Start Date</Text>
+                  <Text weight='bold' style={styles.dateValue}>{formatDate(subscription.startDate)}</Text>
+                </View>
+                {subscription.endDate && (
+                  <View style={styles.dateItem}>
+                    <Text weight='bold' style={styles.dateLabel}>End Date</Text>
+                    <Text weight='bold' style={styles.dateValue}>{formatDate(subscription.endDate)}</Text>
+                  </View>
+                )}
+              </View>
+
+              {subscription.status === 'cancelled' && (
+                <View style={styles.renewalReminder}>
+                  <Ionicons name="information-circle-outline" size={20} color="#fff" />
+                  <Text weight='bold' style={styles.renewalText}>
+                    Subscription cancelled. Access ends on {formatDate(subscription.endDate)}
+                  </Text>
+                </View>
+              )}
+            </LinearGradient>
+
+            {/* Action Buttons for non-active subscription */}
+            <View style={styles.actionButtons}>
+              <TouchableOpacity
+                style={styles.subscribeNowButton}
+                onPress={() => router.push({
+                  pathname: '/subscription-plans',
+                  params: { 
+                    providerId: providerId,
+                    providerEmail: providerEmail
+                  }
+                })}
+              >
+                <Ionicons name="card" size={20} color="#fff" />
+                <Text weight='bold' style={styles.buttonText}>Subscribe Now</Text>
+              </TouchableOpacity>
+            </View>
+          </>
         ) : (
-          // No subscription or trial
+          // PRIORITY 5: No subscription or trial
           <View style={styles.noSubscription}>
             <Ionicons name="card-outline" size={60} color="#ccc" />
             <Text weight='bold' style={styles.noSubscriptionText}>No Active Subscription</Text>
@@ -664,76 +749,19 @@ const SubscriptionManagement = () => {
             </Text>
             <TouchableOpacity 
               style={styles.subscribeButton}
-              onPress={() => router.push('/subscription-plans')}
+              onPress={() => router.push({
+                pathname: '/subscription-plans',
+                params: { 
+                  providerId: providerId,
+                  providerEmail: providerEmail
+                }
+              })}
             >
               <Text weight='bold' style={styles.subscribeButtonText}>Browse Plans</Text>
             </TouchableOpacity>
           </View>
         )}
       </ScrollView>
-
-      {/* Renewal Modal */}
-      <Modal
-        visible={showRenewalModal}
-        transparent={true}
-        animationType="slide"
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text weight='bold' style={styles.modalTitle}>Renew Subscription</Text>
-              <TouchableOpacity onPress={() => setShowRenewalModal(false)}>
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
-            
-            <ScrollView>
-              {plans.filter(plan => plan.isActive).map(plan => (
-                <TouchableOpacity
-                  key={plan._id}
-                  style={[
-                    styles.planOption,
-                    selectedRenewalPlan === plan._id && styles.selectedPlan
-                  ]}
-                  onPress={() => setSelectedRenewalPlan(plan._id)}
-                >
-                  <View style={styles.planOptionHeader}>
-                    <Text weight='bold' style={styles.planOptionName}>{plan.name}</Text>
-                    <Text weight='bold' style={styles.planOptionPrice}>
-                      ₹{plan.price}/{plan.interval === 'month' ? 'mo' : 'yr'}
-                    </Text>
-                  </View>
-                  <Text weight='bold' style={styles.planOptionDesc}>{plan.description}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.cancelModalButton}
-                onPress={() => setShowRenewalModal(false)}
-              >
-                <Text weight='bold' style={styles.cancelModalText}>Cancel</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[
-                  styles.confirmButton,
-                  (!selectedRenewalPlan || actionLoading === 'renew') && styles.buttonDisabled
-                ]}
-                onPress={() => selectedRenewalPlan && handleRenewSubscription(selectedRenewalPlan)}
-                disabled={!selectedRenewalPlan || actionLoading === 'renew'}
-              >
-                {actionLoading === 'renew' ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text weight='bold' style={styles.confirmButtonText}>Renew Now</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       {/* Payment Modal */}
       <Modal 
@@ -825,22 +853,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     marginVertical: 20,
-    gap: 20,
   },
   countdownBox: {
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.2)',
-    padding: 15,
+    padding: 20,
     borderRadius: 12,
-    minWidth: 80,
+    minWidth: 120,
   },
   countdownNumber: {
-    fontSize: 32,
+    fontSize: 42,
     fontWeight: 'bold',
     color: '#fff',
   },
   countdownLabel: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#fff',
     fontWeight: '600',
     marginTop: 5,
@@ -891,21 +918,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
   },
-  continueTrialButton: {
+  renewButton: {
     flexDirection: 'row',
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: '#15803d',
+    backgroundColor: '#10b981',
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
   },
-  renewButton: {
-    flex: 1,
+  cancelButton: {
     flexDirection: 'row',
-    backgroundColor: '#10b981',
+    backgroundColor: '#dc3545',
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',
@@ -1016,92 +1040,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
     fontSize: 16,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    padding: 20,
-    width: width * 0.9,
-    maxWidth: 400,
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  planOption: {
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 10,
-  },
-  selectedPlan: {
-    borderColor: '#15803d',
-    backgroundColor: '#f0f8ff',
-  },
-  planOptionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 5,
-  },
-  planOptionName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  planOptionPrice: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#15803d',
-  },
-  planOptionDesc: {
-    fontSize: 14,
-    color: '#666',
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 15,
-    marginTop: 20,
-  },
-  cancelModalButton: {
-    flex: 1,
-    backgroundColor: '#e70909ff',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  cancelModalText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  confirmButton: {
-    flex: 1,
-    backgroundColor: '#15803d',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  buttonDisabled: {
-    opacity: 0.3,
-  },
-  confirmButtonText: {
-    color: '#fff',
-    fontWeight: '600',
   },
   webviewContainer: {
     flex: 1,

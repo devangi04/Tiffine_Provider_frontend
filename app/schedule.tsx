@@ -188,7 +188,7 @@ const ScheduleScreen: React.FC = () => {
   const cardScale = useRef(new Animated.Value(0.8)).current;
 
   // Calculate indicator width - FIXED: Make both sides equal
-  const indicatorWidth = (width - 60) / 2-8; // Equal width for both tabs
+  const indicatorWidth = (width - 60) / 2-4; // Equal width for both tabs
 
   // Setup scroll listener for animations
   useEffect(() => {
@@ -282,17 +282,23 @@ useEffect(() => {
         });
 
         // Set meal preferences
-        if (result.preferences) {
-          const lunchEnabled = result.preferences.lunch?.enabled === true;
-          const dinnerEnabled = result.preferences.dinner?.enabled === true;
-          setShowMealTabs(lunchEnabled && dinnerEnabled);
+       if (result.preferences) {
+  const lunchEnabled = result.preferences.lunch?.enabled === true;
+  const dinnerEnabled = result.preferences.dinner?.enabled === true;
+  
+  // Only show tabs if both are enabled
+  setShowMealTabs(lunchEnabled && dinnerEnabled);
 
-          if (lunchEnabled && !dinnerEnabled) {
-            setSelectedMealType("lunch");
-          } else if (!lunchEnabled && dinnerEnabled) {
-            setSelectedMealType("dinner");
-          }
-        }
+  // Set default selected meal type based on preferences
+  if (lunchEnabled && !dinnerEnabled) {
+    setSelectedMealType("lunch");
+  } else if (!lunchEnabled && dinnerEnabled) {
+    setSelectedMealType("dinner");
+  } else if (lunchEnabled && dinnerEnabled) {
+    // Both enabled, default to lunch
+    setSelectedMealType("lunch");
+  }
+}
       } else {
         setError(result.message || "Failed to load data");
       }
@@ -1209,9 +1215,9 @@ useEffect(() => {
           Create a {mealType} menu and add dishes to get started
         </Text>
 
-        {renderHistorySection(selectedDay)}
+        {/* {renderHistorySection(selectedDay)} */}
 
-        <TouchableOpacity
+        {/* <TouchableOpacity
           style={styles.addButton}
           onPress={() =>
             router.push({
@@ -1231,7 +1237,7 @@ useEffect(() => {
               mealType.slice(1)}{" "}
             Menu
           </Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </View>
     );
   };
@@ -1358,73 +1364,102 @@ useEffect(() => {
       )}
 
       {/* Horizontal ScrollView for Content Swiping */}
-      <Animated.ScrollView
-        ref={horizontalScrollViewRef}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-          { useNativeDriver: false }
-        )}
-        onMomentumScrollEnd={handleScrollEnd}
-        scrollEventThrottle={16}
-        style={styles.horizontalScrollView}
-        contentContainerStyle={styles.horizontalScrollContent}
-        decelerationRate="fast"
-        snapToInterval={width}
-        snapToAlignment="center"
-      >
-        {/* Lunch Content Page - Sorted: Sent today first */}
-        <View style={styles.pageContainer}>
-          <FlatList
-            data={lunchMenus}
-            renderItem={renderMenuCard}
-            keyExtractor={(item) => item._id}
-            contentContainerStyle={[
-              styles.listContainer,
-              lunchMenus.length === 0 && styles.emptyListContainer,
-            ]}
-            ListEmptyComponent={() => renderEmptyState("lunch")}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
-                colors={["#2c95f8"]}
-              />
-            }
-            ListHeaderComponent={
-              <>{lunchMenus.length > 0 && renderHistorySection(selectedDay)}</>
-            }
-            showsVerticalScrollIndicator={false}
+    {/* Horizontal ScrollView for Content Swiping - Only when both meals are enabled */}
+{showMealTabs ? (
+  <Animated.ScrollView
+    ref={horizontalScrollViewRef}
+    horizontal
+    pagingEnabled
+    showsHorizontalScrollIndicator={false}
+    onScroll={Animated.event(
+      [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+      { useNativeDriver: false }
+    )}
+    onMomentumScrollEnd={handleScrollEnd}
+    scrollEventThrottle={16}
+    style={styles.horizontalScrollView}
+    contentContainerStyle={styles.horizontalScrollContent}
+    decelerationRate="fast"
+    snapToInterval={width}
+    snapToAlignment="center"
+  >
+    {/* Lunch Content Page */}
+    <View style={styles.pageContainer}>
+      <FlatList
+        data={lunchMenus}
+        renderItem={renderMenuCard}
+        keyExtractor={(item) => item._id}
+        contentContainerStyle={[
+          styles.listContainer,
+          lunchMenus.length === 0 && styles.emptyListContainer,
+        ]}
+        ListEmptyComponent={() => renderEmptyState("lunch")}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={["#2c95f8"]}
           />
-        </View>
-        
-        {/* Dinner Content Page - Sorted: Sent today first */}
-        <View style={styles.pageContainer}>
-          <FlatList
-            data={dinnerMenus}
-            renderItem={renderMenuCard}
-            keyExtractor={(item) => item._id}
-            contentContainerStyle={[
-              styles.listContainer,
-              dinnerMenus.length === 0 && styles.emptyListContainer,
-            ]}
-            ListEmptyComponent={() => renderEmptyState("dinner")}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
-                colors={["#2c95f8"]}
-              />
-            }
-            ListHeaderComponent={
-              <>{dinnerMenus.length > 0 && renderHistorySection(selectedDay)}</>
-            }
-            showsVerticalScrollIndicator={false}
+        }
+        ListHeaderComponent={
+          <>{lunchMenus.length > 0 && renderHistorySection(selectedDay)}</>
+        }
+        showsVerticalScrollIndicator={false}
+      />
+    </View>
+    
+    {/* Dinner Content Page */}
+    <View style={styles.pageContainer}>
+      <FlatList
+        data={dinnerMenus}
+        renderItem={renderMenuCard}
+        keyExtractor={(item) => item._id}
+        contentContainerStyle={[
+          styles.listContainer,
+          dinnerMenus.length === 0 && styles.emptyListContainer,
+        ]}
+        ListEmptyComponent={() => renderEmptyState("dinner")}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={["#2c95f8"]}
           />
-        </View>
-      </Animated.ScrollView>
+        }
+        ListHeaderComponent={
+          <>{dinnerMenus.length > 0 && renderHistorySection(selectedDay)}</>
+        }
+        showsVerticalScrollIndicator={false}
+      />
+    </View>
+  </Animated.ScrollView>
+) : (
+  /* Single meal type view - No swiping */
+  <View style={styles.singleMealContainer}>
+    <FlatList
+      data={selectedMealType === "lunch" ? lunchMenus : dinnerMenus}
+      renderItem={renderMenuCard}
+      keyExtractor={(item) => item._id}
+      contentContainerStyle={[
+        styles.listContainer,
+        (selectedMealType === "lunch" ? lunchMenus : dinnerMenus).length === 0 && 
+        styles.emptyListContainer,
+      ]}
+      ListEmptyComponent={() => renderEmptyState(selectedMealType)}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          colors={["#2c95f8"]}
+        />
+      }
+      ListHeaderComponent={
+        <>{renderHistorySection(selectedDay)}</>
+      }
+      showsVerticalScrollIndicator={false}
+    />
+  </View>
+)}
 
    
 
@@ -2310,6 +2345,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0,
     shadowRadius: 0,
   },
+  singleMealContainer: {
+  flex: 1,
+},
+
 });
 
 export default ScheduleScreen;

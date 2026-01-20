@@ -114,7 +114,6 @@ export const useCoachMark = (pageId?: string) => {
       const keys = await AsyncStorage.getAllKeys();
       const coachMarkKeys = keys.filter(key => key.startsWith(COACH_MARK_PREFIX));
       await AsyncStorage.multiRemove(coachMarkKeys);
-      console.log('All coach marks reset');
     } catch (error) {
       console.error('Error resetting all coach marks:', error);
     }

@@ -155,9 +155,7 @@ const fetchPaymentStatus = async () => {
       // Customer is still active or was active during this month
       return true;
     });
-    
-    console.log(`Fetched ${allCustomers.length} total customers, ${customersForMonth.length} active in ${currentMonth}`);
-    
+        
     if (customersForMonth.length === 0) {
       setCustomers([]);
       setDisplayedCustomers([]);
@@ -178,9 +176,7 @@ const fetchPaymentStatus = async () => {
     } else if (Array.isArray(billsResponse.data)) {
       bills = billsResponse.data;
     }
-    
-    console.log(`Fetched ${bills.length} bills for month ${currentMonth}`);
-    
+        
     // Match customers with bills (use customersForMonth instead of allCustomers)
     const customersWithBills: CustomerWithBill[] = customersForMonth.map(customer => {
       const customerBill = bills.find(bill => {

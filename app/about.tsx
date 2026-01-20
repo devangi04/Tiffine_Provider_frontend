@@ -1,36 +1,25 @@
-// AboutUsScreen.tsx - Simple About Us screen
-import React, { useRef } from 'react';
-import { 
-  View, 
-  ScrollView, 
-  TouchableOpacity, 
-  StyleSheet, 
+// AboutUsScreen.tsx
+import React from 'react';
+import {
+  View,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
   SafeAreaView,
   StatusBar,
-  Linking,
-  Animated,
-  Dimensions
+  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Text from '@/components/ztext';
 
+const HEADER_HEIGHT = 60;
+
 const AboutUsScreen = () => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const scrollY = useRef(new Animated.Value(0)).current;
-
-  const headerOpacity = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
-  });
-
-  const handleBack = () => {
-    router.back();
-  };
 
   const features = [
     { icon: 'fast-food', title: 'Menu Management', desc: 'Easy dish and menu creation' },
@@ -41,131 +30,291 @@ const AboutUsScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar backgroundColor="#f8fafc" barStyle="dark-content" />
-      
-      {/* Header */}
-      <Animated.View style={[styles.header, { opacity: headerOpacity, paddingTop: insets.top }]}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
+
+      {/* ================= HEADER ================= */}
+      <View style={[styles.header, { paddingTop: insets.top }]}>
         <LinearGradient colors={['#f8fafc', '#f8fafc']} style={styles.headerGradient}>
           <View style={styles.headerContent}>
-            <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-              <Ionicons name="arrow-back" size={24} color="#333" />
+            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+              <Ionicons name="arrow-back" size={22} color="#333" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>About Us</Text>
-            <View style={styles.placeholder} />
-          </View>
-        </LinearGradient>
-      </Animated.View>
 
-      <View style={[styles.fixedHeader, { paddingTop: insets.top }]}>
-        <LinearGradient colors={['rgba(248, 250, 252, 0.95)', 'rgba(248, 250, 252, 0.8)']} style={styles.headerGradient}>
-          <View style={styles.headerContent}>
-            <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-              <Ionicons name="arrow-back" size={24} color="#333" />
-            </TouchableOpacity>
             <Text style={styles.headerTitle}>About Us</Text>
+
             <View style={styles.placeholder} />
           </View>
         </LinearGradient>
       </View>
 
-      <ScrollView 
+      {/* ================= CONTENT ================= */}
+      <ScrollView
         style={styles.scrollView}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: false }
-        )}
-        scrollEventThrottle={16}
+        contentContainerStyle={{
+          paddingTop: HEADER_HEIGHT + insets.top + 30,
+          paddingBottom: 40 + insets.bottom,
+        }}
+        showsVerticalScrollIndicator={false}
       >
-        {/* Hero Section */}
+        {/* Hero */}
         <LinearGradient colors={['#15803d', '#4694e2']} style={styles.heroCard}>
           <View style={styles.heroContent}>
             <View style={styles.logoCircle}>
-              <Ionicons name="restaurant" size={32} color="white" />
+              <Ionicons name="restaurant" size={32} color="#fff" />
             </View>
             <Text style={styles.appName}>Tiffine Service</Text>
             <Text style={styles.tagline}>Delicious Food, One Tap Away</Text>
           </View>
         </LinearGradient>
 
-        {/* Content */}
+        {/* Text Content */}
         <View style={styles.content}>
           <Text style={styles.sectionTitle}>Our Story</Text>
           <Text style={styles.paragraph}>
-            Welcome to Tiffine, your trusted partner for delicious home-cooked meals delivered right to your doorstep. 
-            Founded with a passion for bringing authentic flavors and healthy eating to busy lives.
+            Welcome to Tiffine, your trusted partner for delicious home-cooked meals
+            delivered right to your doorstep. Founded with a passion for authentic
+            flavors and healthy eating.
           </Text>
 
           <Text style={styles.sectionTitle}>Our Mission</Text>
           <Text style={styles.paragraph}>
-            To make quality food accessible to everyone. We empower home chefs and providers to share their culinary 
-            expertise with the community while ensuring every meal is prepared with love, care, and the finest ingredients.
+            To make quality food accessible to everyone while empowering home chefs
+            and food providers with smart tools.
           </Text>
 
           <Text style={styles.sectionTitle}>Features</Text>
           <View style={styles.featuresGrid}>
-            {features.map((feature, index) => (
+            {features.map((item, index) => (
               <View key={index} style={styles.featureItem}>
                 <View style={styles.featureIcon}>
-                  <Ionicons name={feature.icon as any} size={24} color="#15803d" />
+                  <Ionicons name={item.icon as any} size={22} color="#15803d" />
                 </View>
-                <Text style={styles.featureTitle}>{feature.title}</Text>
-                <Text style={styles.featureDesc}>{feature.desc}</Text>
+                <Text style={styles.featureTitle}>{item.title}</Text>
+                <Text style={styles.featureDesc}>{item.desc}</Text>
               </View>
             ))}
           </View>
 
           <Text style={styles.sectionTitle}>Contact Us</Text>
-          <View style={styles.contactInfo}>
-            <TouchableOpacity style={styles.contactItem}>
-              <Ionicons name="mail-outline" size={20} color="#666" />
+          <View style={styles.contactBox}>
+            <View style={styles.contactItem}>
+              <Ionicons name="mail-outline" size={18} color="#666" />
               <Text style={styles.contactText}>support@tiffine.com</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.contactItem}>
-              <Ionicons name="call-outline" size={20} color="#666" />
+            </View>
+            <View style={styles.contactItem}>
+              <Ionicons name="call-outline" size={18} color="#666" />
               <Text style={styles.contactText}>+91 98765 43210</Text>
-            </TouchableOpacity>
+            </View>
           </View>
         </View>
 
+        {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.version}>Version 1.0.0</Text>
-          <Text style={styles.copyright}>© 2025 Techtriosphere</Text>
+          <Text  style={styles.footerText}>Lichi-Provider</Text>
+                  <Text style={styles.footerCopyright}>© 2026 Triosphere Tech.pvt.ltd</Text>
+                  <Text style={styles.footerVersion}>Version 1.0.0</Text>
         </View>
-        <View style={{ height: 40 + insets.bottom }} />
       </ScrollView>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
-  header: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
-  fixedHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
-  headerGradient: { paddingHorizontal: 20, paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)' },
-  headerContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 60 },
-   backButton: {width: 40,height: 40,borderRadius: 22,backgroundColor: 'white',alignItems: 'center',justifyContent: 'center',shadowColor: '#000',shadowOffset: { width: 0, height: 2 },shadowOpacity: 0.08,shadowRadius: 8,elevation: 3,},
-  headerTitle: { fontSize: 18, fontWeight: '600', color: '#333' },
-  placeholder: { width: 40 },
-  scrollView: { flex: 1 },
-  heroCard: { marginTop: 90, marginHorizontal: 20, borderRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 8 },
-  heroContent: { alignItems: 'center' },
-  logoCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-  appName: { color: 'white', fontSize: 24, fontWeight: '700', marginBottom: 8,  },
-  tagline: { color: 'rgba(255,255,255,0.9)', fontSize: 16 },
-  content: { paddingHorizontal: 20, paddingTop: 24 },
-  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#333', marginTop: 24, marginBottom: 12 },
-  paragraph: { fontSize: 15, lineHeight: 24, color: '#555', marginBottom: 16 },
-  featuresGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 24 },
-  featureItem: { width: (Dimensions.get('window').width - 52) / 2, backgroundColor: 'white', borderRadius: 12, padding: 16, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 2 },
-  featureIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#f0f7ff', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  featureTitle: { fontSize: 14, fontWeight: '600', color: '#333', textAlign: 'center', marginBottom: 4 },
-  featureDesc: { fontSize: 12, color: '#666', textAlign: 'center' },
-  contactInfo: { backgroundColor: 'white', borderRadius: 12, padding: 16, marginBottom: 24 },
-  contactItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
-  contactText: { fontSize: 14, color: '#333', flex: 1 },
-  footer: { alignItems: 'center', paddingVertical: 24 },
-  version: { fontSize: 14, color: '#666', marginBottom: 8 },
-  copyright: { fontSize: 12, color: '#999' },
-});
-
 export default AboutUsScreen;
+
+/* ================= STYLES ================= */
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+
+  header: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 20,
+    backgroundColor: '#f8fafc',
+    elevation: 6,
+  },
+
+  headerGradient: {
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+
+  headerContent: {
+    height: HEADER_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 3,
+  },
+
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+
+  placeholder: {
+    width: 38,
+  },
+
+  scrollView: {
+    flex: 1,
+  },
+
+  heroCard: {
+    marginHorizontal: 20,
+    borderRadius: 24,
+    padding: 24,
+    elevation: 6,
+  },
+
+  heroContent: {
+    alignItems: 'center',
+  },
+
+  logoCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+
+  appName: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 6,
+  },
+
+  tagline: {
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.9)',
+  },
+
+  content: {
+    paddingHorizontal: 20,
+    paddingTop: 30,
+  },
+
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 10,
+    marginTop: 20,
+  },
+
+  paragraph: {
+    fontSize: 15,
+    lineHeight: 24,
+    color: '#555',
+  },
+
+  featuresGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 10,
+  },
+
+  featureItem: {
+    width: (Dimensions.get('window').width - 52) / 2,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 16,
+    alignItems: 'center',
+    elevation: 2,
+  },
+
+  featureIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#f0f7ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+
+  featureTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
+  },
+
+  featureDesc: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+
+  contactBox: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 16,
+    marginTop: 10,
+  },
+
+  contactItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+
+  contactText: {
+    fontSize: 14,
+    color: '#333',
+  },
+
+  footer: {
+    alignItems: 'center',
+    paddingVertical: 30,
+  },
+
+  version: {
+    fontSize: 14,
+    color: '#666',
+  },
+  footerText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+  },
+  footerCopyright: {
+    fontSize: 12,
+    color: '#999',
+    marginBottom: 4,
+  },
+  footerVersion: {
+    fontSize: 12,
+    color: '#ccc',
+  },
+  copyright: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 6,
+  },
+});

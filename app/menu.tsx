@@ -150,7 +150,7 @@ const DailyMenuScreen: React.FC = () => {
   const [prefsLoading, setPrefsLoading] = useState<boolean>(true);
 
   // Calculate indicator width
-  const indicatorWidth = (width - 60) / 2-8;
+  const indicatorWidth = (width - 60) / 2-4;
 
   // Setup scroll listener for animations
   useEffect(() => {
@@ -182,6 +182,7 @@ const DailyMenuScreen: React.FC = () => {
 
   // Handle meal type tab press
   const handleMealTypePress = useCallback((mealType: 'lunch' | 'dinner') => {
+
     const index = mealType === 'lunch' ? 0 : 1;
     
     if (horizontalScrollViewRef.current) {
@@ -931,15 +932,17 @@ useEffect(() => {
     );
   }
 
-  return (
-    <View style={styles.container}>
-      {/* Fixed Day Tabs at Top */}
-      {renderDaySelector()}
-      
-      {/* Meal Type Selector - Fixed */}
-      {renderMealTypeSelector()}
-      
-      {/* Swipeable Content Area */}
+return (
+  <View style={styles.container}>
+    {/* Fixed Day Tabs at Top */}
+    {renderDaySelector()}
+    
+    {/* Meal Type Selector - Fixed */}
+    {renderMealTypeSelector()}
+    
+    {/* Conditional Content Area */}
+    {hasMultipleMealTypes ? (
+      /* Swipeable Content Area - Only when multiple meal types are enabled */
       <Animated.ScrollView
         ref={horizontalScrollViewRef}
         horizontal
@@ -991,25 +994,43 @@ useEffect(() => {
           </ScrollView>
         </View>
       </Animated.ScrollView>
-      
-      {/* Fixed Save Button */}
-      <View style={styles.fixedButtonContainer}>
-        <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: getMealTypeGradient()[0] }, (!hasSelectedDishes(selectedMealType) || saving) && styles.disabledButton]}
-          onPress={saveMenu}
-          disabled={!hasSelectedDishes(selectedMealType) || saving}
+    ) : (
+      /* Single meal type view - No swiping */
+      <View style={styles.singleMealContainer}>
+        <ScrollView
+          ref={selectedMealType === 'lunch' ? verticalScrollViewRefs.lunch : verticalScrollViewRefs.dinner}
+          style={styles.verticalScrollView}
+          contentContainerStyle={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          {saving ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text weight='bold' style={styles.buttonText}>
-              Save {selectedMealType.charAt(0).toUpperCase() + selectedMealType.slice(1)} Menu
-            </Text>
-          )}
-        </TouchableOpacity>
+          {renderMenuNameInput(selectedMealType)}
+          {renderMealOptions(selectedMealType)}
+          {categories.map(category => renderCategory(category, selectedMealType))}
+          {renderNotesSection(selectedMealType)}
+          <View style={styles.bottomSpacer} />
+        </ScrollView>
       </View>
+    )}
+    
+    {/* Fixed Save Button */}
+    <View style={styles.fixedButtonContainer}>
+      <TouchableOpacity
+        style={[styles.actionButton, { backgroundColor: getMealTypeGradient()[0] }, (!hasSelectedDishes(selectedMealType) || saving) && styles.disabledButton]}
+        onPress={saveMenu}
+        disabled={!hasSelectedDishes(selectedMealType) || saving}
+      >
+        {saving ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text weight='bold' style={styles.buttonText}>
+            Save {selectedMealType.charAt(0).toUpperCase() + selectedMealType.slice(1)} Menu
+          </Text>
+        )}
+      </TouchableOpacity>
     </View>
-  );
+  </View>
+);
 };
 
 // Update styles
@@ -1122,7 +1143,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 4,
     left: 4,
-    width: (Dimensions.get('window').width - 60) / 2,
+    // width: (Dimensions.get('window').width - 60) / 2,
     height: 42,
     borderRadius: 21,
     backgroundColor: '#FFFFFF',
@@ -1434,6 +1455,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1E293B',
   },
+  singleMealContainer: {
+  flex: 1,
+},
 });
 
 export default DailyMenuScreen;

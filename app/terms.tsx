@@ -1,4 +1,4 @@
-// TermsConditionsScreen.tsx - Complete Terms & Conditions for Tiffine Provider App
+// TermsConditionsScreen.tsx - Fixed Header Overlap Issue
 import React, { useRef } from 'react';
 import { 
   View, 
@@ -6,7 +6,6 @@ import {
   TouchableOpacity, 
   StyleSheet, 
   Dimensions,
-  SafeAreaView,
   StatusBar,
   Linking,
   Share,
@@ -19,17 +18,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Text from '@/components/ztext';
 
 const { width } = Dimensions.get('window');
+const HEADER_HEIGHT = 60;
 
 const TermsConditionsScreen = () => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const scrollY = useRef(new Animated.Value(0)).current;
-
-  const headerOpacity = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
-  });
 
   const handleBack = () => {
     router.back();
@@ -80,7 +74,7 @@ const TermsConditionsScreen = () => {
       id: 'subscription-terms',
       title: 'Subscription Terms',
       items: [
-        '3-day free trial available for new providers',
+        '7-day free trial available for new providers',
         'Mandatory subscription via Razorpay after trial',
         'Subscription grants access to all App features',
         'Automatic renewal unless cancelled',
@@ -182,30 +176,25 @@ const TermsConditionsScreen = () => {
   ];
 
   const contactInfo = [
-    {
-      icon: 'mail',
-      label: 'Legal Inquiries',
-      value: 'legal@techtriosphere.com',
-      action: () => openEmail('techtriosphere@gmail.com')
-    },
+  
     {
       icon: 'headset',
       label: 'Support',
-      value: 'support@tiffine.com',
-      action: () => openEmail('techtriosphere@gmail.com')
+      value: 'info@triospheretech.com',
+      action: () => openEmail('info@triospheretech.com')
     },
     {
       icon: 'globe',
       label: 'Website',
       value: 'www.tiffine.com',
-      action: () => openLink('https://triospheretech.com/index.html')
+      action: () => openLink('https://www.triospheretech.com/casestudies/lichi-bringing-structure-to-home-style-tiffin-services')
     }
   ];
 
   const renderSection = (section: any) => (
     <View style={styles.sectionCard} key={section.id}>
       <View style={styles.sectionHeader}>
-        <Ionicons name="document-text" size={20} color="#15803d" />
+        <Ionicons name="document-text" size={20} color="#8b5cf6" />
         <Text style={styles.sectionTitle}>{section.title}</Text>
       </View>
       
@@ -229,26 +218,16 @@ const TermsConditionsScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <StatusBar
         backgroundColor="#f8fafc"
         barStyle="dark-content"
       />
       
-      {/* Animated Header */}
-      <Animated.View style={[styles.header, { opacity: headerOpacity }]}>
-        <LinearGradient
-          colors={['#f8fafc', '#f8fafc']}
-          style={styles.headerGradient}
-        >
-        
-        </LinearGradient>
-      </Animated.View>
-
-      {/* Fixed Header for Scroll */}
+      {/* ================= FIXED HEADER ================= */}
       <View style={[styles.fixedHeader, { paddingTop: insets.top }]}>
         <LinearGradient
-          colors={['rgba(248, 250, 252, 0.95)', 'rgba(248, 250, 252, 0.8)']}
+          colors={['#f8fafc', '#f8fafc']}
           style={styles.headerGradient}
         >
           <View style={styles.headerContent}>
@@ -269,13 +248,11 @@ const TermsConditionsScreen = () => {
         </LinearGradient>
       </View>
 
+      {/* ================= SCROLL CONTENT ================= */}
       <ScrollView 
         style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: false }
-        )}
         scrollEventThrottle={16}
       >
         {/* Hero Section */}
@@ -395,21 +372,19 @@ const TermsConditionsScreen = () => {
               <Text style={styles.legalBold}>Legal Jurisdiction:</Text> Ahmedabad, Gujarat, India
             </Text>
           </View>
-       
         </View>
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerTitle}>Tiffine Service Provider Agreement</Text>
-          <Text style={styles.footerText}>These terms constitute a legal agreement between you and Techtriosphere.</Text>
-          <Text style={styles.footerCopyright}>© 2025 Techtriosphere. All rights reserved.</Text>
-          <Text style={styles.footerVersion}>Document Version: 1.0.0</Text>
+          <Text  style={styles.footerText}>Lichi-Provider</Text>
+                   <Text style={styles.footerCopyright}>© 2026 Triosphere Tech.pvt.ltd</Text>
+                   <Text style={styles.footerVersion}>Version 1.0.0</Text>
         </View>
 
         {/* Bottom spacing */}
         <View style={{ height: 40 + insets.bottom }} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -418,69 +393,91 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
-  header: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-  },
+  
+  /* ===== HEADER ===== */
   fixedHeader: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 10,
+    zIndex: 100,
+    backgroundColor: '#f8fafc',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
   },
+  
   headerGradient: {
     paddingHorizontal: 20,
-    paddingBottom: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
   },
+  
   headerContent: {
+    height: HEADER_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    height: 60,
   },
-   backButton: {width: 40,height: 40,borderRadius: 22,backgroundColor: 'white',alignItems: 'center',justifyContent: 'center',shadowColor: '#000',shadowOffset: { width: 0, height: 2 },shadowOpacity: 0.08,shadowRadius: 8,elevation: 3,},
-
+  
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'white',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#333',
   },
+  
   shareButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: 'white',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
+  
+  /* ===== SCROLL VIEW ===== */
   scrollView: {
     flex: 1,
   },
+  
+  scrollContent: {
+    paddingTop: HEADER_HEIGHT + (StatusBar.currentHeight || 0) + 20, // Fixed: Add space for header
+    paddingBottom: 40,
+    paddingHorizontal: 20,
+  },
+  
+  /* ===== HERO SECTION ===== */
   heroCard: {
-    marginTop: 80,
-    marginHorizontal: 20,
     borderRadius: 24,
     padding: 24,
+    marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
     shadowRadius: 24,
     elevation: 8,
   },
+  
   heroContent: {
     alignItems: 'center',
   },
+  
   logoCircle: {
     width: 64,
     height: 64,
@@ -490,6 +487,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 16,
   },
+  
   heroTitle: {
     color: 'white',
     fontSize: 24,
@@ -497,58 +495,67 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 8,
   },
+  
   heroSubtitle: {
     color: 'rgba(255, 255, 255, 0.9)',
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 4,
   },
+  
   effectiveDate: {
     color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 14,
     fontStyle: 'italic',
   },
+  
+  /* ===== NOTICE CARD ===== */
   noticeCard: {
     backgroundColor: '#fff8e1',
-    marginHorizontal: 20,
     borderRadius: 16,
     padding: 20,
-    marginTop: 24,
-    marginBottom: 24,
+    marginBottom: 20,
     borderLeftWidth: 4,
     borderLeftColor: '#f59e0b',
   },
+  
   noticeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     marginBottom: 12,
   },
+  
   noticeTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#333',
   },
+  
   noticeText: {
     fontSize: 14,
     lineHeight: 22,
     color: '#555',
   },
+  
+  /* ===== KEY POINTS ===== */
   keyPointsSection: {
-    paddingHorizontal: 20,
     marginBottom: 24,
   },
+  
   keyPointsTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#333',
     marginBottom: 16,
   },
+  
   keyPointsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
   },
+  
   keyPointCard: {
     width: (width - 52) / 2,
     backgroundColor: 'white',
@@ -561,6 +568,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
+  
   keyPointIcon: {
     width: 40,
     height: 40,
@@ -569,16 +577,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 8,
   },
+  
   keyPointText: {
     fontSize: 12,
     fontWeight: '600',
     color: '#333',
     textAlign: 'center',
   },
+  
+  /* ===== SECTIONS ===== */
   sectionsContainer: {
-    paddingHorizontal: 20,
     marginBottom: 24,
   },
+  
   sectionCard: {
     backgroundColor: 'white',
     borderRadius: 16,
@@ -590,49 +601,58 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 3,
   },
+  
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
     gap: 12,
   },
+  
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
   },
+  
   sectionContent: {
     fontSize: 14,
     lineHeight: 22,
     color: '#555',
     marginBottom: 16,
   },
+  
   itemsList: {
     gap: 12,
   },
+  
   listItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
   },
+  
   bulletPoint: {
     width: 20,
     alignItems: 'center',
   },
+  
   bulletText: {
     fontSize: 16,
     color: '#8b5cf6',
     fontWeight: 'bold',
   },
+  
   listItemText: {
     flex: 1,
     fontSize: 14,
     lineHeight: 20,
     color: '#555',
   },
+  
+  /* ===== AGREEMENT CARD ===== */
   agreementCard: {
     backgroundColor: 'white',
-    marginHorizontal: 20,
     borderRadius: 16,
     padding: 20,
     marginBottom: 24,
@@ -644,35 +664,42 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },
+  
   agreementHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     marginBottom: 16,
   },
+  
   agreementTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#333',
   },
+  
   agreementText: {
     fontSize: 14,
     lineHeight: 22,
     color: '#555',
   },
+  
+  /* ===== CONTACT SECTION ===== */
   contactSection: {
-    paddingHorizontal: 20,
     marginBottom: 24,
   },
+  
   contactTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#333',
     marginBottom: 16,
   },
+  
   contactCards: {
     gap: 12,
   },
+  
   contactCardItem: {
     backgroundColor: 'white',
     borderRadius: 16,
@@ -685,6 +712,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
+  
   contactIconWrapper: {
     width: 40,
     height: 40,
@@ -694,22 +722,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 16,
   },
+  
   contactInfo: {
     flex: 1,
   },
+  
   contactLabel: {
     fontSize: 14,
     color: '#666',
     marginBottom: 2,
   },
+  
   contactValue: {
     fontSize: 15,
     fontWeight: '500',
     color: '#333',
   },
+  
+  /* ===== LEGAL FOOTER ===== */
   legalFooter: {
     backgroundColor: 'white',
-    marginHorizontal: 20,
     borderRadius: 16,
     padding: 20,
     marginBottom: 24,
@@ -719,51 +751,38 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 3,
   },
+  
   legalTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#333',
     marginBottom: 16,
   },
+  
   legalDetails: {
     backgroundColor: '#f8fafc',
     borderRadius: 8,
     padding: 16,
-    marginBottom: 20,
   },
+  
   legalText: {
     fontSize: 13,
     lineHeight: 20,
     color: '#555',
   },
+  
   legalBold: {
     fontWeight: '600',
     color: '#333',
   },
-  signatureSection: {
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-    paddingTop: 20,
-    marginTop: 20,
-  },
-  signatureTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
-  },
-  signatureText: {
-    fontSize: 14,
-    lineHeight: 24,
-    color: '#555',
-    fontFamily: 'monospace',
-  },
+  
+  /* ===== FOOTER ===== */
   footer: {
     alignItems: 'center',
-    paddingHorizontal: 20,
     paddingTop: 24,
     paddingBottom: 40,
   },
+  
   footerTitle: {
     fontSize: 16,
     fontWeight: '600',
@@ -771,17 +790,20 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textAlign: 'center',
   },
+  
   footerText: {
     fontSize: 14,
     color: '#666',
     marginBottom: 16,
     textAlign: 'center',
   },
+  
   footerCopyright: {
     fontSize: 12,
     color: '#999',
     marginBottom: 8,
   },
+  
   footerVersion: {
     fontSize: 12,
     color: '#ccc',

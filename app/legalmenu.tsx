@@ -122,8 +122,8 @@ const LegalMenuScreen = () => {
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text  style={styles.footerText}>Tiffine Service Provider App</Text>
-          <Text style={styles.footerCopyright}>© 2025 Techtriosphere</Text>
+          <Text  style={styles.footerText}>Lichi-Provider</Text>
+          <Text style={styles.footerCopyright}>© 2026 Triosphere Tech.pvt.ltd</Text>
           <Text style={styles.footerVersion}>Version 1.0.0</Text>
         </View>
 

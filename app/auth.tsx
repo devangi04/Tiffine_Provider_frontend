@@ -30,6 +30,7 @@ import { API_URL } from './config/env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import socketService from '../app/config/socketservice'; // Adjust path as needed
+import { fetchTrialStatus } from '@/app/store/slices/providerslice';
 
 
 
@@ -335,171 +336,53 @@ const handleLogin = async () => {
     return;
   }
 
-  setIsLoading(true);
-  setIsLoginSubmitted(true);
-  dispatch(setLoading(true));
-
-  let pushToken = null;
   try {
-    const { status } = await Notifications.getPermissionsAsync();
-    let finalStatus = status;
-    
-    if (status !== 'granted') {
-      const { status: newStatus } = await Notifications.requestPermissionsAsync();
-      finalStatus = newStatus;
-    }
-    
-    if (finalStatus === 'granted') {
-      pushToken = (await Notifications.getExpoPushTokenAsync()).data;
-      console.log('📱 Push token obtained:', pushToken?.substring(0, 30) + '...');
-    }
-  } catch (tokenError) {
-    console.log('Could not get push token:', tokenError);
-    // Continue login even if push token fails
-  }
+    setIsLoading(true);
+    dispatch(setLoading(true));
 
- try {
     const response = await axios.post(
       `${API_BASE_URL}/api/auth/login`,
       { email, password },
-      {
-        timeout: 10000,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      }
+      { timeout: 10000 }
     );
-    
-    if (response.data.success) {
-      const providerData = response.data.data;
-      const token = response.data.token;
-      
-      // ✅ Save token to AsyncStorage
-      await AsyncStorage.setItem('providerToken', token);
-      
-      // ✅ Dispatch to Redux
-      dispatch(setProvider({
-        id: providerData.providerId,
-        email: providerData.email,
-        name: providerData.name,
-        phone: providerData.phone || '',
-        token: token,
-        subscription: providerData.subscription || { status: 'inactive' },
-        upiId: providerData.upiId || '',
-        notificationsEnabled: providerData.notificationsEnabled || false // ✅ Add this
 
-      }));
-      
-       console.log('Login successful:', providerData);
-      console.log('Push token registration status:', response.data.data.pushTokenUpdated);
-       if (!response.data.data.pushTokenUpdated && pushToken) {
-        try {
-          // Initialize socket with the token
-          await socketService.initializeSocket(token);
-          
-          // Register push token via socket
-          await socketService.registerProviderPushToken(
-            providerData.providerId,
-            pushToken
-          );
-          
-          console.log('✅ Push token registered via socket');
-        } catch (socketError) {
-          console.error('Socket registration failed:', socketError.message);
-          // Don't fail login if socket fails
-        }
-      }
-      // 🆓 Check trial status immediately
-      try {
-        const trialResponse = await axios.get(
-          `${API_BASE_URL}/api/subscription/trial-status/${providerData.providerId}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          }
-        );
-        
-        if (trialResponse.data.success) {
-          const { trialStatus, hasActiveSubscription } = trialResponse.data;
-          
-          // ALWAYS show subscription screen after login for trial users
-          // This educates them about the 7-day free trial
-          
-          if (trialStatus?.isActive && !hasActiveSubscription) {
-            // 🆓 User is on free trial - show subscription screen to inform them
-            Alert.alert(
-              "🎁 Welcome to Your Free Trial!",
-              `You have ${trialStatus.daysLeft} days of free access. After that, you'll need a subscription.`,
-              [
-                {
-                  text: "View Plans & Continue",
-                  onPress: () => {
-                    router.replace({
-                      pathname: "/subscription",
-                      params: { 
-                        providerId: providerData.providerId, 
-                        providerEmail: providerData.email,
-                        showTrialInfo: 'true' // Flag to show trial info
-                      }
-                    });
-                  }
-                }
-              ]
-            );
-          } else if (trialStatus?.requiresSubscription && !hasActiveSubscription) {
-            // Trial expired - must subscribe
-            Alert.alert(
-              "Trial Expired",
-              "Your 7-day free trial has ended. Please subscribe to continue.",
-              [
-                {
-                  text: "Subscribe Now",
-                  onPress: () => {
-                    router.replace({
-                      pathname: "/subscription",
-                      params: { 
-                        providerId: providerData.providerId, 
-                        providerEmail: providerData.email,
-                        trialExpired: 'true'
-                      }
-                    });
-                  }
-                }
-              ]
-            );
-          } else if (hasActiveSubscription) {
-            // Already subscribed - go directly to dashboard
-            console.log('Already subscribed, going to dashboard');
-            // AuthChecker will handle navigation
-          } else {
-            // No trial, no subscription (edge case)
-            router.replace({
-              pathname: "/subscription",
-              params: { 
-                providerId: providerData.providerId, 
-                providerEmail: providerData.email 
-              }
-            });
-          }
-        }
-      } catch (trialError) {
-        console.error('Failed to check trial status:', trialError);
-        // On error, redirect to dashboard
-        router.replace('/dashboard');
-      }
-      
-    } else {
+    if (!response.data.success) {
       throw new Error(response.data.error || 'Login failed');
     }
+
+    const providerData = response.data.data;
+    const token = response.data.token;
+
+    await AsyncStorage.setItem('providerToken', token);
+
+    dispatch(setProvider({
+      id: providerData.providerId,
+      email: providerData.email,
+      name: providerData.name,
+      phone: providerData.phone || '',
+      token,
+      subscription: providerData.subscription || { status: 'inactive' },
+      upiId: providerData.upiId || '',
+      notificationsEnabled: providerData.notificationsEnabled ?? true,
+    }));
+
+    // 🔥 FETCH TRIAL STATUS ONCE — PROPERLY
+    dispatch(fetchTrialStatus(providerData.providerId));
+
+    // ❗ NO NAVIGATION HERE
+    // AuthChecker WILL handle everything
+
   } catch (error: any) {
-    // ... existing error handling ...
+    Alert.alert(
+      'Login Failed',
+      error?.response?.data?.error || error.message || 'Something went wrong'
+    );
   } finally {
     setIsLoading(false);
     dispatch(setLoading(false));
   }
 };
+
 
   const handleRegister = async () => {
     if (!name || !email || !phone || !password) {

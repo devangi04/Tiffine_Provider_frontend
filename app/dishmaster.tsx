@@ -108,7 +108,6 @@ const scrollRef = useRef<KeyboardAwareScrollView>(null);
           });
         }
       } catch (dishError) {
-        console.log('Dish fetch error:', dishError);
       }
 
       // Merge categories with their dishes

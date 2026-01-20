@@ -1,317 +1,239 @@
 // app/components/AuthChecker.tsx
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+
+import { useEffect, useRef } from 'react';
+import { Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter, usePathname } from 'expo-router';
-import { useSelector, useDispatch } from 'react-redux';
-import { RootState, AppDispatch } from '../app/store';
-import axios from 'axios';
-import { API_URL } from '@/app/config/env';
-import { fetchMealPreferences } from '@/app/store/slices/mealsslice';
-import { View, ActivityIndicator, Text, AppState, AppStateStatus } from 'react-native';
+import { useDispatch, useSelector } from 'react-redux';
+
+import { RootState, AppDispatch } from '@/app/store';
+import { fetchMealPreferences, resetJustSaved } from '@/app/store/slices/mealsslice';
+import { fetchTrialStatus } from '@/app/store/slices/providerslice';
 
 export default function AuthChecker({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const dispatch = useDispatch<AppDispatch>();
-  const hasNavigatedRef = useRef(false);
-  const [isCheckingAuth, setIsCheckingAuth] = useState(false);
-  const [appState, setAppState] = useState(AppState.currentState);
+  const redirectedRef = useRef(false);
 
+  // =========================
+  // 🔐 AUTH STATE
+  // =========================
   const isAuthenticated = useSelector(
-    (state: RootState) => state.provider.token !== null
+    (state: RootState) => !!state.provider.token
   );
 
   const hasCompletedWelcome = useSelector(
     (state: RootState) => state.app.hasCompletedWelcome
   );
 
-  const subscription = useSelector(
-    (state: RootState) => state.provider.subscription
+  // =========================
+  // 👤 PROVIDER STATE
+  // =========================
+  const provider = useSelector((state: RootState) => state.provider);
+  const subscription = provider.subscription;
+  const trialStatus = provider.trialStatus;
+
+  // =========================
+  // 🍽 MEAL PREFERENCES
+  // =========================
+  const mealPreferences = useSelector(
+    (state: RootState) => state.mealPreferences.preferences
   );
 
-  const provider = useSelector((state: RootState) => state.provider);
+  const mealLoading = useSelector(
+    (state: RootState) => state.mealPreferences.loading
+  );
 
-  // Get meal preferences state
-  const mealPreferences = useSelector((state: RootState) => state.mealPreferences.preferences);
-  const mealPreferencesLoading = useSelector((state: RootState) => state.mealPreferences.loading);
+  const justSaved = useSelector(
+    (state: RootState) => state.mealPreferences.justSaved
+  );
 
-  // Track app state changes
+  // =========================
+  // 🔄 RESET REDIRECT LOCK
+  // =========================
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', nextAppState => {
-      setAppState(nextAppState);
-      
-      // When app comes to foreground, reset navigation flag
-      if (appState.match(/inactive|background/) && nextAppState === 'active') {
-        hasNavigatedRef.current = false;
+    redirectedRef.current = false;
+  }, [pathname, isAuthenticated]);
+
+  // =========================
+  // 🆓 FETCH TRIAL STATUS
+  // =========================
+  useEffect(() => {
+    if (isAuthenticated && provider?.id && trialStatus === null) {
+      dispatch(fetchTrialStatus(provider.id));
+    }
+  }, [isAuthenticated, provider?.id, trialStatus, dispatch]);
+
+  // =========================
+  // 🎁 TRIAL POPUP (ONCE)
+  // =========================
+  useEffect(() => {
+    const showTrialPopup = async () => {
+      if (!provider?.id || !trialStatus) return;
+
+      if (
+        trialStatus.isActive &&
+        trialStatus.hasTrial &&
+        subscription?.status !== 'active'
+      ) {
+        const key = `trial_welcome_shown_${provider.id}`;
+        const shown = await AsyncStorage.getItem(key);
+
+        if (!shown) {
+          Alert.alert(
+            '🎁 Welcome to Your Free Trial',
+            `You have ${trialStatus.daysLeft} days of free access.`,
+            [
+              {
+                text: 'View Plans',
+                onPress: () => router.replace('/subscription'),
+              },
+              { text: 'Continue', style: 'cancel' },
+            ]
+          );
+          await AsyncStorage.setItem(key, 'true');
+        }
       }
-    });
-
-    return () => {
-      subscription.remove();
     };
-  }, [appState]);
 
-  // Fetch meal preferences when authenticated
+    showTrialPopup();
+  }, [trialStatus, subscription?.status, provider?.id, router]);
+
+  // =========================
+  // 🍽 FETCH MEAL PREFS
+  // =========================
   useEffect(() => {
-    if (isAuthenticated && provider?.token && !mealPreferences) {
-      console.log('Fetching meal preferences...');
+    if (
+      isAuthenticated &&
+      provider?.id &&
+      provider?.token &&
+      !mealPreferences &&
+      !mealLoading
+    ) {
       dispatch(fetchMealPreferences());
     }
-  }, [isAuthenticated, provider?.token, mealPreferences, dispatch]);
+  }, [isAuthenticated, provider?.id, provider?.token, mealPreferences, mealLoading, dispatch]);
 
-  // Background subscription sync
+  // =========================
+  // 🚦 MAIN ROUTE GUARD
+  // =========================
   useEffect(() => {
-    const syncSubscription = async () => {
-      if (provider?.id && provider?.token && isAuthenticated) {
-        try {
-          await axios.get(
-            `${API_URL}/api/subscription/sync-status/${provider.id}`,
-            {
-              headers: {
-                'Authorization': `Bearer ${provider.token}`
-              },
-              timeout: 10000
-            }
-          );
-        } catch (error) {
-          console.log('Background sync failed, continuing...');
-        }
-      }
-    };
+    if (redirectedRef.current) return;
 
-    if (isAuthenticated && appState === 'active') {
-      syncSubscription();
+    const providerReady =
+      isAuthenticated &&
+      provider?.id &&
+      provider?.token &&
+      trialStatus !== null;
+
+    if (isAuthenticated && !providerReady) return;
+
+    // ROOT
+    if (pathname === '/') {
+      redirectedRef.current = true;
+      router.replace(
+        isAuthenticated
+          ? '/dashboard'
+          : hasCompletedWelcome
+          ? '/login'
+          : '/welcome'
+      );
+      return;
     }
-  }, [isAuthenticated, provider, appState]);
 
-  // Main auth check logic
-  const checkAccess = useCallback(async () => {
-    if (isCheckingAuth) return;
+    // UNAUTH
+    if (!isAuthenticated) {
+      const publicRoutes = ['/welcome', '/login', '/forgotpassword'];
+      if (!publicRoutes.includes(pathname)) {
+        redirectedRef.current = true;
+        router.replace(hasCompletedWelcome ? '/login' : '/welcome');
+      }
+      return;
+    }
+
+    if (mealLoading) return;
+
+    // =========================
+    // 🍽 MEAL CHECK (SIMPLIFIED)
+    // =========================
     
-    setIsCheckingAuth(true);
-    try {
-      console.log('AuthChecker: Starting check', {
-        pathname,
-        isAuthenticated,
-        hasMealPreferences: mealPreferences ? 'loaded' : 'not loaded'
-      });
+    // ✅ Use ONLY provider.hasMealPreferences (single source of truth)
+    const hasMealPreferences = provider.hasMealPreferences || justSaved;
+    
 
-      // 🚪 Unauthenticated flow
-      if (!isAuthenticated) {
-        const protectedRoutes = [
-          '/dashboard', '/schedule', '/response', 
-          '/subscription', '/settings', '/profile',
-          '/custmorelist', '/dishmaster', '/payment'
-        ];
+    // Routes that require meal preferences
+    const protectedRoutes = [
+      '/dashboard',
+      '/schedule',
+      '/response',
+      '/custmorelist',
+      '/payment',
+    ];
 
-        if (protectedRoutes.some(route => pathname.startsWith(route))) {
-          console.log('AuthChecker: Unauthenticated, redirecting to login');
-          hasNavigatedRef.current = true;
-          
-          if (!hasCompletedWelcome) {
-            router.replace('/welcome');
-          } else {
-            router.replace('/login');
-          }
-          return;
-        }
+    // Check if current route is protected
+    const isProtectedRoute = protectedRoutes.some(r => pathname.startsWith(r));
+    
+    // Check if we're on meal setup screen
+    const isMealSetupScreen = pathname === '/providerseetingscreen';
 
-        // Allow access to public routes
-        if (pathname === '/welcome' || pathname === '/login' || pathname === '/forgotpassword') {
-          return;
-        }
+    // 🚨 Redirect to meal setup if needed
+    if (
+      !hasMealPreferences &&
+      isProtectedRoute &&
+      !isMealSetupScreen &&
+      !redirectedRef.current
+    ) {
+      redirectedRef.current = true;
+      router.replace('/providerseetingscreen');
+      return;
+    }
 
-        // Default for unauthenticated
-        if (!hasCompletedWelcome) {
-          router.replace('/welcome');
-        } else {
-          router.replace('/login');
-        }
-        return;
+    // =========================
+    // 💳 SUBSCRIPTION CHECK
+    // =========================
+    const hasActiveSubscription = subscription?.status === 'active';
+    const trialActive = trialStatus?.isActive === true;
+
+    // Wait if trialStatus is still loading
+    if (trialStatus === null) return;
+
+    if (!hasActiveSubscription && !trialActive) {
+      if (pathname !== '/subscription') {
+        redirectedRef.current = true;
+        router.replace('/subscription');
       }
+      return;
+    }
 
-      // ✅ AUTHENTICATED USER FLOW
-      
-      // Wait for meal preferences to load if we're still loading
-      if (mealPreferencesLoading && !mealPreferences) {
-        console.log('AuthChecker: Waiting for meal preferences to load...');
-        return;
-      }
+    // =========================
+    // ✅ CONSUME justSaved FLAG
+    // Only reset when we're on dashboard and have meal preferences
+    // =========================
+    if (justSaved && pathname === '/dashboard' && hasMealPreferences) {
+      dispatch(resetJustSaved());
+    }
 
-      // Check if meal preferences are set
-      const hasMealPreferences = mealPreferences?.mealService && 
-        (mealPreferences.mealService.lunch?.enabled === true || 
-         mealPreferences.mealService.dinner?.enabled === true);
-      
-      console.log('AuthChecker: Meal preferences check', {
-        hasMealPreferences,
-        pathname
-      });
-
-      // Define routes that require meal preferences
-      const routesRequiringPreferences = [
-        '/dashboard',
-        '/schedule',
-        '/response',
-        '/custmorelist',
-        '/payment'
-      ];
-
-      const isOnMealPreferencesScreen = pathname === '/providerseetingscreen';
-      const isOnProtectedRoute = routesRequiringPreferences.some(route => pathname.startsWith(route));
-
-      // 🍽️ Handle meal preferences access
-      if (mealPreferences !== undefined) {
-        // Case 1: No preferences and trying to access protected routes
-        if (!hasMealPreferences && isOnProtectedRoute) {
-          console.log('AuthChecker: No meal preferences, redirecting to setup');
-          hasNavigatedRef.current = true;
-          router.replace({
-            pathname: '/providerseetingscreen',
-            params: { 
-              requireSetup: 'true',
-              redirectFrom: pathname
-            }
-          });
-          return;
-        }
-
-        // Case 2: Has preferences and on preferences screen (OK for updates)
-        // Case 3: No preferences and on preferences screen (OK for setup)
-        // Both cases are allowed - no redirect needed
-      }
-
-      // Check subscription/trial status
-      let trialStatus = provider.trialStatus;
-      let hasActiveSubscription = subscription?.status === 'active';
-      
-      // Fetch trial status if not available
-      if (!trialStatus && provider?.id && provider?.token) {
-        try {
-          const trialResponse = await axios.get(
-            `${API_URL}/api/subscription/trial-status/${provider.id}`,
-            {
-              headers: {
-                'Authorization': `Bearer ${provider.token}`
-              },
-              timeout: 5000
-            }
-          );
-          
-          if (trialResponse.data.success) {
-            trialStatus = trialResponse.data.trialStatus;
-            hasActiveSubscription = trialResponse.data.hasActiveSubscription;
-          }
-        } catch (trialError) {
-          console.error('AuthChecker: Failed to fetch trial status:', trialError);
-        }
-      }
-
-      // Determine access rights
-      const canAccess = hasActiveSubscription || trialStatus?.isActive;
-      const requiresSubscription = trialStatus?.requiresSubscription && !hasActiveSubscription;
-      
-      console.log('AuthChecker: Access check', {
-        canAccess,
-        requiresSubscription,
-        hasActiveSubscription,
-        trialActive: trialStatus?.isActive
-      });
-
-      // 🚫 Trial expired, redirect to subscription
-      if (requiresSubscription) {
-        const allowedRoutes = ['/subscription', '/login', '/providerseetingscreen'];
-        if (!allowedRoutes.some(route => pathname === route)) {
-          console.log('AuthChecker: Trial expired, redirecting to subscription');
-          hasNavigatedRef.current = true;
-          router.replace({
-            pathname: '/subscription',
-            params: { 
-              providerId: provider.id, 
-              providerEmail: provider.email,
-              trialExpired: 'true'
-            }
-          });
-          return;
-        }
-      }
-      
-      // ✅ User can access (has subscription OR active trial)
-      if (canAccess) {
-        // Redirect from auth screens to dashboard
-        if (pathname === '/login' || pathname === '/welcome' || pathname === '/') {
-          console.log('AuthChecker: Authenticated, redirecting to dashboard');
-          hasNavigatedRef.current = true;
-          router.replace('/dashboard');
-          return;
-        }
-        // Allow access to all other pages
-        return;
-      }
-      
-      // ⚠️ No subscription, no active trial - redirect to subscription
-      if (pathname !== '/subscription' && pathname !== '/login' && pathname !== '/providerseetingscreen') {
-        console.log('AuthChecker: No active subscription/trial, redirecting');
-        hasNavigatedRef.current = true;
-        router.replace({
-          pathname: '/subscription',
-          params: { 
-            providerId: provider.id, 
-            providerEmail: provider.email 
-          }
-        });
-        return;
-      }
-
-    } catch (error) {
-      console.error('AuthChecker: Error during auth check:', error);
-    } finally {
-      setIsCheckingAuth(false);
+    // =========================
+    // 🚫 BLOCK AUTH SCREENS WHEN LOGGED IN
+    // =========================
+    if (pathname === '/login' || pathname === '/welcome') {
+      redirectedRef.current = true;
+      router.replace('/dashboard');
     }
   }, [
-    pathname, 
-    isAuthenticated, 
-    hasCompletedWelcome, 
-    mealPreferences, 
-    mealPreferencesLoading,
-    subscription,
+    pathname,
+    isAuthenticated,
+    hasCompletedWelcome,
     provider,
-    router,
-    isCheckingAuth
-  ]);
-
-  // Run auth check on relevant changes
-  useEffect(() => {
-    // Reset navigation flag on pathname change
-    hasNavigatedRef.current = false;
-    
-    // Skip if already navigating
-    if (hasNavigatedRef.current) return;
-    
-    // Add small delay to ensure state is updated
-    const timer = setTimeout(() => {
-      checkAccess();
-    }, 100);
-
-    return () => clearTimeout(timer);
-  }, [
-    pathname, 
-    isAuthenticated, 
-    hasCompletedWelcome, 
+    subscription,
+    trialStatus,
     mealPreferences,
-    mealPreferencesLoading
+    mealLoading,
+    justSaved,
+    dispatch, // ✅ Added
+    router,   // ✅ Added
   ]);
-
-  // Show loading while checking preferences for first time
-  if (isAuthenticated && mealPreferencesLoading && !mealPreferences) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8FAFC' }}>
-        <ActivityIndicator size="large" color="#15803d" />
-        <Text style={{ marginTop: 16, fontSize: 16, color: '#4B5563' }}>
-          Loading your preferences...
-        </Text>
-      </View>
-    );
-  }
 
   return <>{children}</>;
 }

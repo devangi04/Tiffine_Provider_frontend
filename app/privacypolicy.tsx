@@ -12,34 +12,24 @@ import {
   Share
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons, Feather, MaterialIcons } from '@expo/vector-icons';
-import { useRouter, useNavigation } from 'expo-router';
+import { Ionicons, Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Text from '@/components/ztext';
 
 const { width } = Dimensions.get('window');
+const HEADER_HEIGHT = 60;
 
 const PrivacyPolicyScreen = () => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
   const scrollY = useRef(new Animated.Value(0)).current;
-
-  const headerOpacity = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
-  });
-
-  const handleBack = () => {
-    router.back();
-  };
 
   const handleShare = async () => {
     try {
       await Share.share({
         title: 'Tiffine Privacy Policy',
-        message: 'Check out Tiffine Privacy Policy',
+        message: 'Check out Tiffine Privacy Policy - Your data protection matters',
         url: 'https://triospheretech.com/contact.html',
       });
     } catch (error) {
@@ -53,6 +43,14 @@ const PrivacyPolicyScreen = () => {
   const openLink = (url: string) => {
     Linking.openURL(url);
   };
+
+  /* ---------- DATA ---------- */
+  const stats = [
+    { icon: 'shield-checkmark', label: 'Data Protected', value: '100%' },
+    { icon: 'lock-closed', label: 'Encryption', value: 'SSL/TLS' },
+    { icon: 'document-text', label: 'Last Updated', value: 'Dec 10, 2025' },
+    { icon: 'time', label: 'Response Time', value: '48 hours' },
+  ];
 
   const sections = [
     {
@@ -109,7 +107,7 @@ const PrivacyPolicyScreen = () => {
       title: 'Grievance Officer',
       contact: {
         name: 'Krunal Mistry',
-        email: 'techtriosphere.com',
+        email: 'info@triospheretech.com',
         address: '1205, Phoenix building, Vijay Cross Road to Commerce Six Road, Gujarat, India'
       }
     }
@@ -119,30 +117,24 @@ const PrivacyPolicyScreen = () => {
     {
       icon: 'mail',
       label: 'General Support',
-      value: 'techtriosphere@gmail.com',
-      action: () => openEmail('techtriosphere@gmail.com')
+      value: 'info@triospheretech.com',
+      action: () => openEmail('info@triospheretech.com')
     },
     {
       icon: 'shield',
       label: 'Privacy Concerns',
-      value: 'grievance.officer@techtriosphere.com',
-      action: () => openEmail('techtriosphere@gmail.com')
+      value: 'info@triospheretech.com',
+      action: () => openEmail('info@triospheretech.com')
     },
     {
       icon: 'globe',
       label: 'Website',
       value: 'www.tiffine.com',
-      action: () => openLink('https://triospheretech.com/index.html')
+      action: () => openLink('https://www.triospheretech.com/casestudies/lichi-bringing-structure-to-home-style-tiffin-services')
     }
   ];
 
-  const stats = [
-    { icon: 'shield-checkmark', label: 'Data Protected', value: '100%' },
-    { icon: 'lock-closed', label: 'Encryption', value: 'SSL/TLS' },
-    { icon: 'document-text', label: 'Last Updated', value: 'Dec 10, 2025' },
-    { icon: 'time', label: 'Response Time', value: '48 hours' },
-  ];
-
+  /* ---------- RENDER FUNCTIONS ---------- */
   const renderSection = (section: any) => {
     switch (section.id) {
       case 'grievance':
@@ -205,117 +197,93 @@ const PrivacyPolicyScreen = () => {
     }
   };
 
+  /* ---------- UI ---------- */
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar
-        backgroundColor="#f8fafc"
-        barStyle="dark-content"
+    <View style={styles.container}>
+      <StatusBar 
+        barStyle="dark-content" 
+        backgroundColor="#f8fafc" 
       />
-      
-      {/* Animated Header */}
-      <Animated.View style={[styles.header, { opacity: headerOpacity }]}>
-        <LinearGradient
-          colors={['#f8fafc', '#f8fafc']}
-          style={styles.headerGradient}
-        >
-          {/* <View style={[styles.headerContent, { paddingTop: insets.top }]}>
-            <TouchableOpacity 
-              style={styles.backButton}
-              onPress={handleBack}
-            >
-              <Ionicons name="arrow-back" size={24} color="#333" />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Privacy Policy</Text>
-            <TouchableOpacity 
-              style={styles.shareButton}
-              onPress={handleShare}
-            >
-              <Feather name="share-2" size={20} color="#333" />
-            </TouchableOpacity>
-          </View> */}
-        </LinearGradient>
-      </Animated.View>
 
-      {/* Fixed Header for Scroll */}
+      {/* ================= FIXED HEADER ================= */}
       <View style={[styles.fixedHeader, { paddingTop: insets.top }]}>
-        <LinearGradient
-          colors={['rgba(248, 250, 252, 0.95)', 'rgba(248, 250, 252, 0.8)']}
+        <LinearGradient 
+          colors={['#f8fafc', '#f8fafc']} 
           style={styles.headerGradient}
         >
           <View style={styles.headerContent}>
             <TouchableOpacity 
-              style={styles.backButton}
-              onPress={handleBack}
+              style={styles.backButton} 
+              onPress={() => router.back()}
             >
-              <Ionicons name="arrow-back" size={24} color="#333" />
+              <Ionicons name="arrow-back" size={22} color="#333" />
             </TouchableOpacity>
+
             <Text style={styles.headerTitle}>Privacy Policy</Text>
+
             <TouchableOpacity 
-              style={styles.shareButton}
+              style={styles.shareButton} 
               onPress={handleShare}
             >
-              <Feather name="share-2" size={20} color="#333" />
+              <Feather name="share-2" size={18} color="#333" />
             </TouchableOpacity>
           </View>
         </LinearGradient>
       </View>
 
-      <ScrollView 
+      {/* ================= SCROLL CONTENT ================= */}
+      <ScrollView
         style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: false }
-        )}
-        scrollEventThrottle={16}
       >
         {/* Hero Section */}
-        <LinearGradient
-          colors={['#15803d', '#4694e2']}
+        <LinearGradient 
+          colors={['#15803d', '#4694e2']} 
           style={styles.heroCard}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
           <View style={styles.heroContent}>
             <View style={styles.logoCircle}>
-              <Ionicons name="shield-checkmark" size={32} color="white" />
+              <Ionicons name="shield-checkmark" size={32} color="#fff" />
             </View>
             <Text style={styles.heroTitle}>Privacy & Data Protection</Text>
             <Text style={styles.heroSubtitle}>Last updated: December 10, 2025</Text>
           </View>
         </LinearGradient>
 
-        {/* Stats Section */}
-        <View style={styles.statsSection}>
-          <View style={styles.statsGrid}>
-            {stats.map((stat, index) => (
-              <View key={index} style={styles.statItem}>
-                <View style={styles.statIconWrapper}>
-                  <Ionicons name={stat.icon as any} size={20} color="#15803d" />
-                </View>
-                <Text style={styles.statValue}>{stat.value}</Text>
-                <Text style={styles.statLabel}>{stat.label}</Text>
+        {/* Stats Grid */}
+        <View style={styles.statsGrid}>
+          {stats.map((stat, index) => (
+            <View key={index} style={styles.statItem}>
+              <View style={styles.statIcon}>
+                <Ionicons name={stat.icon as any} size={20} color="#15803d" />
               </View>
-            ))}
-          </View>
+              <Text style={styles.statValue}>{stat.value}</Text>
+              <Text style={styles.statLabel}>{stat.label}</Text>
+            </View>
+          ))}
         </View>
 
-        {/* Introduction Card */}
-        <View style={styles.introCard}>
-          <Text style={styles.introTitle}>Your Privacy Matters</Text>
-          <Text style={styles.introText}>
-            We are committed to protecting your personal information and being transparent about our data practices. This policy covers how we handle data for Tiffine Service Providers.
+        {/* Intro Card */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Your Privacy Matters</Text>
+          <Text style={styles.cardText}>
+            We are committed to protecting your personal information and being transparent
+            about our data practices for all Tiffine providers.
           </Text>
         </View>
 
-        {/* Policy Sections */}
+        {/* All Policy Sections */}
         <View style={styles.sectionsContainer}>
           {sections.map(renderSection)}
         </View>
 
-        {/* Contact Section */}
-        <View style={styles.contactSection}>
-          <Text style={styles.contactTitle}>Contact Information</Text>
+        {/* Contact Information */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Contact Information</Text>
+          
           <View style={styles.contactCards}>
             {contactInfo.map((contact, index) => (
               <TouchableOpacity
@@ -355,123 +323,146 @@ const PrivacyPolicyScreen = () => {
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerTitle}>Tiffine Service</Text>
-          <Text style={styles.footerText}>Provider Application</Text>
-          <Text style={styles.footerCopyright}>© 2025 Techtriosphere. All rights reserved.</Text>
-          <Text style={styles.footerVersion}>Version 1.0.0</Text>
+          <Text  style={styles.footerText}>Lichi-Provider</Text>
+                   <Text style={styles.footerCopyright}>© 2026 Triosphere Tech.pvt.ltd</Text>
+                   <Text style={styles.footerVersion}>Version 1.0.0</Text>
         </View>
 
-        {/* Bottom spacing */}
-        <View style={{ height: 40 + insets.bottom }} />
+        {/* Bottom Spacing */}
+        <View style={{ height: insets.bottom + 40 }} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
+export default PrivacyPolicyScreen;
+
+/* ================= STYLES ================= */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
   },
-  header: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-  },
+
+  /* ===== HEADER ===== */
   fixedHeader: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 10,
+    zIndex: 100,
+    backgroundColor: '#f8fafc',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
   },
+
   headerGradient: {
     paddingHorizontal: 20,
-    paddingBottom: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(12, 12, 12, 0.05)',
   },
+
   headerContent: {
+    height: HEADER_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    height: 60,
   },
-   backButton: {width: 40,height: 40,borderRadius: 22,backgroundColor: 'white',alignItems: 'center',justifyContent: 'center',shadowColor: '#000',shadowOffset: { width: 0, height: 2 },shadowOpacity: 0.08,shadowRadius: 8,elevation: 3,},
+
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+
+  shareButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
 
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#333',
   },
-  shareButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
+
+  /* ===== SCROLL VIEW ===== */
   scrollView: {
     flex: 1,
+    marginTop: HEADER_HEIGHT + (StatusBar.currentHeight || 0), // Fixed: Add space for header
   },
+
+  scrollContent: {
+    paddingTop: 20,
+    paddingBottom: 40,
+    paddingHorizontal: 20,
+  },
+
+  /* ===== HERO ===== */
   heroCard: {
-    marginTop: 80,
-    marginHorizontal: 20,
     borderRadius: 24,
     padding: 24,
+    marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
     shadowRadius: 24,
     elevation: 8,
   },
+
   heroContent: {
     alignItems: 'center',
   },
+
   logoCircle: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255,255,255,0.25)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
   },
+
   heroTitle: {
-    color: 'white',
     fontSize: 24,
     fontWeight: '700',
+    color: '#fff',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
+
   heroSubtitle: {
-    color: 'rgba(255, 255, 255, 0.8)',
     fontSize: 14,
-    textAlign: 'center',
+    color: 'rgba(255,255,255,0.9)',
   },
-  statsSection: {
-    paddingHorizontal: 20,
-    marginTop: 24,
-    marginBottom: 24,
-  },
+
+  /* ===== STATS ===== */
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
     gap: 12,
+    marginBottom: 24,
   },
+
   statItem: {
-    flex: 1,
-    minWidth: '47%',
-    backgroundColor: 'white',
+    width: (width - 52) / 2,
+    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 16,
     alignItems: 'center',
@@ -481,7 +472,8 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 3,
   },
-  statIconWrapper: {
+
+  statIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -490,46 +482,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 8,
   },
+
   statValue: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: '#333',
-    marginBottom: 4,
   },
+
   statLabel: {
     fontSize: 12,
     color: '#666',
+    marginTop: 4,
     textAlign: 'center',
   },
-  introCard: {
-    backgroundColor: 'white',
-    marginHorizontal: 20,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  introTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
-  },
-  introText: {
-    fontSize: 14,
-    lineHeight: 22,
-    color: '#555',
-  },
-  sectionsContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  sectionCard: {
-    backgroundColor: 'white',
+
+  /* ===== CARDS ===== */
+  card: {
+    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
@@ -539,125 +508,159 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 3,
   },
+
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
+
+  cardText: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: '#555',
+  },
+
+  /* ===== SECTIONS ===== */
+  sectionsContainer: {
+    marginBottom: 16,
+  },
+
+  sectionCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
     gap: 12,
   },
+
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
   },
+
   sectionContent: {
     fontSize: 14,
     lineHeight: 22,
     color: '#555',
     marginBottom: 16,
   },
+
   itemsList: {
     gap: 12,
   },
+
   listItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
   },
+
   listItemText: {
     flex: 1,
     fontSize: 14,
     lineHeight: 20,
     color: '#555',
   },
-  contactCard: {
+
+  /* ===== CONTACT ===== */
+  contactCards: {
+    gap: 12,
+  },
+
+  contactCardItem: {
     backgroundColor: '#f8fafc',
     borderRadius: 12,
     padding: 16,
-    gap: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
+
+  contactIconWrapper: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+
+  contactInfo: {
+    flex: 1,
+  },
+
+  contactLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 2,
+  },
+
+  contactValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+  },
+
   contactRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    paddingVertical: 8,
   },
+
   contactText: {
     fontSize: 14,
     color: '#555',
     flex: 1,
   },
+
   linkText: {
     color: '#15803d',
     textDecorationLine: 'underline',
   },
+
   procedureCard: {
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
     borderRadius: 8,
     padding: 16,
-    marginTop: 8,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
+
   procedureTitle: {
     fontSize: 14,
     fontWeight: '600',
     color: '#333',
     marginBottom: 12,
   },
+
   procedureStep: {
     fontSize: 13,
     color: '#666',
     marginBottom: 8,
     marginLeft: 8,
   },
-  contactSection: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  contactTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 16,
-  },
-  contactCards: {
-    gap: 12,
-  },
-  contactCardItem: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  contactIconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f0f7ff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  contactInfo: {
-    flex: 1,
-  },
-  contactLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 2,
-  },
-  contactValue: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#333',
-  },
+
+  /* ===== RESPONSIBILITIES ===== */
   responsibilitiesCard: {
-    backgroundColor: 'white',
-    marginHorizontal: 20,
+    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 20,
     marginBottom: 24,
@@ -667,52 +670,57 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 3,
   },
+
   responsibilitiesHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     marginBottom: 20,
   },
+
   responsibilitiesTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
     flex: 1,
   },
+
   responsibilitiesList: {
     gap: 12,
   },
+
   responsibilityItem: {
     fontSize: 14,
     color: '#555',
     paddingLeft: 8,
   },
+
+  /* ===== FOOTER ===== */
   footer: {
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 40,
+    paddingVertical: 30,
   },
+
   footerTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: '#333',
-    marginBottom: 8,
   },
+
   footerText: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 16,
-  },
-  footerCopyright: {
     fontSize: 12,
-    color: '#999',
-    marginBottom: 8,
+    color: '#666',
+    marginTop: 6,
   },
+
   footerVersion: {
     fontSize: 12,
-    color: '#ccc',
+    color: '#999',
+    marginTop: 4,
+  },
+    footerCopyright: {
+    fontSize: 12,
+    color: '#999',
+    marginBottom: 4,
   },
 });
-
-export default PrivacyPolicyScreen;

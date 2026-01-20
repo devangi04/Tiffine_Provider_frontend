@@ -19,6 +19,7 @@ import { clearProvider } from './store/slices/providerslice';
 import { persistor } from './store/index';
 import { API_URL } from './config/env';
 import { logoutProvider } from './store/slices/providerslice';
+import { resetAppState } from './store/slices/appslice'; // Add this import
 
 const API_BASE_URL = API_URL;
 

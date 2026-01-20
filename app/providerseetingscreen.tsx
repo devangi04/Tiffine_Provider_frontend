@@ -437,6 +437,8 @@ const MealPreferencesScreen = () => {
   const params = useLocalSearchParams();
   const dispatch = useAppDispatch();
   
+  const hasRedirectedRef = useRef(false);
+
   const provider = useAppSelector((state) => state.provider);
   const providerId = provider.id;
   
@@ -486,7 +488,6 @@ const MealPreferencesScreen = () => {
        preferences.mealService.dinner?.enabled);
     
     if (hasMealPreferences) {
-      console.log('Initial setup complete, redirecting...');
       // Small delay to show success message
       setTimeout(() => {
         if (redirectFrom) {
@@ -500,27 +501,27 @@ const MealPreferencesScreen = () => {
   }
 }, [preferences, params, router, hasJustSaved]);
   // Handle redirect after successful save when required setup
-  useEffect(() => {
-    if (preferences?.mealService && isRequiredSetup && hasJustSaved) {
-      // Check if any meal service is enabled after save
-      const hasMealPreferences = preferences.mealService && 
-        (preferences.mealService.lunch?.enabled || 
-         preferences.mealService.dinner?.enabled);
-      
-      if (hasMealPreferences) {
-        console.log('Meal preferences set, redirecting...');
-        // After successful setup, redirect back
-        setTimeout(() => {
-          if (redirectFrom && redirectFrom !== '/providerseetingscreen') {
-            router.replace(redirectFrom);
-          } else {
-            router.replace('/dashboard');
-          }
-        }, 1500); // Small delay to show success message
-      }
-      setHasJustSaved(false);
-    }
-  }, [preferences, isRequiredSetup, redirectFrom, router, hasJustSaved]);
+useEffect(() => {
+  if (
+    hasRedirectedRef.current ||
+    !hasJustSaved ||
+    !isRequiredSetup ||
+    !preferences?.mealService
+  ) return;
+
+  const hasMealPreferences =
+    preferences.mealService.lunch?.enabled ||
+    preferences.mealService.dinner?.enabled;
+
+  if (!hasMealPreferences) return;
+
+  hasRedirectedRef.current = true; // ✅ consume redirect
+  setHasJustSaved(false);
+
+  setTimeout(() => {
+    router.replace(redirectFrom || '/dashboard');
+  }, 800);
+}, [hasJustSaved, preferences, isRequiredSetup, redirectFrom]);
 
   useEffect(() => {
     if (error) {      
@@ -572,11 +573,11 @@ const MealPreferencesScreen = () => {
     }
   }, [upi.upiId]);
 
-  useEffect(() => {
-    return () => {
-      dispatch(resetMealPreferences());
-    };
-  }, [dispatch]);
+  // useEffect(() => {
+  //   return () => {
+  //     dispatch(resetMealPreferences());
+  //   };
+  // }, [dispatch]);
 
   const toggleMealEnabled = (mealType: MealType): void => {
     setMealService(prev => ({
@@ -739,12 +740,12 @@ const MealPreferencesScreen = () => {
               </View>
             </View>
             
-            <View style={styles.mealInfo}>
+            {/* <View style={styles.mealInfo}>
               <Icon name="info" size={16} color="#15803d" />
               <Text style={styles.mealInfoText}>
                 Orders will auto-confirm after this time
               </Text>
-            </View>
+            </View> */}
           </>
         )}
       </Card>
@@ -775,6 +776,7 @@ const MealPreferencesScreen = () => {
           <Icon name="check-circle" size={18} color="#4CAF50" />
           <Text style={styles.infoText}>System automatically confirms orders after cutoff</Text>
         </View>
+        
       </View>
     </Card>
   );

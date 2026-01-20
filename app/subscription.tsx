@@ -19,6 +19,9 @@ import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { API_URL } from './config/env';
+import { useSelector } from 'react-redux';
+import { RootState } from '@/app/store';
+
 
 interface Plan {
   _id: string;
@@ -64,16 +67,21 @@ const SubscriptionPlans = () => {
   const [activeTab, setActiveTab] = useState<'monthly' | 'yearly'>('monthly');
   
   // Trial states
-  const [trialStatus, setTrialStatus] = useState<TrialStatus | null>(null);
-  const [checkingTrial, setCheckingTrial] = useState(true);
+  // const [trialStatus, setTrialStatus] = useState<TrialStatus | null>(null);
+  // const [checkingTrial, setCheckingTrial] = useState(true);
   const [showTrialWelcome, setShowTrialWelcome] = useState(false);
-  const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
+  // const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
+const provider = useSelector((state: RootState) => state.provider);
 
+const providerId = provider.id;
+const providerEmail = provider.email;
+const trialStatus = provider.trialStatus;
+const hasActiveSubscription = provider.subscription?.status === 'active';
   // Get provider data from params
-  const providerId = params.providerId as string;
-  const providerEmail = params.providerEmail as string;
-  const showTrialInfo = params.showTrialInfo === 'true';
-  const trialExpired = params.trialExpired === 'true';
+  // const providerId = params.providerId as string;
+  // const providerEmail = params.providerEmail as string;
+  // const showTrialInfo = params.showTrialInfo === 'true';
+  // const trialExpired = params.trialExpired === 'true';
 
   useEffect(() => {
     if (!providerId) {
@@ -83,50 +91,34 @@ const SubscriptionPlans = () => {
   }, [providerId]);
 
   // Fetch trial status and plans
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setCheckingTrial(true);
-        
-        // Fetch trial status
-        const trialRes = await axios.get(`${API_URL}/api/subscription/trial-status/${providerId}`);
-        
-        if (trialRes.data.success) {
-          setTrialStatus(trialRes.data.trialStatus);
-          setHasActiveSubscription(trialRes.data.hasActiveSubscription);
-          
-          // Show welcome modal for new trial users
-          if (showTrialInfo && trialRes.data.trialStatus?.isActive) {
-            setShowTrialWelcome(true);
-          }
-        }
-        
-        // Fetch plans
-        const plansRes = await axios.get(`${API_URL}/api/plans`);
-        
-        if (plansRes.data.success) {
-          setPlans(plansRes.data.data || []);
-          setError(null);
-        } else {
-          throw new Error(plansRes.data.error || 'Failed to fetch plans');
-        }
-        
-      } catch (err) {
-        const message = axios.isAxiosError(err)
-          ? err.response?.data?.error || err.message
-          : (err as Error).message;
-        setError(message);
-      } finally {
-        setLoading(false);
-        setCheckingTrial(false);
-      }
-    };
+useEffect(() => {
+  const fetchPlans = async () => {
+    try {
+      setLoading(true);
 
-    if (providerId) {
-      fetchData();
+      const plansRes = await axios.get(`${API_URL}/api/plans`);
+
+      if (plansRes.data.success) {
+        setPlans(plansRes.data.data || []);
+        setError(null);
+      } else {
+        throw new Error(plansRes.data.error || 'Failed to fetch plans');
+      }
+
+    } catch (err) {
+      const message = axios.isAxiosError(err)
+        ? err.response?.data?.error || err.message
+        : (err as Error).message;
+
+      setError(message);
+    } finally {
+      setLoading(false);
     }
-  }, [providerId, showTrialInfo]);
+  };
+
+  fetchPlans();
+}, []);
+
 
   const handleSubscribe = async (planId: string) => {
     if (!providerId) {
@@ -566,58 +558,17 @@ const SubscriptionPlans = () => {
     );
   };
 
-  // Plan Comparison Table
-  const PlanComparison = () => (
-    <View style={styles.comparisonContainer}>
-      <Text style={styles.comparisonTitle}>Plan Comparison</Text>
-      
-      <View style={styles.comparisonTable}>
-        <View style={styles.tableHeader}>
-          <Text style={styles.tableHeaderText}>Features</Text>
-          {plans.map(plan => (
-            <Text key={plan._id} style={styles.tableHeaderPlan}>{plan.name}</Text>
-          ))}
-        </View>
-        
-        <View style={styles.tableRow}>
-          <Text style={styles.tableFeature}>Max Customers</Text>
-          {plans.map(plan => (
-            <Text key={plan._id} style={styles.tableValue}>{plan.features.maxCustomers}</Text>
-          ))}
-        </View>
-        
-        <View style={styles.tableRow}>
-          <Text style={styles.tableFeature}>Analytics</Text>
-          {plans.map(plan => (
-            <Text key={plan._id} style={styles.tableValue}>
-              {plan.features.analytics ? '✓' : '✗'}
-            </Text>
-          ))}
-        </View>
-        
-        <View style={styles.tableRow}>
-          <Text style={styles.tableFeature}>Support</Text>
-          {plans.map(plan => (
-            <Text key={plan._id} style={styles.tableValue}>
-              {plan.features.supportPriority === 'priority' ? 'Priority' : 'Standard'}
-            </Text>
-          ))}
-        </View>
-      </View>
-    </View>
-  );
-
   // Loading State
-  if (checkingTrial || (loading && plans.length === 0)) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#15803d" />
-        <Text style={styles.loadingText}>
-          {checkingTrial ? 'Checking your trial status...' : 'Loading plans...'}
-        </Text>
-      </View>
-    );
-  }
+  // if (checkingTrial || (loading && plans.length === 0)) {
+  //   return (
+  //     <View style={styles.centerContainer}>
+  //       <ActivityIndicator size="large" color="#15803d" />
+  //       <Text style={styles.loadingText}>
+  //         {checkingTrial ? 'Checking your trial status...' : 'Loading plans...'}
+  //       </Text>
+  //     </View>
+  //   );
+  // }
 
   if (error) {
     return (
@@ -648,29 +599,34 @@ const SubscriptionPlans = () => {
       
       <TrialWelcomeModal />
       
-      <ScrollView contentContainerStyle={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Ionicons name="arrow-back" size={24} color="#333" />
-          </TouchableOpacity>
-          
-          <Text style={styles.title}>
+      {/* Sticky Header */}
+      <View style={styles.stickyHeader}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Ionicons name="arrow-back" size={24} color="#333" />
+        </TouchableOpacity>
+        
+        <View style={styles.headerContent}>
+          <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
             {trialStatus?.requiresSubscription 
               ? 'Subscribe to Continue' 
               : 'Choose Your Plan'}
           </Text>
-          
-          <Text style={styles.subtitle}>
+          <Text style={styles.subtitle} numberOfLines={1} ellipsizeMode="tail">
             {trialStatus?.isActive 
               ? `Enjoy ${trialStatus.daysLeft} days free, then choose a plan`
               : 'Select the perfect plan for your tiffin business'}
           </Text>
         </View>
+      </View>
 
+      <ScrollView 
+        contentContainerStyle={styles.container}
+        stickyHeaderIndices={[]}
+        showsVerticalScrollIndicator={true}
+      >
         {/* Trial/Subscription Status Card */}
         <TrialStatusCard />
 
@@ -684,7 +640,7 @@ const SubscriptionPlans = () => {
               <Text style={[styles.tabText, activeTab === 'monthly' && styles.activeTabText]}>
                 Monthly
               </Text>
-              <Text style={styles.tabSubtext}>Flexible</Text>
+              {/* <Text style={styles.tabSubtext}>Flexible</Text> */}
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.tab, activeTab === 'yearly' && styles.activeTab]}
@@ -693,7 +649,7 @@ const SubscriptionPlans = () => {
               <Text style={[styles.tabText, activeTab === 'yearly' && styles.activeTabText]}>
                 Yearly
               </Text>
-              <Text style={styles.tabSubtext}>Save 20%</Text>
+              {/* <Text style={styles.tabSubtext}>Save 20%</Text> */}
             </TouchableOpacity>
           </View>
         </View>
@@ -711,9 +667,6 @@ const SubscriptionPlans = () => {
             </View>
           )}
         </View>
-
-        {/* Plan Comparison */}
-        {plans.length > 1 && <PlanComparison />}
 
         {/* FAQ Section */}
         <View style={styles.faqContainer}>
@@ -817,6 +770,7 @@ const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     padding: 20,
+    paddingTop: 120, // Added padding to account for sticky header
     paddingBottom: 40,
   },
   centerContainer: {
@@ -851,33 +805,45 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   
-  // Header
-  header: {
+  // Sticky Header
+  stickyHeader: {
+    position: 'absolute',
+    top: 2,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    backgroundColor: '#f8fafc',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 5,
+    paddingTop: Platform.OS === 'ios' ? 50 : 20,
+    paddingBottom: 15,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 30,
-    marginTop: 10,
   },
   backButton: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    marginTop: 40,
+    marginRight: 15,
     padding: 5,
   },
+  headerContent: {
+    flex: 1,
+  },
   title: {
-    fontSize: 28,
+    paddingTop:20,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#1a1a1a',
-    marginBottom: 10,
-    marginTop: 40,
-    textAlign: 'center',
+    marginBottom: 4,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
-    textAlign: 'center',
-    maxWidth: 600,
-    lineHeight: 22,
+    lineHeight: 18,
   },
   
   // Status Cards
@@ -1181,79 +1147,6 @@ const styles = StyleSheet.create({
     color: '#999',
     marginTop: 15,
     textAlign: 'center',
-  },
-  
-  // Plan Comparison
-  comparisonContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 25,
-    marginBottom: 30,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  comparisonTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  comparisonTable: {
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  tableHeader: {
-    flexDirection: 'row',
-    backgroundColor: '#f9fafb',
-    paddingVertical: 15,
-    paddingHorizontal: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  tableHeaderText: {
-    flex: 2,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  tableHeaderPlan: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#15803d',
-    textAlign: 'center',
-  },
-  tableRow: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  tableRow: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  tableFeature: {
-    flex: 2,
-    fontSize: 14,
-    color: '#4b5563',
-  },
-  tableValue: {
-    flex: 1,
-    fontSize: 14,
-    color: '#1f2937',
-    textAlign: 'center',
-    fontWeight: '500',
   },
   
   // FAQ

@@ -16,13 +16,11 @@ class SocketService {
     try {
       // If already connected, return existing socket
       if (this.socket?.connected) {
-        console.log('📡 Socket already connected');
         return this.socket;
       }
 
       // If connecting, wait
       if (this.isConnecting) {
-        console.log('📡 Socket connection in progress, waiting...');
         await new Promise(resolve => setTimeout(resolve, 1000));
         if (this.socket?.connected) return this.socket;
       }
@@ -35,12 +33,9 @@ class SocketService {
       }
 
       if (!token) {
-        console.log('❌ No authentication token available for socket');
         this.isConnecting = false;
         return null;
       }
-
-      console.log('📡 Initializing socket connection...');
       
       // Initialize socket with token
       this.socket = io(`${API_URL}`, {
@@ -64,7 +59,6 @@ class SocketService {
 
         this.socket.once('connect', () => {
           clearTimeout(timeout);
-          console.log('✅ Socket connected successfully:', this.socket.id);
           this.isConnecting = false;
           this.reconnectAttempts = 0;
           resolve(this.socket);
@@ -91,11 +85,9 @@ class SocketService {
     if (!this.socket) return;
 
     this.socket.on('connect', () => {
-      console.log('📡 Socket connected:', this.socket.id);
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('📡 Socket disconnected:', reason);
     });
 
     this.socket.on('connect_error', (error) => {
@@ -103,7 +95,6 @@ class SocketService {
     });
 
     this.socket.on('reconnect_attempt', (attempt) => {
-      console.log(`📡 Socket reconnect attempt: ${attempt}`);
     });
 
     this.socket.on('reconnect_failed', () => {
@@ -112,11 +103,9 @@ class SocketService {
 
     // Custom events from server
     this.socket.on('provider-push-token-saved', (data) => {
-      console.log('📡 Push token saved via socket:', data);
     });
 
     this.socket.on('auto-confirm-completed', (data) => {
-      console.log('📡 Auto-confirm completed:', data);
     });
   }
 
@@ -138,7 +127,6 @@ class SocketService {
         }, (response) => {
           clearTimeout(timeout);
           if (response?.success) {
-            console.log('✅ Push token registered via socket');
             resolve(response);
           } else {
             reject(new Error(response?.message || 'Registration failed'));
@@ -148,7 +136,6 @@ class SocketService {
         // Fallback if server doesn't send callback
         setTimeout(() => {
           clearTimeout(timeout);
-          console.log('⚠️ Socket registration completed (no callback)');
           resolve({ success: true, message: 'Registration sent' });
         }, 3000);
       });
@@ -164,7 +151,6 @@ class SocketService {
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
-      console.log('📡 Socket disconnected');
     }
     this.isConnecting = false;
   }
