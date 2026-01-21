@@ -7,9 +7,12 @@
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "automatic",
     "scheme": "tiffine-provider",
+    "jsEngine": "hermes",
     "android": {
       "package": "com.triospheretech.tiffineprovider",
       "versionCode": 1,
+      "enableProguardInReleaseBuilds":true,
+      "enableMinifyInReleaseBuilds":true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/splash.png",
         "backgroundImage": "./assets/images/splash.png",
@@ -54,8 +57,9 @@
       "compileSdkVersion": 35,
       "targetSdkVersion": 34,
       "buildToolsVersion": "35.0.0",
-      "enableProguardInReleaseBuilds": false,
-      "enableMinifyInReleaseBuilds": false
+      "enableProguardInReleaseBuilds": true,
+      "enableMinifyInReleaseBuilds": true,
+      "useLegacyPackaging": false
     },
     "ios": {
       "deploymentTarget": "15.1"
