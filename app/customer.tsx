@@ -94,6 +94,8 @@ const ModernInput = ({
   loading = false,
   placeholder = '',
   containerStyle,
+  autoComplete,
+  textContentType,
 }: {
   label: string;
   value: string;
@@ -111,6 +113,8 @@ const ModernInput = ({
   loading?: boolean;
   placeholder?: string;
   containerStyle?: any;
+  autoComplete?: string;
+  textContentType?: string;
 }) => {
   return (
     <View style={[styles.inputContainer, containerStyle]}>
@@ -154,12 +158,16 @@ const ModernInput = ({
           onChangeText={onChangeText}
           keyboardType={keyboardType}
           multiline={multiline}
+          numberOfLines={multiline ? 4 : 1}
           maxLength={maxLength}
           textAlignVertical={multiline ? 'top' : 'center'}
           editable={editable}
           selectTextOnFocus={editable}
           placeholderTextColor="#9CA3AF"
           placeholder={placeholder}
+          autoComplete={autoComplete}
+          textContentType={textContentType}
+          {...(multiline ? { ellipsizeMode: 'tail' } : {})}
         />
       </View>
 
@@ -285,13 +293,6 @@ const AddCustomerScreen: React.FC<Props> = ({ navigation, route }) => {
       if (!area.trim() && result.city) {
         setArea(result.city);
       }
-      
-      // Show success alert
-      // Alert.alert(
-      //   'Location Found',
-      //   `City: ${result.city}\nState: ${result.state}`,
-      //   [{ text: 'OK' }]
-      // );
       
     } catch (error: any) {
       Alert.alert(
@@ -571,6 +572,8 @@ const AddCustomerScreen: React.FC<Props> = ({ navigation, route }) => {
                 touched={touchedFields.name}
                 maxLength={CHAR_LIMITS.NAME}
                 icon={<Ionicons name="person" size={20} color="#6B7280" />}
+                autoComplete="name"
+                textContentType="name"
               />
 
               <ModernInput
@@ -583,6 +586,8 @@ const AddCustomerScreen: React.FC<Props> = ({ navigation, route }) => {
                 editable={!submitting}
                 error={fieldErrors.phone}
                 touched={touchedFields.phone}
+                autoComplete="tel"
+                textContentType="telephoneNumber"
               />
 
               <ModernInput
@@ -595,6 +600,8 @@ const AddCustomerScreen: React.FC<Props> = ({ navigation, route }) => {
                 touched={touchedFields.email}
                 maxLength={CHAR_LIMITS.EMAIL}
                 icon={<Ionicons name="mail" size={20} color="#6B7280" />}
+                autoComplete="email"
+                textContentType="emailAddress"
               />
             </View>
 
@@ -623,6 +630,8 @@ const AddCustomerScreen: React.FC<Props> = ({ navigation, route }) => {
                     }
                     placeholder="Enter 6-digit pincode"
                     containerStyle={styles.pincodeInputCustom}
+                    autoComplete="postal-code"
+                    textContentType="postalCode"
                   />
                 </View>
                 <View style={styles.lookupButtonWrapper}>
@@ -658,6 +667,8 @@ const AddCustomerScreen: React.FC<Props> = ({ navigation, route }) => {
                     maxLength={CHAR_LIMITS.CITY}
                     icon={<Ionicons name="business" size={20} color="#6B7280" />}
                     placeholder="Auto-filled from pincode"
+                    autoComplete="address-city"
+                    textContentType="addressCity"
                   />
                 </View>
                 <View style={styles.halfInput}>
@@ -671,6 +682,8 @@ const AddCustomerScreen: React.FC<Props> = ({ navigation, route }) => {
                     maxLength={CHAR_LIMITS.STATE}
                     icon={<Ionicons name="flag" size={20} color="#6B7280" />}
                     placeholder="Auto-filled from pincode"
+                    autoComplete="address-state"
+                    textContentType="addressState"
                   />
                 </View>
               </View>
@@ -684,6 +697,7 @@ const AddCustomerScreen: React.FC<Props> = ({ navigation, route }) => {
                 maxLength={CHAR_LIMITS.AREA}
                 icon={<Ionicons name="navigate" size={20} color="#6B7280" />}
                 placeholder="e.g., Downtown, Suburb"
+                autoComplete="address-line2"
               />
 
               <ModernInput
@@ -699,6 +713,8 @@ const AddCustomerScreen: React.FC<Props> = ({ navigation, route }) => {
                 maxLength={CHAR_LIMITS.ADDRESS}
                 icon={<Ionicons name="home" size={20} color="#6B7280" />}
                 placeholder="House no, Building, Street"
+                autoComplete="street-address"
+                textContentType="fullStreetAddress"
               />
             </View>
 
@@ -775,9 +791,6 @@ const AddCustomerScreen: React.FC<Props> = ({ navigation, route }) => {
                 />
               </View>
             </View>
-
-            {/* Spacer for button */}
-            {/* <View style={{ height: 100 }} /> */}
           </View>
         </ScrollView>
 
@@ -815,7 +828,6 @@ const AddCustomerScreen: React.FC<Props> = ({ navigation, route }) => {
 
 const styles = StyleSheet.create({
   container: {
-    // paddingTop:30,
     flex: 1,
     backgroundColor: '#f8fafc',
   },
@@ -911,6 +923,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     fontWeight: '400',
     minHeight: 24,
+    ...Platform.select({
+      android: {
+        includeFontPadding: false,
+      },
+    }),
   },
   inputWithPrefix: {
     paddingLeft: 12,
@@ -920,9 +937,13 @@ const styles = StyleSheet.create({
   },
   multilineInput: {
     minHeight: 100,
-    paddingTop: 16,
-    paddingBottom: 16,
+    paddingVertical: 14,
     textAlignVertical: 'top',
+    ...Platform.select({
+      android: {
+        textAlignVertical: 'top',
+      },
+    }),
   },
   inputDisabled: {
     color: '#9CA3AF',
@@ -949,10 +970,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   pincodeInputCustom: {
-    marginBottom: 0, // Override the default margin
+    marginBottom: 0,
   },
   lookupButtonWrapper: {
-    marginTop: 30, // This aligns perfectly with the input field (8px label margin + 22px label height)
+    marginTop: 25,
     height: 50,
     justifyContent: 'center',
   },

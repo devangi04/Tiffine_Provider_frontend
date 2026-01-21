@@ -8,10 +8,19 @@ export const fetchSearchResults = createAsyncThunk(
   'search/fetchResults',
   async (query: string, { rejectWithValue }) => {
     try {
-      // Use 'q' instead of 'query' to match your backend
-      const response = await axios.get(`${API_BASE_URL}/api/search?q=${encodeURIComponent(query)}`);
+      const response = await axios.get(
+        `${API_BASE_URL}/api/search?q=${encodeURIComponent(query)}`
+      );
+      
       if (response.data.success) {
-        return response.data.results;
+        // Filter to only return customers
+        return {
+          customers: response.data.results.customers || [],
+          dishes: [],  // Empty arrays for other categories
+          menus: [],
+          responses: [],
+          bills: []
+        };
       } else {
         return rejectWithValue(response.data.message || 'Search failed');
       }
@@ -20,7 +29,6 @@ export const fetchSearchResults = createAsyncThunk(
     }
   }
 );
-
 // Define proper types for sedarch results
 interface SearchResultItem {
   _id: string;

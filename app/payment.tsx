@@ -317,62 +317,7 @@ const fetchPaymentStatus = async () => {
     setGeneratingBills(false);
   }
 };
-  // Send bills to all customers via email
-  // const sendBillsToAllCustomers = async () => {
-  //   try {
-  //     setSendingEmails(true);
-      
-  //     const [year, month] = currentMonth.split('-');
-      
-  //     Alert.alert(
-  //       'Send Bill Emails',
-  //       `Send bill emails to all customers for ${moment(currentMonth).format('MMMM YYYY')}?`,
-  //       [
-  //         {
-  //           text: 'Cancel',
-  //           style: 'cancel'
-  //         },
-  //         {
-  //           text: 'Send Emails',
-  //           onPress: async () => {
-  //             try {
-  //               const response = await axios.post(
-  //                 `${API_BASE_URL}/bills/send-all/${year}/${month}`
-  //               );
-
-  //               if (response.data.success) {
-  //                 const { emailsSent, emailsFailed } = response.data.data;
-                  
-  //                 let message = `Successfully sent ${emailsSent} emails`;
-  //                 if (emailsFailed > 0) {
-  //                   message += `, ${emailsFailed} failed`;
-  //                 }
-                  
-  //                 Alert.alert(
-  //                   'Success', 
-  //                   message,
-  //                   [{ text: 'OK', onPress: fetchPaymentStatus }]
-  //                 );
-  //               } else {
-  //                 Alert.alert('Info', response.data.message || 'No bills to send or already sent');
-  //               }
-  //             } catch (error: any) {
-  //               Alert.alert(
-  //                 'Error', 
-  //                 error.response?.data?.message || 'Failed to send emails. Please try again.'
-  //               );
-  //             } finally {
-  //               setSendingEmails(false);
-  //             }
-  //           }
-  //         }
-  //       ]
-  //     );
-  //   } catch (error) {
-  //     setSendingEmails(false);
-  //   }
-  // };
-
+ 
   const handleMonthChange = (direction: 'prev' | 'next') => {
     const newMonth = moment(currentMonth).add(direction === 'prev' ? -1 : 1, 'month').format('YYYY-MM');
     setCurrentMonth(newMonth);

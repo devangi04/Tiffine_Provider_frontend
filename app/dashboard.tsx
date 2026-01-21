@@ -926,7 +926,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 30,
     paddingTop: 15,
   },
   heroCard: {

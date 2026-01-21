@@ -66,23 +66,14 @@ const SubscriptionPlans = () => {
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('idle');
   const [activeTab, setActiveTab] = useState<'monthly' | 'yearly'>('monthly');
   
-  // Trial states
-  // const [trialStatus, setTrialStatus] = useState<TrialStatus | null>(null);
-  // const [checkingTrial, setCheckingTrial] = useState(true);
+ 
   const [showTrialWelcome, setShowTrialWelcome] = useState(false);
-  // const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
 const provider = useSelector((state: RootState) => state.provider);
 
 const providerId = provider.id;
 const providerEmail = provider.email;
 const trialStatus = provider.trialStatus;
 const hasActiveSubscription = provider.subscription?.status === 'active';
-  // Get provider data from params
-  // const providerId = params.providerId as string;
-  // const providerEmail = params.providerEmail as string;
-  // const showTrialInfo = params.showTrialInfo === 'true';
-  // const trialExpired = params.trialExpired === 'true';
-
   useEffect(() => {
     if (!providerId) {
       Alert.alert('Error', 'Provider information missing. Please login again.');
@@ -557,19 +548,6 @@ useEffect(() => {
       </View>
     );
   };
-
-  // Loading State
-  // if (checkingTrial || (loading && plans.length === 0)) {
-  //   return (
-  //     <View style={styles.centerContainer}>
-  //       <ActivityIndicator size="large" color="#15803d" />
-  //       <Text style={styles.loadingText}>
-  //         {checkingTrial ? 'Checking your trial status...' : 'Loading plans...'}
-  //       </Text>
-  //     </View>
-  //   );
-  // }
-
   if (error) {
     return (
       <View style={styles.centerContainer}>

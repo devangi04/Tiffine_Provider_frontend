@@ -573,12 +573,6 @@ useEffect(() => {
     }
   }, [upi.upiId]);
 
-  // useEffect(() => {
-  //   return () => {
-  //     dispatch(resetMealPreferences());
-  //   };
-  // }, [dispatch]);
-
   const toggleMealEnabled = (mealType: MealType): void => {
     setMealService(prev => ({
       ...prev,
@@ -679,6 +673,7 @@ useEffect(() => {
       
       if (result) {
         Alert.alert('Success', 'Meal preferences updated successfully!');
+        router.push('/dashboard');
         setHasJustSaved(true);
       }
     } catch (error: any) {

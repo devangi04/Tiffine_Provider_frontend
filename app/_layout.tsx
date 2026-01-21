@@ -1,4 +1,4 @@
-// app/_layout.tsx
+
 import { useEffect,useState } from 'react';
 import { Provider } from 'react-redux';
 import { store,persistor } from './store';
@@ -11,7 +11,6 @@ import 'react-native-reanimated';
 import { useFonts } from "expo-font";
 import * as SplashScreen from 'expo-splash-screen';
 
-// Import Nunito Sans Fonts (existing)
 import {
   NunitoSans_200ExtraLight,
   NunitoSans_300Light,
