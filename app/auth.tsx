@@ -13,7 +13,8 @@ import {
   KeyboardAvoidingView,
   ActivityIndicator
 } from 'react-native';
-import axios from 'axios';
+import api from './api/api';
+
 import {Text,TextStyles} from '@/components/ztext';
 
 import { LinearGradient } from 'expo-linear-gradient';
@@ -340,31 +341,33 @@ const handleLogin = async () => {
     setIsLoading(true);
     dispatch(setLoading(true));
 
-    const response = await axios.post(
+    const response = await api.post(
       `${API_BASE_URL}/api/auth/login`,
       { email, password },
       { timeout: 10000 }
     );
-
     if (!response.data.success) {
       throw new Error(response.data.error || 'Login failed');
     }
 
     const providerData = response.data.data;
     const token = response.data.token;
-
     await AsyncStorage.setItem('providerToken', token);
 
-    dispatch(setProvider({
-      id: providerData.providerId,
-      email: providerData.email,
-      name: providerData.name,
-      phone: providerData.phone || '',
-      token,
-      subscription: providerData.subscription || { status: 'inactive' },
-      upiId: providerData.upiId || '',
-      notificationsEnabled: providerData.notificationsEnabled ?? true,
-    }));
+  dispatch(setProvider({
+  id: providerData.providerId,
+  email: providerData.email,
+  name: providerData.name,
+  phone: providerData.phone || '',
+  token,
+  subscription: providerData.subscription || { status: 'inactive' },
+  upiId: providerData.upiId || '',
+  notificationsEnabled: providerData.notificationsEnabled ?? true,
+
+  // ✅ REQUIRED FIELD
+  hasMealPreferences: providerData.hasMealPreferences ?? false,
+}));
+
 
     // 🔥 FETCH TRIAL STATUS ONCE — PROPERLY
     dispatch(fetchTrialStatus(providerData.providerId));
@@ -409,7 +412,7 @@ const handleLogin = async () => {
     setIsRegisterSubmitted(true);
 
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/providers/register`, {
+      const response = await api.post(`${API_BASE_URL}/api/providers/register`, {
         name, email, phone, password
       });
       if (response.data.success) {
@@ -438,7 +441,7 @@ const handleLogin = async () => {
     setIsLoading(true);
 
     try {
-      const response = await axios.post(
+      const response = await api.post(
         `${API_BASE_URL}/api/providers/verify-otp`, 
         { email: verificationEmail, otp }
       );
@@ -483,7 +486,7 @@ const handleLogin = async () => {
 
     setIsLoading(true);
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/providers/forgot-password`, { 
+      const response = await api.post(`${API_BASE_URL}/api/providers/forgot-password`, { 
         email: forgotEmail 
       });
       
@@ -508,7 +511,7 @@ const handleLogin = async () => {
 
     setIsLoading(true);
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/providers/verify-reset-otp`, {
+      const response = await api.post(`${API_BASE_URL}/api/providers/verify-reset-otp`, {
         email: forgotEmail,
         otp: resetOtp
       });
@@ -544,7 +547,7 @@ const handleLogin = async () => {
 
     setIsLoading(true);
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/providers/reset-password`, {
+      const response = await api.post(`${API_BASE_URL}/api/providers/reset-password`, {
         email: forgotEmail,
         otp: resetOtp,
         newPassword
@@ -586,7 +589,7 @@ const handleLogin = async () => {
     setIsLoading(true);
 
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/providers/resend-otp`, {
+      const response = await api.post(`${API_BASE_URL}/api/providers/resend-otp`, {
         email: verificationEmail
       });
 
@@ -604,7 +607,7 @@ const handleLogin = async () => {
 
   const resendResetOTP = async () => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/providers/resend-reset-otp`, { 
+      const response = await api.post(`${API_BASE_URL}/api/providers/resend-reset-otp`, { 
         email: forgotEmail 
       });
       if (response.data.success) {

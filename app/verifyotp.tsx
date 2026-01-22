@@ -12,7 +12,7 @@ import {
   Platform,
   ScrollView
 } from "react-native";
-import axios from "axios";
+import api from './api/api';
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from '@expo/vector-icons';
 import {Text,TextStyles} from '@/components/ztext';
@@ -54,7 +54,7 @@ export default function VerifyOtp() {
     setIsLoading(true);
 
     try {
-      const response = await axios.post(
+      const response = await api.post(
         `${API_BASE_URL}/api/providers/verify-otp`, 
         { 
           email: Array.isArray(email) ? email[0] : email, 
@@ -108,7 +108,7 @@ export default function VerifyOtp() {
     setResendLoading(true);
 
     try {
-      const response = await axios.post(
+      const response = await api.post(
         `${API_BASE_URL}/api/providers/resend-otp`,
         { email: Array.isArray(email) ? email[0] : email },
         {

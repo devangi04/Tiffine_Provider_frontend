@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import axios from 'axios';
+import api from '../../api/api';
 import { MealPreferencesState, MealService } from '../types/meals';
 import { API_URL } from '@/app/config/env';
 import { setHasMealPreferences } from './providerslice';
@@ -17,7 +17,7 @@ export const fetchMealPreferences = createAsyncThunk(
         return rejectWithValue('No authentication token found');
       }      
       
-      const response = await axios.get(
+      const response = await api.get(
         `${API_BASE_URL}/Provider/preferences`,
         {
           headers: {
@@ -63,7 +63,7 @@ export const updateMealPreferences = createAsyncThunk(
         return rejectWithValue('No authentication token found');
       }
       
-      const response = await axios.post(
+      const response = await api.post(
         `${API_BASE_URL}/Provider/preferences`,
         { mealService },
         {

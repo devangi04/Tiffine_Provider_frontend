@@ -10,7 +10,7 @@ import {
   SafeAreaView
 } from 'react-native';
 import { useRouter, useNavigation } from 'expo-router';
-import axios from 'axios';
+import api from './api/api';
 import { Text } from '@/components/ztext';
 import { AntDesign, Feather, MaterialIcons, Ionicons, FontAwesome6, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -115,7 +115,7 @@ const ProfileScreen = () => {
         return;
       }
       
-      const response = await axios.get<{
+      const response = await api.get<{
         success: boolean;
         data?: Provider;
         error?: string;

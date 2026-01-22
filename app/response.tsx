@@ -15,7 +15,7 @@ import {
 import { Text } from '@/components/ztext';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Check, X, Calendar, FileText, Search, ChevronRight, Sun, Moon, Filter, ChevronDown } from 'lucide-react-native';
-import axios from 'axios';
+import api from './api/api';
 import { useNavigation } from 'expo-router';
 import moment from 'moment';
 import { API_URL } from './config/env';
@@ -192,7 +192,7 @@ const isPastDate = (date: string): boolean => {
   const fetchMealPreferences = async () => {
     try {
       setPrefsLoading(true);
-      const response = await axios.get(`${API_BASE_URL}/Provider/preferences`, {
+      const response = await api.get(`${API_BASE_URL}/Provider/preferences`, {
         headers: {
           Authorization: `Bearer ${providerId}`,
         }
@@ -253,14 +253,14 @@ const isPastDate = (date: string): boolean => {
     
     // Fetch both responses in parallel
     const [lunchResponse, dinnerResponse] = await Promise.all([
-      axios.get(`${API_BASE_URL}/responses/daily`, {
+      api.get(`${API_BASE_URL}/responses/daily`, {
         params: {
           providerId,
           date,
           mealType: 'lunch'
         }
       }),
-      axios.get(`${API_BASE_URL}/responses/daily`, {
+      api.get(`${API_BASE_URL}/responses/daily`, {
         params: {
           providerId,
           date,
@@ -307,7 +307,7 @@ const isPastDate = (date: string): boolean => {
 
   const fetchTimingInfo = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/responses/timing`, {
+      const response = await api.get(`${API_BASE_URL}/responses/timing`, {
         params: { providerId }
       });
       
@@ -407,7 +407,7 @@ const isPastDate = (date: string): boolean => {
       return;
     }
     
-    const response = await axios.post(`${API_BASE_URL}/response`, {
+    const response = await api.post(`${API_BASE_URL}/response`, {
       customerId,
       menuDate: selectedDate,
       mealType: selectedMealType,

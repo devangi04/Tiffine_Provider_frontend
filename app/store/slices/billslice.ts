@@ -1,6 +1,6 @@
 import { API_URL } from '@/app/config/env';
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
+import api from '../../api/api';
 
 const API_BASE_URL = `${API_URL}/api`;
 
@@ -82,7 +82,7 @@ export const fetchCustomerBills = createAsyncThunk(
   async ({ customerId }: { customerId: string }, { rejectWithValue }) => {
     try {
       // Temporary: Get all bills and filter for this customer
-      const response = await axios.get(`${API_BASE_URL}/bills/list`);
+      const response = await api.get(`${API_BASE_URL}/bills/list`);
       
       if (response.data.success) {
         // Filter bills for this specific customer
@@ -157,7 +157,7 @@ export const fetchBillDetails = createAsyncThunk(
   'bills/fetchBillDetails',
   async ({ billId }: { billId: string }, { rejectWithValue }) => {
     try {
-      const response = await axios.get(
+      const response = await api.get(
         `${API_BASE_URL}/bills/${billId}`
       );
       
@@ -185,7 +185,7 @@ export const fetchMonthlyBill = createAsyncThunk(
     month: string | number 
   }, { rejectWithValue }) => {
     try {
-      const response = await axios.get(
+      const response = await api.get(
         `${API_BASE_URL}/bills/customers/${customerId}/${year}/${month}`
       );
       
@@ -260,7 +260,7 @@ export const generateCustomerBill = createAsyncThunk(
   }, { rejectWithValue }) => {
     try {
       // Using GET endpoint since your Express router has GET /customers/:customerId/:year/:month
-      const response = await axios.get(
+      const response = await api.get(
         `${API_BASE_URL}/bills/customers/${customerId}/${year}/${month}`
       );
       
@@ -286,7 +286,7 @@ export const generateAllBills = createAsyncThunk(
     month?: number;
   }, { rejectWithValue }) => {
     try {
-      const response = await axios.post(
+      const response = await api.post(
         `${API_BASE_URL}/bills/generate-all/${year}/${month}`,
         {}
       );
@@ -319,7 +319,7 @@ export const addPayment = createAsyncThunk(
     method?: 'cash' | 'upi' | 'other' 
   }, { rejectWithValue }) => {
     try {
-      const response = await axios.post(
+      const response = await api.post(
         `${API_BASE_URL}/bills/customers/${customerId}/${year}/${month}/payments`,
         { amount, method }
       );
@@ -340,7 +340,7 @@ export const sendBillEmail = createAsyncThunk(
   'bills/sendBillEmail',
   async (billId: string, { rejectWithValue }) => {
     try {
-      const response = await axios.post(
+      const response = await api.post(
         `${API_BASE_URL}/bills/send-email/${billId}`,
         {}
       );
@@ -361,7 +361,7 @@ export const fetchAllBills = createAsyncThunk(
   'bills/fetchAllBills',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/bills/list`);
+      const response = await api.get(`${API_BASE_URL}/bills/list`);
       
       if (response.data.success) {
         return response.data.data;
@@ -379,7 +379,7 @@ export const fetchPaymentSummary = createAsyncThunk(
   'bills/fetchPaymentSummary',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/bills/payment-summary`);
+      const response = await api.get(`${API_BASE_URL}/bills/payment-summary`);
       
       if (response.data.success) {
         return response.data.data;

@@ -8,7 +8,7 @@ import {
   StyleSheet, 
   ActivityIndicator 
 } from "react-native";
-import axios from "axios";
+import api from './api/api';
 import { useRouter, useLocalSearchParams } from "expo-router";
 import {Text,TextStyles} from '@/components/ztext';
 import { API_URL } from "./config/env";
@@ -30,7 +30,7 @@ export default function VerifyOtp() {
     setIsLoading(true);
 
     try {
-      const response = await axios.post(
+      const response = await api.post(
         `${API_BASE_URL}/api/providers/verify-otp`, 
         { email, otp }
       );

@@ -24,7 +24,7 @@ import {
   Mail,
   ReceiptText
 } from 'lucide-react-native';
-import axios from 'axios';
+import api from './api/api';
 import moment from 'moment';
 import { useAppSelector } from './store/hooks';
 import { API_URL } from './config/env';
@@ -122,7 +122,7 @@ const fetchPaymentStatus = async () => {
     const monthEnd = moment(currentMonth).endOf('month').toDate();
     
     // Fetch ALL customers
-    const customersResponse = await axios.get(`${API_BASE_URL}/customer/provider/${providerId}`, {
+    const customersResponse = await api.get(`${API_BASE_URL}/customer/provider/${providerId}`, {
       params: { 
         limit: 1000
       }
@@ -163,7 +163,7 @@ const fetchPaymentStatus = async () => {
     }
 
     // Rest of your existing code...
-    const billsResponse = await axios.get(`${API_BASE_URL}/bills/list`, {
+    const billsResponse = await api.get(`${API_BASE_URL}/bills/list`, {
       params: { 
         month: currentMonth,
         limit: 1000
@@ -271,7 +271,7 @@ const fetchPaymentStatus = async () => {
           text: 'Generate',
           onPress: async () => {
             try {
-              const response = await axios.post(
+              const response = await api.post(
                 `${API_BASE_URL}/bills/generate-all/${year}/${month}`
               );
 

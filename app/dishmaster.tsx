@@ -6,7 +6,7 @@ import {
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { Plus, Edit2, Trash2, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import axios from 'axios';
+import api from './api/api';
 import { useAppSelector } from './store/hooks';
 import { Text } from '@/components/ztext';
 import { API_URL } from './config/env';
@@ -89,13 +89,13 @@ const scrollRef = useRef<KeyboardAwareScrollView>(null);
       setRefreshing(true);
 
       // Fetch categories
-      const catRes = await axios.get(`${CATEGORY_API_URL}/provider/${providerId}`);
+      const catRes = await api.get(`${CATEGORY_API_URL}/provider/${providerId}`);
       
       // Fetch dishes
       let dishesByCategory = {};
       
       try {
-        const dishRes = await axios.get(`${DISH_API_URL}/provider/${providerId}`);
+        const dishRes = await api.get(`${DISH_API_URL}/provider/${providerId}`);
     
         if (dishRes.data.data && Array.isArray(dishRes.data.data)) {
           dishRes.data.data.forEach(categoryData => {
@@ -185,7 +185,7 @@ const scrollRef = useRef<KeyboardAwareScrollView>(null);
     try {
       setLoading(true);
 
-      const response = await axios.post(`${DISH_API_URL}/`, {
+      const response = await api.post(`${DISH_API_URL}/`, {
         providerId,
         name: name.trim(),
         description: description.trim(),
@@ -224,7 +224,7 @@ const scrollRef = useRef<KeyboardAwareScrollView>(null);
     if (!newName.trim()) return Alert.alert('Error', 'Dish name cannot be empty');
     try {
       setLoading(true);
-      await axios.patch(`${DISH_API_URL}/${providerId}/${categoryId}/${dishId}`, { 
+      await api.patch(`${DISH_API_URL}/${providerId}/${categoryId}/${dishId}`, { 
         name: newName.trim(), 
         description: newDescription.trim(),
         isActive 
@@ -257,7 +257,7 @@ const scrollRef = useRef<KeyboardAwareScrollView>(null);
         onPress: async () => {
           try {
             setLoading(true);
-            await axios.delete(`${DISH_API_URL}/${providerId}/${categoryId}/${dishId}`);
+            await api.delete(`${DISH_API_URL}/${providerId}/${categoryId}/${dishId}`);
             const updatedCategories = categories.map(cat => cat._id === categoryId ? {
               ...cat,
               dishes: cat.dishes.filter(d => d._id !== dishId)
@@ -280,83 +280,82 @@ const scrollRef = useRef<KeyboardAwareScrollView>(null);
   };
 
   // DishItem component
-  const DishItem: React.FC<{ dish: Dish; categoryId: string; isLast: boolean;}> = ({ dish, categoryId ,isLast }) => {
-    const [isEditing, setIsEditing] = useState(false);
-    const [editingName, setEditingName] = useState(dish.name);
-    const [editingDescription, setEditingDescription] = useState(dish.description || '');
-    const [editingActive, setEditingActive] = useState(dish.isActive ?? true);
+const DishItem: React.FC<{ dish: Dish; categoryId: string; isLast: boolean;}> = ({ dish, categoryId, isLast }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingName, setEditingName] = useState(dish.name);
+  const [editingDescription, setEditingDescription] = useState(dish.description || '');
+  const [editingActive, setEditingActive] = useState(dish.isActive ?? true);
 
-    const handleSave = () => {
-      handleEditSave(categoryId, dish._id, editingName, editingDescription, editingActive);
-      setIsEditing(false);
-    };
-
-    return (
-      <View style={[styles.dishItem,isLast && styles.lastDishItem]}>
-        {isEditing ? (
-          <View style={styles.editForm}>
-            <TextInput
-              ref={(ref) => editInputRefs.current[dish._id] = ref}
-              style={styles.editInput}
-              value={editingName}
-              onChangeText={setEditingName}
-              placeholder="Enter dish name..."
-              returnKeyType="next"
-            />
-            <TextInput
-              style={[styles.editInput, styles.descriptionInput]}
-              value={editingDescription}
-              onChangeText={setEditingDescription}
-              placeholder="Enter dish description..."
-              multiline
-              numberOfLines={3}
-            />
-            <View style={styles.editFormRow}>
-              <View style={styles.toggleContainer}>
-                <Text weight='extraBold' style={styles.toggleLabel}>Active:</Text>
-                <Switch 
-                  value={editingActive} 
-                  onValueChange={setEditingActive} 
-                  trackColor={{false:'#767577', true:'#81ffaf43'}} 
-                  thumbColor={editingActive ? '#15803d':'#f4f3f4'}
-                />
-              </View>
-              <View style={styles.editButtons}>
-                <TouchableOpacity style={[styles.actionButton, styles.saveButton]} onPress={handleSave}>
-                  <Text style={styles.buttonText}>Save</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.actionButton, styles.cancelButton]} onPress={() => setIsEditing(false)}>
-                  <Text style={styles.buttonText}>Cancel</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.dishRow}>
-            <View style={styles.dishInfo}>
-              <Text weight='extraBold' style={[styles.dishName, !dish.isActive && styles.inactiveDish]}>
-                {dish.name}
-              </Text>
-              {dish.description ? (
-                <Text weight='extraBold' style={[styles.dishDescription, !dish.isActive && styles.inactiveDish]}>
-                  {dish.description}
-                </Text>
-              ) : null}
-            </View>
-            <View style={styles.dishActions}>
-              <TouchableOpacity style={[styles.actionButton, styles.editButton]} onPress={() => setIsEditing(true)}>
-                <Edit2 size={18} color="#3B82F6"/>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.actionButton, styles.deleteButton]} onPress={() => handleDeleteDish(categoryId, dish._id)}>
-                <Trash2 size={18} color="#EF4444"/>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-      </View>
-    );
+  const handleSave = () => {
+    handleEditSave(categoryId, dish._id, editingName, editingDescription, editingActive);
+    setIsEditing(false);
   };
 
+  return (
+    <View style={[styles.dishItem, isLast && styles.lastDishItem]}>
+      {isEditing ? (
+        <View style={styles.editForm}>
+          <TextInput
+            ref={(ref) => editInputRefs.current[dish._id] = ref}
+            style={styles.editInput}
+            value={editingName}
+            onChangeText={setEditingName}
+            placeholder="Enter dish name..."
+            returnKeyType="next"
+          />
+          <TextInput
+            style={[styles.editInput, styles.descriptionInput]}
+            value={editingDescription}
+            onChangeText={setEditingDescription}
+            placeholder="Enter dish description..."
+            multiline
+            numberOfLines={3}
+          />
+          <View style={styles.editFormRow}>
+            <View style={styles.toggleContainer}>
+              <Text weight='extraBold' style={styles.toggleLabel}>Active:</Text>
+              <Switch 
+                value={editingActive} 
+                onValueChange={setEditingActive} 
+                trackColor={{false:'#767577', true:'#81ffaf43'}} 
+                thumbColor={editingActive ? '#15803d':'#f4f3f4'}
+              />
+            </View>
+            <View style={styles.editButtons}>
+              <TouchableOpacity style={[styles.actionButton, styles.saveButton]} onPress={handleSave}>
+                <Text style={styles.buttonText}>Save</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionButton, styles.cancelButton]} onPress={() => setIsEditing(false)}>
+                <Text style={styles.buttonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      ) : (
+        <View style={styles.dishRow}>
+          <View style={styles.dishInfo}>
+            <Text weight='extraBold' style={[styles.dishName, !dish.isActive && styles.inactiveDish]}>
+              {dish.name}
+            </Text>
+            {dish.description ? (
+              <Text weight='extraBold' style={[styles.dishDescription, !dish.isActive && styles.inactiveDish]}>
+                {dish.description}
+              </Text>
+            ) : null}
+          </View>
+          <View style={styles.dishActions}>
+            <TouchableOpacity style={[styles.actionButton, styles.editButton]} onPress={() => setIsEditing(true)}>
+              <Edit2 size={18} color="#3B82F6"/>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.actionButton, styles.deleteButton]} onPress={() => handleDeleteDish(categoryId, dish._id)}>
+              <Trash2 size={18} color="#EF4444"/>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+};
   // AddDishForm component
   const AddDishForm: React.FC<{ categoryId: string }> = ({ categoryId }) => {
     const [name, setName] = useState('');
@@ -490,7 +489,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
   loadingContainer: { flex: 1, justifyContent:'center', alignItems:'center', backgroundColor:'#F8FAFC' },
   mainContent: { flex:1, backgroundColor:'transparent'},
-  scrollContainer: { paddingHorizontal:24, paddingBottom:40,paddingTop:12},
+  scrollContainer: { paddingHorizontal:24, paddingBottom:90,paddingTop:12},
   categoryCard: { backgroundColor:'#fff', borderRadius:20, padding:4, marginBottom:8, marginTop:8, overflow:'hidden', borderWidth:1, borderColor:'rgba(0,0,0,0.05)' },
   categoryHeader: { flexDirection:'row', justifyContent:'space-between', alignItems:'center', padding:16 },
   categoryInfo: { flexDirection:'row', alignItems:'center', gap:12 },
@@ -515,11 +514,11 @@ const styles = StyleSheet.create({
   dishActions: { flexDirection:'row', gap:8 },
   actionButton: { 
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 8,
     alignItems:'center',
     justifyContent:'center',
-    minWidth: 80,
+    minWidth: 70,
     flexDirection: 'row',
     gap: 6,
   },
@@ -558,22 +557,29 @@ const styles = StyleSheet.create({
   editFormRow: { 
     flexDirection:'row', 
     justifyContent:'space-between', 
+    flexWrap: 'wrap', 
     alignItems:'center',
+    gap:12,
     marginTop: 8,
   },
   toggleContainer: { 
     flexDirection:'row', 
     alignItems:'center',
     flex: 1,
+    minWidth:'48%'
   },
   toggleLabel: { 
     marginRight:8, 
     color:'#1E293B', 
-    fontWeight:'500' 
+    fontWeight:'500', 
+    fontSize:14
   },
   editButtons: { 
     flexDirection:'row', 
     gap:12,
+    flex: 1,
+    justifyContent: 'flex-end',
+    minWidth:'48%'
   },
   buttonText: {
     color: '#fff',

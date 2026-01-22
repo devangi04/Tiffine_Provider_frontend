@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import axios from 'axios';
+import api from './api/api';
 import FloatingInput from '@/components/floatinginput';
 import OTPInputBoxes from '@/components/otpbox';
 import {TextStyles} from '@/components/ztext';
@@ -40,7 +40,7 @@ const ForgotPasswordScreen = () => {
 
     setIsLoading(true);
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/providers/forgot-password`, { email });
+      const response = await api.post(`${API_BASE_URL}/api/providers/forgot-password`, { email });
       
       if (response.data.success) {
         setStep('otp');
@@ -63,7 +63,7 @@ const ForgotPasswordScreen = () => {
 
     setIsLoading(true);
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/providers/verify-reset-otp`, {
+      const response = await api.post(`${API_BASE_URL}/api/providers/verify-reset-otp`, {
         email,
         otp
       });
@@ -99,7 +99,7 @@ const ForgotPasswordScreen = () => {
 
     setIsLoading(true);
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/providers/reset-password`, {
+      const response = await api.post(`${API_BASE_URL}/api/providers/reset-password`, {
         email,
         otp,
         newPassword
@@ -121,7 +121,7 @@ const ForgotPasswordScreen = () => {
 
   const resendOTP = async () => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/providers/resend-reset-otp`, { email });
+      const response = await api.post(`${API_BASE_URL}/api/providers/resend-reset-otp`, { email });
       if (response.data.success) {
         Alert.alert('Success', 'New OTP sent to your email');
       }

@@ -11,7 +11,7 @@ import {
 import {Text,TextStyles} from '@/components/ztext';
 
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import axios from 'axios';
+import api from './api/api';
 import { Send, ArrowLeft, Check } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Header from '@/components/header';
@@ -82,19 +82,19 @@ const MenuPreviewScreen: React.FC = () => {
       setLoading(true);
       
       // Fetch menu details
-      const menuResponse = await axios.get(`${API_BASE_URL}/menu/${menuId}`);
+      const menuResponse = await api.get(`${API_BASE_URL}/menu/${menuId}`);
       if (menuResponse.data.success) {
         setMenu(menuResponse.data.menu || menuResponse.data.data);
       }
       
       // Fetch categories
-      const categoriesResponse = await axios.get(`http://192.168.1.3:5000/api/category/provider/${providerId}`);
+      const categoriesResponse = await api.get(`http://192.168.1.3:5000/api/category/provider/${providerId}`);
       if (categoriesResponse.data.success) {
         setCategories(categoriesResponse.data.data);
       }
       
       // Fetch dishes
-      const dishesResponse = await axios.get(`http://192.168.1.3:5000/api/dish/provider/${providerId}`);
+      const dishesResponse = await api.get(`http://192.168.1.3:5000/api/dish/provider/${providerId}`);
       if (dishesResponse.data.success) {
         const transformedDishes = transformDishesData(dishesResponse.data.data);
         setDishes(transformedDishes);
@@ -159,7 +159,7 @@ const MenuPreviewScreen: React.FC = () => {
   const sendMenu = async () => {
     try {
       setSending(true);
-      const response = await axios.post(SENT_MENU_URL, {
+      const response = await api.post(SENT_MENU_URL, {
         providerId,
         menuId
       });

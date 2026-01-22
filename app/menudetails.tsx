@@ -16,7 +16,7 @@ import {Text,TextStyles} from '@/components/ztext';
 
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { ChevronLeft, Users, Send, CheckCircle, XCircle } from 'lucide-react-native';
-import axios from 'axios';
+import api from './api/api';
 import Header from '@/components/header';
 import { useAppSelector } from './store/hooks';
 import { API_URL } from './config/env';
@@ -104,7 +104,7 @@ const MenuDetailsScreen = () => {
 
   const fetchMenuDetails = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/menu/${params.menuId}`);
+      const response = await api.get(`${API_BASE_URL}/menu/${params.menuId}`);
       if (response.data.success) {
         setMenu(response.data.data);
       }
@@ -116,7 +116,7 @@ const MenuDetailsScreen = () => {
 
   const fetchAllCustomers = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/customers/provider/${provider.id}`);
+      const response = await api.get(`${API_BASE_URL}/customers/provider/${provider.id}`);
       if (response.data.success) {
         // Filter only active customers
         const activeCustomers = response.data.data.filter(
@@ -134,7 +134,7 @@ const MenuDetailsScreen = () => {
     try {
       if (!menu || !menu.date) return;
       
-      const response = await axios.get(`${API_BASE_URL}/daily`, { // Fixed endpoint
+      const response = await api.get(`${API_BASE_URL}/daily`, { // Fixed endpoint
         params: {
           providerId: provider.id,
           date: menu.date
@@ -166,7 +166,7 @@ const MenuDetailsScreen = () => {
     
     setSending(true);
     try {
-      const response = await axios.post(`${API_BASE_URL}/menu/send-to-customers`, {
+      const response = await api.post(`${API_BASE_URL}/menu/send-to-customers`, {
         menuId: menu._id,
         providerId: provider.id
       });

@@ -1,6 +1,6 @@
 // store/slices/providerSlice.ts
 import { createSlice, PayloadAction, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
+import api from '../../api/api';
 import { API_URL } from '../../config/env';
 
 interface Subscription {
@@ -73,7 +73,7 @@ export const fetchTrialStatus = createAsyncThunk(
   'provider/fetchTrialStatus',
   async (providerId: string, { rejectWithValue }) => {
     try {
-      const response = await axios.get(
+      const response = await api.get(
         `${API_URL}/api/subscription/trial-status/${providerId}`,
         {
           timeout: 10000,
@@ -103,7 +103,7 @@ export const fetchNotificationSettings = createAsyncThunk(
         return rejectWithValue('No auth token');
       }
 
-      const response = await axios.get(
+      const response = await api.get(
         `${API_URL}/api/providers/me/notification-settings`,
         {
           headers: {
@@ -131,7 +131,7 @@ export const logoutProvider = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       await Promise.race([
-        axios.post(
+        api.post(
           `${API_URL}/api/auth/logout`,
           {},
           { 

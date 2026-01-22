@@ -22,7 +22,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useNavigation, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import axios from 'axios';
+import api from './api/api';
 import { useAppSelector, useAppDispatch } from './store/hooks';
 import { clearSearchQuery } from './store/slices/searchslice';
 import DashboardHeader from '@/components/dahsboardheader';
@@ -274,7 +274,7 @@ const TiffinDashboard = () => {
       
       // Make both requests in parallel
       const [providerResponse, dashboardResponse] = await Promise.all([
-        axios.get(
+        api.get(
           `${API_BASE_URL}/api/providers/${providerId}`,
           {
             timeout: 10000,
@@ -284,7 +284,7 @@ const TiffinDashboard = () => {
             }
           }
         ),
-        axios.get(
+        api.get(
           `${API_BASE_URL}/api/providers/${providerId}/dashboard`,
           {
             timeout: 10000,

@@ -1,6 +1,6 @@
 import { API_URL } from '@/app/config/env';
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
+import api from '../../api/api';
 
 const API_BASE_URL = `${API_URL}/api`;
 
@@ -64,7 +64,7 @@ export const fetchCustomers = createAsyncThunk(
   'customers/fetchCustomers',
   async ({ providerId, isRefresh = false }: { providerId: string; isRefresh?: boolean }, { rejectWithValue }) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/customer/provider/${providerId}`, {
+      const response = await api.get(`${API_BASE_URL}/customer/provider/${providerId}`, {
         params: { limit: 10 },
         headers: {
           'Cache-Control': 'no-cache',
@@ -86,7 +86,7 @@ export const fetchCustomerById = createAsyncThunk(
   'customer/fetchCustomerById',
   async (customerId: string, { rejectWithValue }) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/customer/${customerId}`);
+      const response = await api.get(`${API_BASE_URL}/customer/${customerId}`);
       return response.data.data;
     } catch (err: any) {
       return rejectWithValue(err.response?.data?.error || err.message || 'Network error');
@@ -106,7 +106,7 @@ export const fetchMoreCustomers = createAsyncThunk(
     lastId?: string 
   }, { rejectWithValue }) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/customer/provider/${providerId}`, {
+      const response = await api.get(`${API_BASE_URL}/customer/provider/${providerId}`, {
         params: { 
           limit: 10,
           ...(lastCreatedAt && { lastCreatedAt }),
@@ -130,7 +130,7 @@ export const createCustomer = createAsyncThunk(
       if(!customerData.providerId){
         throw new Error('Provider ID is required');
       }
-      const response = await axios.post(`${API_BASE_URL}/customer`, {
+      const response = await api.post(`${API_BASE_URL}/customer`, {
         ...customerData,
         isActive: true // Ensure new customers are active by default
       });
@@ -147,7 +147,7 @@ export const fetchLocationFromPincode = createAsyncThunk(
   async (pincode: string, { rejectWithValue }) => {
     try {
       // Option 1: Use your existing API
-      const response = await axios.get(`${API_BASE_URL}/location/pincode/${pincode}`);
+      const response = await api.get(`${API_BASE_URL}/location/pincode/${pincode}`);
       
       
       return response.data;
@@ -179,7 +179,7 @@ export const updateCustomer = createAsyncThunk(
   'customers/updateCustomer',
   async ({ id, customerData }: { id: string; customerData: Partial<Customer> }, { rejectWithValue }) => {
     try {
-      const response = await axios.put(`${API_BASE_URL}/customer/${id}`, customerData);
+      const response = await api.put(`${API_BASE_URL}/customer/${id}`, customerData);
       return response.data.data;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.error || error.message);
@@ -191,7 +191,7 @@ export const deleteCustomer = createAsyncThunk(
   'customers/deleteCustomer',
   async (id: string, { rejectWithValue }) => {
     try {
-      await axios.delete(`${API_BASE_URL}/customer/${id}`);
+      await api.delete(`${API_BASE_URL}/customer/${id}`);
       return id;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.error || error.message);
@@ -203,7 +203,7 @@ export const toggleCustomerActive = createAsyncThunk(
   'customers/toggleCustomerActive',
   async (id: string, { rejectWithValue }) => {
     try {
-      const response = await axios.patch(`${API_BASE_URL}/customer/${id}/toggle-active`);
+      const response = await api.patch(`${API_BASE_URL}/customer/${id}/toggle-active`);
       return response.data.data;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.error || error.message);

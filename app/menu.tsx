@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from './api/api';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
@@ -203,7 +203,7 @@ const DailyMenuScreen: React.FC = () => {
   const fetchMealPreferences = async () => {
     try {
       setPrefsLoading(true);
-      const response = await axios.get(`${API_BASE_URL}/Provider/preferences`, {
+      const response = await api.get(`${API_BASE_URL}/Provider/preferences`, {
         headers: {
           Authorization: `Bearer ${providerId}`,
         }
@@ -241,7 +241,7 @@ const DailyMenuScreen: React.FC = () => {
 
   const fetchAllMealPreferences = async () => {
   try {
-    const response = await axios.get(`${PROVIDER_API_URL}/preferences`, {
+    const response = await api.get(`${PROVIDER_API_URL}/preferences`, {
       headers: { Authorization: `Bearer ${provider.token}` }
     });
     
@@ -322,7 +322,7 @@ useEffect(() => {
 
   const fetchProviderPreferencesForMealType = async (mealType: 'lunch' | 'dinner') => {
     try {
-      const response = await axios.get(`${PROVIDER_API_URL}/preferences`, {
+      const response = await api.get(`${PROVIDER_API_URL}/preferences`, {
         headers: { Authorization: `Bearer ${provider.token}` }
       });
       
@@ -366,7 +366,7 @@ useEffect(() => {
       setError(null);
       
       // Fetch categories
-      const categoriesResponse = await axios.get(`${CATEGORY_API_URL}/provider/${providerId}`);
+      const categoriesResponse = await api.get(`${CATEGORY_API_URL}/provider/${providerId}`);
       const activeCategories = categoriesResponse.data.data.filter((cat: DishCategory) => cat.isActive);
       
       activeCategories.sort((a: DishCategory, b: DishCategory) => {
@@ -399,7 +399,7 @@ useEffect(() => {
       let activeDishes: Dish[] = [];
       
       try {
-        const dishesResponse = await axios.get(`${DISH_API_URL}/provider/${providerId}`);
+        const dishesResponse = await api.get(`${DISH_API_URL}/provider/${providerId}`);
         
         if (dishesResponse.data.success && dishesResponse.data.data) {
           dishesResponse.data.data.forEach((categoryGroup: any) => {
@@ -550,7 +550,7 @@ useEffect(() => {
         specialPricingNote: specialPricingNote.trim() || undefined
       };
 
-      const response = await axios.post(`${MENU_API_URL}`, menuData);
+      const response = await api.post(`${MENU_API_URL}`, menuData);
       
       if (response.data.success) {
         clearSelectedDishes(selectedMealType);
@@ -559,7 +559,7 @@ useEffect(() => {
         throw new Error(response.data.message);
       }
     } catch (error) {
-      const errorMessage = axios.isAxiosError(error) 
+      const errorMessage = api.isapiError(error) 
         ? error.response?.data?.message || error.message 
         : 'Failed to save menu';
       setError(errorMessage);

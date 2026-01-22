@@ -30,7 +30,7 @@ import {
   Sun,
   Star
 } from 'lucide-react-native';
-import axios from 'axios';
+import api from './api/api';
 import moment from 'moment';
 import { API_URL } from './config/env';
 
@@ -215,7 +215,7 @@ const [sendingPayment, setSendingPayment] = useState(false);
         setLoading(true);
       }
 
-      const response = await axios.get(
+      const response = await api.get(
         `${API_BASE_URL}/bills/customers/${customerId}/${currentYear}/${currentMonth}`,
         { 
           signal: abortControllerRef.current.signal,
@@ -361,7 +361,7 @@ const handlePayment = async () => {
     const year = bill.period.year;
     const month = bill.period.month;
 
-    const response = await axios.post(
+    const response = await api.post(
       `${API_BASE_URL}/bills/customers/${customerId}/${year}/${month}/payments`,
       {
         amount,
@@ -392,7 +392,7 @@ const handlePayment = async () => {
     try {
       setGeneratingBill(true);
       
-      const response = await axios.post(
+      const response = await api.post(
         `${API_BASE_URL}/bills/generate-all/${currentYear}/${currentMonth}`
       );
 
@@ -425,7 +425,7 @@ const sendBillEmail = async () => {
   try {
     setSendingEmail(true); // Start loading
     
-    const response = await axios.post(
+    const response = await api.post(
       `${API_BASE_URL}/bills/send-email/${bill.id}`,
       {}, // Add empty object if needed
       { timeout: 15000 } // Add timeout

@@ -13,7 +13,7 @@ import {
   RefreshControl
 } from 'react-native';
 import {Text,TextStyles} from '@/components/ztext';
-import axios from 'axios';
+import api from './api/api';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
@@ -110,7 +110,7 @@ const SubscriptionManagement = () => {
       setError(null);
       
       // Fetch subscription data FIRST
-      const subscriptionRes = await axios.get(`${API_URL}/api/subscription/provider/${providerId}`);
+      const subscriptionRes = await api.get(`${API_URL}/api/subscription/provider/${providerId}`);
       
       if (subscriptionRes.data.success && subscriptionRes.data.subscription) {
         const subscriptionData = subscriptionRes.data.subscription;
@@ -153,7 +153,7 @@ const SubscriptionManagement = () => {
 
       // Only fetch trial status if no active subscription
       if (!subscriptionRes.data.success || !subscriptionRes.data.subscription || subscriptionRes.data.subscription.status !== 'active') {
-        const trialRes = await axios.get(`${API_URL}/api/subscription/trial-status/${providerId}`);
+        const trialRes = await api.get(`${API_URL}/api/subscription/trial-status/${providerId}`);
         if (trialRes.data.success) {
           setTrialStatus(trialRes.data.trialStatus);
         }
@@ -163,13 +163,13 @@ const SubscriptionManagement = () => {
       }
 
       // Fetch plans
-      const plansRes = await axios.get(`${API_URL}/api/plans`);
+      const plansRes = await api.get(`${API_URL}/api/plans`);
       if (plansRes.data.success) {
         setPlans(plansRes.data.data || []);
       }
 
     } catch (err) {
-      const message = axios.isAxiosError(err)
+      const message = api.isapiError(err)
         ? err.response?.data?.error || err.message
         : (err as Error).message;
       setError(message);
@@ -198,7 +198,7 @@ const SubscriptionManagement = () => {
             try {
               setActionLoading('cancel');
               
-              const res = await axios.post(`${API_URL}/api/subscription/cancel`, {
+              const res = await api.post(`${API_URL}/api/subscription/cancel`, {
                 providerId
               });
 
@@ -293,7 +293,7 @@ const SubscriptionManagement = () => {
 
   const verifyPayment = async (paymentResponse: any, isRenewal: boolean) => {
     try {
-      const res = await axios.post(`${API_URL}/api/subscription/verify`, {
+      const res = await api.post(`${API_URL}/api/subscription/verify`, {
         providerId,
         razorpay_payment_id: paymentResponse.razorpay_payment_id,
         razorpay_subscription_id: paymentResponse.razorpay_subscription_id,

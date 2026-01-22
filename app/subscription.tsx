@@ -12,7 +12,7 @@ import {
   Dimensions,
   SafeAreaView
 } from 'react-native';
-import axios from 'axios';
+import api from './api/api';
 import { Text } from '@/components/ztext';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { WebView } from 'react-native-webview';
@@ -87,7 +87,7 @@ useEffect(() => {
     try {
       setLoading(true);
 
-      const plansRes = await axios.get(`${API_URL}/api/plans`);
+      const plansRes = await api.get(`${API_URL}/api/plans`);
 
       if (plansRes.data.success) {
         setPlans(plansRes.data.data || []);
@@ -97,7 +97,7 @@ useEffect(() => {
       }
 
     } catch (err) {
-      const message = axios.isAxiosError(err)
+      const message = api.isapiError(err)
         ? err.response?.data?.error || err.message
         : (err as Error).message;
 
@@ -121,7 +121,7 @@ useEffect(() => {
       setSelectedPlanId(planId);
       setPaymentStatus('processing');
 
-      const res = await axios.post(`${API_URL}/api/subscription/create`, {
+      const res = await api.post(`${API_URL}/api/subscription/create`, {
         providerId,
         planId
       });
@@ -197,7 +197,7 @@ useEffect(() => {
     try {
       setPaymentStatus('processing');
       
-      const res = await axios.post(`${API_URL}/api/subscription/verify`, {
+      const res = await api.post(`${API_URL}/api/subscription/verify`, {
         providerId,
         razorpay_payment_id: paymentResponse.razorpay_payment_id,
         razorpay_subscription_id: paymentResponse.razorpay_subscription_id,

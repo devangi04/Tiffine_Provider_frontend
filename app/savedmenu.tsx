@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from './api/api';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
@@ -440,7 +440,7 @@ const SavedMenusScreen: React.FC = () => {
         };
       }
 
-      const response = await axios.put(`${API_BASE_URL}/menu`, menuData);
+      const response = await api.put(`${API_BASE_URL}/menu`, menuData);
       
       if (response.data.success) {
         setIsEditModalVisible(false);

@@ -1,6 +1,6 @@
 // store/slices/upislice.ts
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import axios from 'axios';
+import api from '../../api/api';
 import { API_URL} from '../../config/env';
 const API_BASE_URL = `${API_URL}/api/providers`;
 
@@ -51,7 +51,7 @@ export const fetchUpiId = createAsyncThunk(
       
       const url = `${API_BASE_URL}/me/upi-id`;
       
-      const response = await axios.get(url, {
+      const response = await api.get(url, {
         headers: { 
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -82,7 +82,7 @@ export const saveUpiId = createAsyncThunk(
         return rejectWithValue('No authentication token found');
       }
       
-      const response = await axios.put(
+      const response = await api.put(
         `${API_BASE_URL}/me/upi-id`,
         { upiId },
         { headers: { Authorization: `Bearer ${token}` } }
@@ -110,7 +110,7 @@ export const removeUpiId = createAsyncThunk(
         return rejectWithValue('No authentication token found');
       }
       
-      const response = await axios.delete(`${API_BASE_URL}/me/upi-id`, {
+      const response = await api.delete(`${API_BASE_URL}/me/upi-id`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -136,7 +136,7 @@ export const validateUpi = createAsyncThunk(
         return rejectWithValue('No authentication token found');
       }
       
-      const response = await axios.post(
+      const response = await api.post(
         `${API_BASE_URL}/me/upi-id/validate`,
         { upiId },
         { headers: { Authorization: `Bearer ${token}` } }

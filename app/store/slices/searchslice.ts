@@ -1,6 +1,6 @@
 import { API_URL } from '@/app/config/env';
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
+import api from '../../api/api';
 
 const API_BASE_URL = API_URL;
 
@@ -8,7 +8,7 @@ export const fetchSearchResults = createAsyncThunk(
   'search/fetchResults',
   async (query: string, { rejectWithValue }) => {
     try {
-      const response = await axios.get(
+      const response = await api.get(
         `${API_BASE_URL}/api/search?q=${encodeURIComponent(query)}`
       );
       

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Image, Keyboard,Animated ,ScrollView
 } from 'react-native';
-import axios from 'axios';
+import api from './api/api';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { Save, X, Edit2, Trash2,Check } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -47,7 +47,7 @@ const CategoryMasterScreen: React.FC = () => {
       if (!providerId) return;
       try {
         setLoading(true);
-        const res = await axios.get(`${CATEGORY_API_URL}/provider/${providerId}`);
+        const res = await api.get(`${CATEGORY_API_URL}/provider/${providerId}`);
         setCategories(res.data.data || []);
       } catch (err) {
         Alert.alert('Error', 'Failed to fetch categories. Please try again.');
@@ -72,7 +72,7 @@ const handleAddCategory = async () => {
 
   try {
     setLoading(true);
-    const res = await axios.post(CATEGORY_API_URL, { 
+    const res = await api.post(CATEGORY_API_URL, { 
       providerId, 
       name: newCategoryName.trim(), 
       isActive: true 
@@ -94,7 +94,7 @@ const handleAddCategory = async () => {
     if (!editingName.trim()) return Alert.alert('Error', 'Category name cannot be empty');
     try {
       setLoading(true);
-      await axios.patch(`${CATEGORY_API_URL}/${categoryId}`, { name: editingName.trim() });
+      await api.patch(`${CATEGORY_API_URL}/${categoryId}`, { name: editingName.trim() });
       setCategories(categories.map(cat => cat._id === categoryId ? { ...cat, name: editingName.trim() } : cat));
       setEditingCategoryId(null);
       setEditingName('');
@@ -116,7 +116,7 @@ const handleAddCategory = async () => {
         onPress: async () => {
           try {
             setLoading(true);
-            await axios.delete(`${CATEGORY_API_URL}/${categoryId}`);
+            await api.delete(`${CATEGORY_API_URL}/${categoryId}`);
             setCategories(categories.filter(cat => cat._id !== categoryId));
             Alert.alert('Success', 'Category deleted successfully!');
           } catch (err) {

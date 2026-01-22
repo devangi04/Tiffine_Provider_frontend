@@ -18,7 +18,7 @@ import {
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import axios from 'axios';
+import api from './api/api';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppSelector, useAppDispatch } from '@/app/store/hooks';
 import { setProvider } from '@/app/store/slices/providerslice';
@@ -160,6 +160,7 @@ const EditProfileScreen = () => {
   const router = useRouter();
   const reduxProvider = useAppSelector((state) => state.provider);
   const dispatch = useAppDispatch();
+  
 
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
@@ -170,6 +171,7 @@ const EditProfileScreen = () => {
     phone: '',
   });
 
+  
   // Input refs
   const nameRef = useRef<TextInput>(null);
   const emailRef = useRef<TextInput>(null);
@@ -188,7 +190,7 @@ const EditProfileScreen = () => {
           return;
         }
 
-        const response = await axios.get(
+        const response = await api.get(
           `${API_BASE_URL}/api/providers/${providerId}`,
           {
             timeout: 10000,
@@ -211,13 +213,16 @@ const EditProfileScreen = () => {
           });
           
           // Update Redux state as well
-          dispatch(setProvider({
-            id: providerData.id || providerId,
-            email: providerData.email || '',
-            name: providerData.name || '',
-            phone: providerData.phone || '',
-            subscription: providerData.subscription || {}
-          }));
+      dispatch(setProvider({
+  id: providerData.id || reduxProvider.id || '',             // required string
+  token: reduxProvider.token || '',                          // keep existing token
+  hasMealPreferences: reduxProvider.hasMealPreferences ?? false, // required boolean
+  name: providerData.name || reduxProvider.name || '',
+  email: providerData.email || reduxProvider.email || '',
+  phone: providerData.phone || reduxProvider.phone || '',
+  subscription: providerData.subscription || reduxProvider.subscription,
+ 
+}));
         } else {
           // Fallback to Redux data
           if (reduxProvider) {
@@ -297,7 +302,7 @@ const EditProfileScreen = () => {
         phone: formData.phone
       };
 
-      const response = await axios.put(
+      const response = await api.put(
         `${API_BASE_URL}/api/providers/${reduxProvider.id}`,
         updateData,
         { 
@@ -310,13 +315,16 @@ const EditProfileScreen = () => {
         Alert.alert('Success', 'Phone number updated successfully!');
         
         // Update Redux with new phone
-        dispatch(setProvider({
-          id: reduxProvider.id,
-          email: reduxProvider.email, // Keep original
-          name: reduxProvider.name, // Keep original
-          phone: formData.phone, // Only update phone
-          subscription: reduxProvider.subscription || {}
-        }));
+       dispatch(setProvider({
+  id: reduxProvider.id,
+  email: reduxProvider.email,
+  name: reduxProvider.name,
+  phone: formData.phone,
+  subscription: reduxProvider.subscription || {},
+  token: reduxProvider.token || '',                  // <--- keep token
+  hasMealPreferences: reduxProvider.hasMealPreferences ?? false // keep boolean
+}));
+
         
         router.back();
       } else {
