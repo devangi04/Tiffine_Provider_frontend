@@ -24,7 +24,8 @@
         "RECEIVE_BOOT_COMPLETED",
         "WAKE_LOCK",
         "INTERNET",
-        "ACCESS_NETWORK_STATE"
+        "ACCESS_NETWORK_STATE",
+        "POST_NOTIFICATIONS"
       ]
     },
     "ios": {
