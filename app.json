@@ -14,9 +14,9 @@
       "enableProguardInReleaseBuilds":true,
       "enableMinifyInReleaseBuilds":true,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/splash.png",
-        "backgroundImage": "./assets/images/splash.png",
-        "backgroundColor": "#0C831F"
+        "foregroundImage": "./assets/images/Single_Logo_Trans.png",
+        "backgroundImage": "./assets/images/Single_Logo_Trans.png",
+        "backgroundColor": "#15803d"
       },
       "googleServicesFile": "./google-services.json",
       "useNextNotificationsApi": true,
