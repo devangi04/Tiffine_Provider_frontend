@@ -36,6 +36,7 @@ interface Plan {
   };
   description?: string;
   isActive: boolean;
+  isVisible: boolean;
 }
 
 interface TrialStatus {
@@ -563,13 +564,16 @@ useEffect(() => {
     );
   }
 
-  const filteredPlans = plans.filter(plan => {
-    if (activeTab === 'monthly') {
-      return plan.interval === 'month' && plan.isActive;
-    } else {
-      return plan.interval === 'year' && plan.isActive;
-    }
-  });
+const filteredPlans = plans.filter(plan => {
+  if (!plan.isVisible) return false;
+
+  if (activeTab === 'monthly') {
+    return plan.interval === 'month';
+  } else {
+    return plan.interval === 'year';
+  }
+});
+
 
   return (
     <SafeAreaView style={styles.safeArea}>

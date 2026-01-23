@@ -160,7 +160,6 @@ const ModernInput = ({
           multiline={multiline}
           numberOfLines={multiline ? 4 : 1}
           maxLength={maxLength}
-          textAlignVertical={multiline ? 'top' : 'center'}
           editable={editable}
           selectTextOnFocus={editable}
           placeholderTextColor="#9CA3AF"

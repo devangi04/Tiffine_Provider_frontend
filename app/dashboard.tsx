@@ -30,6 +30,7 @@ import SearchBar from '@/components/searchbar';
 import Text from '@/components/ztext';
 import { API_URL } from './config/env';
 const { width, height } = Dimensions.get('window');
+import { BackHandler } from 'react-native';
 
 const API_BASE_URL = API_URL;
 
@@ -256,16 +257,29 @@ const TiffinDashboard = () => {
   }, []);
 
   // Clear search when returning to dashboard
- useFocusEffect(
+useFocusEffect(
   useCallback(() => {
-    // Don't clear on focus - only clear on unmount
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        // If search is open → close it first
+        if (isSearchFocused || searchQuery.trim().length > 0) {
+          Keyboard.dismiss();
+          dispatch(clearSearchQuery());
+          setIsSearchFocused(false);
+          return true; // prevent default back
+        }
+
+        return false; // allow normal back
+      }
+    );
+
     return () => {
-      // Clear when leaving the screen (not when coming back)
-      dispatch(clearSearchQuery());
-      setIsSearchFocused(false);
+      subscription.remove(); // ✅ correct cleanup
     };
-  }, [dispatch])
+  }, [isSearchFocused, searchQuery])
 );
+
 
   // Optimized data fetching (parallel requests)
   const fetchProviderData = async () => {
@@ -627,25 +641,6 @@ const handleSearchItemClick = (item: SearchResultItem, category: string) => {
                 </TouchableOpacity>
               )}
             </View>
-
-            {/* Quick Actions */}
-            {/* <View style={styles.quickActions}>
-              <TouchableOpacity 
-                style={styles.quickActionButton}
-                onPress={() => router.push('/schedule')}
-              >
-                <Ionicons name="pencil" size={16} color="#3B82F6" />
-                <Text weight="bold" style={styles.quickActionText}>Edit Menu</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.quickActionButton}
-                onPress={() => router.push('/response')}
-              >
-                <Ionicons name="eye" size={16} color="#10B981" />
-                <Text weight="bold" style={styles.quickActionText}>View Responses</Text>
-              </TouchableOpacity>
-            </View> */}
           </>
         )}
       </TouchableOpacity>
