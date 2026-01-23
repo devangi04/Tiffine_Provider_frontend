@@ -11,6 +11,12 @@
     "android": {
       "package": "com.triospheretech.tiffineprovider",
       "versionCode": 1,
+
+      "statusBar": {
+    "translucent": true,
+    "backgroundColor": "#00000000",
+    "barStyle": "light-content"
+  },
       "enableProguardInReleaseBuilds":true,
       "enableMinifyInReleaseBuilds":true,
       "adaptiveIcon": {

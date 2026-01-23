@@ -200,18 +200,14 @@ const TimePickerModal = ({
     }
   }, [visible, slideAnim, fadeAnim]);
 
-  const handleConfirm = () => {
-    let hour24;
-    if (isAM) {
-      hour24 = hour === 12 ? 0 : hour;
-    } else {
-      hour24 = hour === 12 ? 12 : hour + 12;
-    }
-    
-    const timeString = `${hour24.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')} ${isAM ? 'AM' : 'PM'}`;
-    onTimeSelect(timeString);
-    onClose();
-  };
+ const handleConfirm = () => {
+  const timeString = 
+    `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')} ${isAM ? 'AM' : 'PM'}`;
+
+  onTimeSelect(timeString);
+  onClose();
+};
+
 
   const handleScrollEnd = (
     event: any, 

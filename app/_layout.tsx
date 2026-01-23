@@ -180,7 +180,12 @@ function LayoutContent() {
       {/* ✅ Bottom Navbar */}
       {headerData.showNavbar && <BottomNavBar />}
 
-      <StatusBar style="auto" />
+      <StatusBar
+  style="light"
+  backgroundColor="transparent"
+  translucent
+/>
+
     </View>
   );
 }
