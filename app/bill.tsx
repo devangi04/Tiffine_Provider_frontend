@@ -815,9 +815,9 @@ const sendBillEmail = async () => {
           <ChevronLeft size={24} color="#1E293B" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Monthly Bill</Text>
-        {/* <TouchableOpacity onPress={downloadBill}>
-          <Download size={24} color="#4F46E5" />
-        </TouchableOpacity> */}
+        <TouchableOpacity onPress={downloadBill}>
+          {/* <Download size={24} color="#4F46E5" /> */}
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -1122,6 +1122,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   headerTitle: {
+    paddingTop:4,
     fontSize: 20,
     fontWeight: '600',
     color: '#1E293B',

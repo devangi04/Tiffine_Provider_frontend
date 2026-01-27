@@ -408,13 +408,14 @@ const styles = StyleSheet.create({
   },
 
   scrollContent: {
-    paddingTop: 20,
+    paddingTop: 70,
     paddingBottom: 40,
     paddingHorizontal: 20,
   },
 
   /* ===== HERO ===== */
   heroCard: {
+  
     borderRadius: 24,
     padding: 24,
     marginBottom: 20,

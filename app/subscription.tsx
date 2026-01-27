@@ -21,7 +21,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { API_URL } from './config/env';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/app/store';
-
+import axios from 'axios';
 
 interface Plan {
   _id: string;
@@ -88,22 +88,24 @@ useEffect(() => {
     try {
       setLoading(true);
 
-      const plansRes = await api.get(`${API_URL}/api/plans`);
+      const plansRes = await axios.get(`${API_URL}/api/plans`);
 
       if (plansRes.data.success) {
+        console.log('ALL PLANS FROM API 👉', plans);
         setPlans(plansRes.data.data || []);
         setError(null);
       } else {
         throw new Error(plansRes.data.error || 'Failed to fetch plans');
       }
 
-    } catch (err) {
-      const message = api.isapiError(err)
-        ? err.response?.data?.error || err.message
-        : (err as Error).message;
+    }  catch (err: any) {
+  if (err?.response?.status === 404) {
+    setPlans([]); // no plans available
+    return;
+  }
 
-      setError(message);
-    } finally {
+  setError(err?.response?.data?.error || err?.message || 'Something went wrong');
+} finally {
       setLoading(false);
     }
   };
@@ -122,7 +124,7 @@ useEffect(() => {
       setSelectedPlanId(planId);
       setPaymentStatus('processing');
 
-      const res = await api.post(`${API_URL}/api/subscription/create`, {
+      const res = await axios.post(`${API_URL}/api/subscription/create`, {
         providerId,
         planId
       });
@@ -198,7 +200,7 @@ useEffect(() => {
     try {
       setPaymentStatus('processing');
       
-      const res = await api.post(`${API_URL}/api/subscription/verify`, {
+      const res = await axios.post(`${API_URL}/api/subscription/verify`, {
         providerId,
         razorpay_payment_id: paymentResponse.razorpay_payment_id,
         razorpay_subscription_id: paymentResponse.razorpay_subscription_id,
@@ -568,11 +570,17 @@ const filteredPlans = plans.filter(plan => {
   if (!plan.isVisible) return false;
 
   if (activeTab === 'monthly') {
-    return plan.interval === 'month';
-  } else {
+    return plan.interval === 'month'; // just check interval
+  }
+
+  if (activeTab === 'yearly') {
     return plan.interval === 'year';
   }
+
+  return false;
 });
+
+
 
 
   return (
