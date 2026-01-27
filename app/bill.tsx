@@ -815,9 +815,9 @@ const sendBillEmail = async () => {
           <ChevronLeft size={24} color="#1E293B" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Monthly Bill</Text>
-        <TouchableOpacity onPress={downloadBill}>
+        {/* <TouchableOpacity onPress={downloadBill}>
           <Download size={24} color="#4F46E5" />
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </View>
 
       <ScrollView
