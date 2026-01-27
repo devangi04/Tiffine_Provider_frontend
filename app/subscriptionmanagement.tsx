@@ -20,7 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppSelector } from './store/hooks';
 import { API_URL } from './config/env';
-
+import axios from 'axios'; 
 const { width, height } = Dimensions.get('window');
 
 interface Subscription {
@@ -168,12 +168,16 @@ const SubscriptionManagement = () => {
         setPlans(plansRes.data.data || []);
       }
 
-    } catch (err) {
-      const message = api.isapiError(err)
-        ? err.response?.data?.error || err.message
-        : (err as Error).message;
-      setError(message);
-    } finally {
+  } catch (err: any) {
+  if (err?.response?.status === 404) {
+    setPlans([]); // no plans available
+    return;
+  }
+
+  setError(err?.response?.data?.error || err?.message || 'Something went wrong');
+}
+
+ finally {
       setLoading(false);
       setRefreshing(false);
       setCheckingTrial(false);

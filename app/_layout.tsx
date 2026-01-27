@@ -180,11 +180,13 @@ function LayoutContent() {
       {/* ✅ Bottom Navbar */}
       {headerData.showNavbar && <BottomNavBar />}
 
-      <StatusBar
+     <StatusBar
   style="light"
   backgroundColor="transparent"
-  translucent
+  translucent={true}
+  hidden={false}
 />
+
 
     </View>
   );
