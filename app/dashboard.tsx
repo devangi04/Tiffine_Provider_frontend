@@ -822,11 +822,11 @@ const handleSearchItemClick = (item: SearchResultItem, category: string) => {
 
   return (
     <View style={styles.container}>
-      {/* <StatusBar
+      <StatusBar
         translucent
         backgroundColor="transparent"
         barStyle="light-content"
-      /> */}
+      />
       
       <KeyboardAvoidingView 
         style={styles.keyboardAvoid}

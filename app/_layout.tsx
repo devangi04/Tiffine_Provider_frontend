@@ -262,6 +262,7 @@ export default function RootLayout() {
           <SafeAreaProvider>
             <AuthChecker>
               <LayoutContent /> 
+               <StatusBar style="light" translucent={true} />
             </AuthChecker>
           </SafeAreaProvider>
         )}
