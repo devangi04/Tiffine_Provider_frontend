@@ -88,13 +88,13 @@ const MenuPreviewScreen: React.FC = () => {
       }
       
       // Fetch categories
-      const categoriesResponse = await api.get(`http://192.168.1.3:5000/api/category/provider/${providerId}`);
+      const categoriesResponse = await api.get(`${API_BASE_URL}/api/category/provider/${providerId}`);
       if (categoriesResponse.data.success) {
         setCategories(categoriesResponse.data.data);
       }
       
       // Fetch dishes
-      const dishesResponse = await api.get(`http://192.168.1.3:5000/api/dish/provider/${providerId}`);
+      const dishesResponse = await api.get(`${API_BASE_URL}/api/dish/provider/${providerId}`);
       if (dishesResponse.data.success) {
         const transformedDishes = transformDishesData(dishesResponse.data.data);
         setDishes(transformedDishes);
