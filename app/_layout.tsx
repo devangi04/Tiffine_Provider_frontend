@@ -4,9 +4,8 @@ import { Provider } from 'react-redux';
 import { store,persistor } from './store';
 import { Stack, usePathname } from 'expo-router';
 import { PersistGate } from 'redux-persist/integration/react'; // ✅ Import PersistGate
-import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { View, StyleSheet, Text,ActivityIndicator } from 'react-native';
+import { View, StyleSheet, Text,ActivityIndicator ,StatusBar} from 'react-native';
 import 'react-native-reanimated';
 import { useFonts } from "expo-font";
 import * as SplashScreen from 'expo-splash-screen';
@@ -154,7 +153,7 @@ const renderHeader = () => {
   return (
     <View style={styles.container}>
        <StatusBar
-  style="light"
+  barStyle='light-content'
   backgroundColor="transparent"
   translucent={true}
   hidden={false}

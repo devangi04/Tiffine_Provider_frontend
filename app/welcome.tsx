@@ -7,7 +7,8 @@ import {
   FlatList, 
   Animated, 
   Easing,
-  Image 
+  Image ,
+  StatusBar
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -400,6 +401,8 @@ const handleNext = () => {
   // ==================== WELCOME SPLASH SCREEN ====================
   if (showWelcome) {
     return (
+      <>
+      <StatusBar barStyle='light-content' backgroundColor="transparent"/>
       <LinearGradient
         colors={['#15803d', '#15803d', '#a8ffcbff']}
         style={styles.container}
@@ -450,6 +453,7 @@ const handleNext = () => {
           </Text>
         </Animated.View>
       </LinearGradient>
+      </>
     );
   }
 
