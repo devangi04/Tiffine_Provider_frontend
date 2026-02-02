@@ -348,7 +348,7 @@ const handleSearchItemClick = (item: SearchResultItem, category: string) => {
   
   // Store the target route details first
   const targetRoute = {
-    pathname: '/serachcustomerdetails',
+    pathname: '/searchcustomerdetails',
     params: {
       id: item._id,
       name: item.name || item.customerName,
@@ -388,7 +388,7 @@ const handleSearchItemClick = (item: SearchResultItem, category: string) => {
   const getDisplayType = (item: SearchResultItem, category: string): string => {
     switch (category) {
       case 'customers':
-        return `Customer • ${item.tiffinType || 'No Type'}`;
+        return `Customer `;
       case 'dishes':
         return `Dish • ${item.categoryName || 'No Category'}`;
       case 'menus':

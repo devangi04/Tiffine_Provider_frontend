@@ -73,6 +73,10 @@ function LayoutContent() {
 const hasMealPreferences = useSelector(
   (state: RootState) => state.provider.hasMealPreferences
 );
+
+const isDarkStatusBar =
+  pathname.endsWith('/searchcustomerdeatils') 
+
   // ✅ Route config with header + navbar visibility
   const routeConfig: Record<
     string,
@@ -152,12 +156,13 @@ const renderHeader = () => {
 
   return (
     <View style={styles.container}>
-       <StatusBar
-  barStyle='light-content'
+<StatusBar
+  barStyle={isDarkStatusBar ? 'dark-content' : 'light-content'}
   backgroundColor="transparent"
-  translucent={true}
-  hidden={false}
+  translucent
 />
+
+
       {/* ✅ Sticky Header */}
       <View style={styles.stickyHeader}>
         {renderHeader()}

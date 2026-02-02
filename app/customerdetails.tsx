@@ -7,13 +7,13 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
-  SafeAreaView,
   Modal,
   TextInput,
   StatusBar, // Added StatusBar
 } from 'react-native';
 import { Text } from '@/components/ztext';
 import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ChevronLeft,
   Phone,
@@ -151,7 +151,6 @@ const CustomerDetailsScreen = () => {
   if (!customer && fetchingCustomer) {
     return (
       <SafeAreaView style={styles.container}>
-        <StatusBar backgroundColor="#FFFFFF" barStyle="default" />
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <ChevronLeft size={24} color="#1E293B" />
@@ -732,7 +731,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    marginTop:20,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',

@@ -16,6 +16,7 @@ import { Text, TextStyles } from '@/components/ztext';
 // In your ProviderWelcomeFlow component
 import { useDispatch } from 'react-redux';
 import { setHasCompletedWelcome } from '../app/store/slices/appslice';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
 
@@ -274,6 +275,7 @@ export default function ProviderWelcomeFlow() {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const flatListRef = useRef(null);
   const autoSlideTimer = useRef(null);
+const insets = useSafeAreaInsets();
 
   // Welcome screen animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -405,7 +407,7 @@ const handleNext = () => {
       <StatusBar barStyle='light-content' backgroundColor="transparent"/>
       <LinearGradient
         colors={['#15803d', '#15803d', '#a8ffcbff']}
-        style={styles.container}
+        style={[styles.container,{ paddingTop: insets.top }]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
