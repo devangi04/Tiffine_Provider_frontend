@@ -10,6 +10,7 @@ import {
 import {Text,TextStyles} from '@/components/ztext';
 import { ArrowLeft, User } from "lucide-react-native";
 import { useRouter, usePathname } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface HeaderProps {
   title: string;
@@ -39,6 +40,8 @@ const Header: React.FC<HeaderProps> = ({
   const router = useRouter();
   const pathname = usePathname(); // Get current route
 
+  const insets = useSafeAreaInsets();
+  
   const handleBackPress = () => {
     if (onBackPress) {
       onBackPress();
@@ -60,62 +63,54 @@ const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  return (
-    <>
-      <StatusBar
-        translucent
-        backgroundColor="transparent"
-        barStyle="light-content"
-      />
+ return (
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor,
+          paddingTop: insets.top + 16,
+        },
+      ]}
+    >
+      <View style={styles.topSection}>
+        {showBackButton ? (
+          <Pressable onPress={onBackPress ?? router.back} style={styles.backButton}>
+            <ArrowLeft size={24} color="#15803d" />
+          </Pressable>
+        ) : (
+          <View style={styles.placeholderButton} />
+        )}
 
-      <View style={[styles.container, { backgroundColor }]}>
-        <View style={styles.topSection}>
-          {showBackButton ? (
-            <Pressable
-              onPress={handleBackPress}
-              style={({ pressed }) => [
-                styles.backButton,
-                pressed && { transform: [{ scale: 0.95 }] },
-              ]}
-            >
-              <ArrowLeft size={24} color="#15803d" />
-            </Pressable>
-          ) : (
-            <View style={styles.placeholderButton} />
-          )}
-
-          <View style={styles.titleContainer}>
-            <Text  weight="bold" style={[styles.headerTitle, { color: textColor }]}>
-              {title}
+        <View style={styles.titleContainer}>
+          <Text weight="bold" style={[styles.headerTitle, { color: textColor }]}>
+            {title}
+          </Text>
+          {subtitle && (
+            <Text style={[styles.headerSubtitle, { color: subtitleColor }]}>
+              {subtitle}
             </Text>
-            {subtitle && (
-              <Text weight="bold" style={[styles.headerSubtitle, { color: subtitleColor }]}>
-                {subtitle}
-              </Text>
-            )}
-          </View>
-
-          {showUserButton ? (
-            <TouchableOpacity
-              style={styles.userButton}
-              onPress={handleUserPress}
-              activeOpacity={0.7}
-            >
-              <User size={24} color="#15803d" />
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.placeholderButton} />
           )}
         </View>
+
+        {showUserButton ? (
+          <TouchableOpacity
+            style={styles.userButton}
+            onPress={() => pathname !== "/profile" && router.push("/profile")}
+          >
+            <User size={24} color="#15803d" />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.placeholderButton} />
+        )}
       </View>
-    </>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     backgroundColor: '#15803d',
-    paddingTop: Platform.OS === 'ios' ? 70 : 50,
     paddingHorizontal: 20,
     paddingBottom: 20,
     overflow: "hidden",
@@ -124,7 +119,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: Platform.OS === 'ios' ? 0 : 10,
+   
   },
   backButton: {
     width: 44,

@@ -12,41 +12,27 @@ export const fetchMealPreferences = createAsyncThunk(
     try {
       const state = getState() as any;
       const token = state.provider.token;
-      
-      if (!token) {
-        return rejectWithValue('No authentication token found');
-      }      
-      
-      const response = await api.get(
-        `${API_BASE_URL}/Provider/preferences`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-      
+      if (!token) return rejectWithValue('No auth token');
+
+      const response = await api.get(`${API_BASE_URL}/Provider/preferences`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
       if (response.data.success) {
-        // ✅ Extract hasMealPreferences from backend response
         const hasMealPrefs = response.data.data?.hasMealPreferences || false;
-        
-        // ✅ Dispatch to provider slice (this is in a thunk, so dispatch is available)
+
+        // ✅ Update provider slice immediately
         dispatch(setHasMealPreferences(hasMealPrefs));
-        
-        return response.data.data;
-      } else {
-        return rejectWithValue(response.data.error || 'Failed to fetch preferences');
+
+        // ✅ Update meal slice
+        return {
+          ...response.data.data,
+          hasMealPreferences: hasMealPrefs
+        };
       }
 
+      return rejectWithValue(response.data.error || 'Failed to fetch preferences');
     } catch (error: any) {
-      if (error.response) {
-        return rejectWithValue(error.response.data?.error || error.response.data?.message || `Server error (${error.response.status})`);
-      } else if (error.code === 'ECONNABORTED') {
-        return rejectWithValue('Request timeout. Check your connection.');
-      } else if (error.message.includes('Network Error')) {
-        return rejectWithValue('Cannot connect to server. Please check your connection.');
-      }
       return rejectWithValue(error.message || 'Network error');
     }
   }
@@ -59,45 +45,27 @@ export const updateMealPreferences = createAsyncThunk(
       const state = getState() as any;
       const token = state.provider.token;
 
-      if (!token) {
-        return rejectWithValue('No authentication token found');
-      }
-      
-      const response = await api.post(
-        `${API_BASE_URL}/Provider/preferences`,
-        { mealService },
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-      
-      if (response.data.success) {
-        // ✅ Extract hasMealPreferences from backend response
-        const hasMealPrefs = response.data.hasMealPreferences || false;
-        
-        // ✅ Dispatch to provider slice (this is in a thunk, so dispatch is available)
-        dispatch(setHasMealPreferences(hasMealPrefs));
-        
-        return response.data.data;
-      } else {
-        return rejectWithValue(response.data.error || 'Failed to update preferences');
-      }
+      const response = await api.post(`${API_URL}/api/Provider/preferences`, { mealService }, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
 
-    } catch (error: any) {
-      if (error.response) {
-        return rejectWithValue(error.response.data?.error || error.response.data?.message || `Server error (${error.response.status})`);
-      } else if (error.code === 'ECONNABORTED') {
-        return rejectWithValue('Request timeout. Check your connection.');
-      } else if (error.message.includes('Network Error')) {
-        return rejectWithValue('Cannot connect to server. Please check your connection.');
+      if (response.data.success) {
+        const hasMealPrefs = response.data.data?.hasMealPreferences || false;
+
+        // Update provider slice first
+        dispatch(setHasMealPreferences(hasMealPrefs));
+
+        // Then update mealPreferences slice
+        return response.data.data;
       }
+      return rejectWithValue(response.data.error || 'Failed to update preferences');
+    } catch (error: any) {
       return rejectWithValue(error.message || 'Network error');
     }
   }
 );
+
+
 
 const initialState: MealPreferencesState = {
   preferences: null,

@@ -2,6 +2,7 @@
 import { createSlice, PayloadAction, createAsyncThunk } from '@reduxjs/toolkit';
 import api from '../../api/api';
 import { API_URL } from '../../config/env';
+import { resetMealPreferences } from './mealsslice';
 
 interface Subscription {
   status: string;
@@ -128,26 +129,18 @@ export const fetchNotificationSettings = createAsyncThunk(
 // 🔥 CREATE LOGOUT ASYNC THUNK
 export const logoutProvider = createAsyncThunk(
   'provider/logout',
-  async (_, { rejectWithValue }) => {
+  async (_, { rejectWithValue, dispatch }) => {
     try {
-      await Promise.race([
-        api.post(
-          `${API_URL}/api/auth/logout`,
-          {},
-          { 
-            withCredentials: true,
-            timeout: 2000 
-          }
-        ),
-        new Promise(resolve => setTimeout(resolve, 1000))
-      ]);
-      
+      await api.post(`${API_URL}/api/auth/logout`);
+      // reset meal slice
+      dispatch(resetMealPreferences());
       return { success: true };
     } catch (error: any) {
       return rejectWithValue('Logged out locally');
     }
   }
 );
+
 
 const providerSlice = createSlice({
   name: 'provider',
@@ -218,6 +211,21 @@ const providerSlice = createSlice({
     clearTrialStatus: (state) => {
       state.trialStatus = null;
     },
+    // Add this reducer in the reducers section
+updateProviderData: (state, action: PayloadAction<Partial<{
+  name?: string;
+  email?: string;
+  phone?: string;
+  upiId?: string;
+  hasMealPreferences?: boolean;
+}>>) => {
+  if (action.payload.name !== undefined) state.name = action.payload.name;
+  if (action.payload.email !== undefined) state.email = action.payload.email;
+  if (action.payload.phone !== undefined) state.phone = action.payload.phone;
+  if (action.payload.upiId !== undefined) state.upiId = action.payload.upiId;
+  if (action.payload.hasMealPreferences !== undefined) 
+    state.hasMealPreferences = action.payload.hasMealPreferences;
+},
     setUpiId: (state, action: PayloadAction<string>) => {
       state.upiId = action.payload;
     },
@@ -319,6 +327,7 @@ export const {
   setUpiId,
   clearUpiId,
   setToken,
+  updateProviderData,
   // ✅ EXPORT NEW ACTIONS
   setNotificationSettings,
   updateNotificationSettings,

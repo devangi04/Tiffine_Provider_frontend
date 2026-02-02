@@ -241,6 +241,9 @@ useEffect(() => {
 
 
 
+  // Add this function to your AuthScreen component
+
+
   const performLogoutCleanup = async () => {
     try {
       setIsLoggingOut(true);
@@ -327,6 +330,7 @@ const switchTab = (tab: string) => {
 
  // In your AuthScreen component
 const handleLogin = async () => {
+  setIsLoginSubmitted(false);
   if (!email || !password) {
     Alert.alert('Error', 'Please enter both email and password');
     return;
@@ -339,6 +343,7 @@ const handleLogin = async () => {
 
   try {
     setIsLoading(true);
+    setIsLoginSubmitted(true);
     dispatch(setLoading(true));
 
     const response = await api.post(
@@ -375,11 +380,77 @@ const handleLogin = async () => {
     // ❗ NO NAVIGATION HERE
     // AuthChecker WILL handle everything
 
-  } catch (error: any) {
-    Alert.alert(
-      'Login Failed',
-      error?.response?.data?.error || error.message || 'Something went wrong'
+  }  catch (error: any) {
+    setIsLoginSubmitted(false);
+    
+    // Handle specific errors
+    if (error.response?.data?.requiresVerification) {
+      // If account exists but not verified
+      const userEmail = error.response.data.email || email;
+  Alert.alert(
+      'Account Not Verified',
+      'Please verify your email address first.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        },
+        {
+          text: 'Verify Now',
+          onPress: async () => {
+            try {
+              // Show loading
+              setIsLoading(true);
+              
+              // ✅ AUTO-SEND NEW 4-DIGIT OTP
+              const resendResponse = await api.post(
+                `${API_BASE_URL}/api/providers/resend-otp`, 
+                { email: userEmail }
+              );
+              
+              if (resendResponse.data.success) {
+                // Redirect to verification tab with the email
+                setVerificationEmail(userEmail);
+                setActiveTab('verify');
+                
+                // Reset tab animation
+                Animated.spring(tabSlideAnim, {
+                  toValue: 0,
+                  tension: 120,
+                  friction: 8,
+                  useNativeDriver: false,
+                }).start();
+                
+                // Show success message
+                Alert.alert(
+                  '4-digit OTP Sent', 
+                  'New verification OTP has been sent to your email.'
+                );
+              } else {
+                Alert.alert('Error', resendResponse.data.error || 'Failed to send OTP');
+              }
+            } catch (resendError: any) {
+              Alert.alert(
+                'Error', 
+                resendError.response?.data?.error || 'Failed to send OTP'
+              );
+            } finally {
+              setIsLoading(false);
+            }
+          }
+        }
+      ]
     );
+    } else if (error.response?.data?.error) {
+      // Display specific error from backend
+      Alert.alert('Login Failed', error.response.data.error);
+    } else if (error.message?.includes('Network Error')) {
+      Alert.alert('Network Error', 'Please check your internet connection');
+    } else if (error.message?.includes('timeout')) {
+      Alert.alert('Timeout', 'Request timed out. Please try again');
+    } else {
+      Alert.alert('Login Failed', error.message || 'Something went wrong');
+    }
   } finally {
     setIsLoading(false);
     dispatch(setLoading(false));
@@ -388,15 +459,29 @@ const handleLogin = async () => {
 
 
   const handleRegister = async () => {
+     setIsRegisterSubmitted(false);
     if (!name || !email || !phone || !password) {
       Alert.alert('Error', 'All fields are required!');
       return;
     }
+ // Name validation - at least 3 characters
+  if (name.trim().length < 3) {
+    Alert.alert('Error', 'Name must be at least 3 characters long');
+    return;
+  }
 
-    if (!/^\S+@\S+\.\S+$/.test(email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
-      return;
-    }
+   // Phone validation - 10 digits
+  const phoneRegex = /^\d{10}$/;
+  if (!phoneRegex.test(phone.trim())) {
+    Alert.alert('Error', 'Phone number must be exactly 10 digits');
+    return;
+  }
+ // Email validation
+  const emailRegex = /^\S+@\S+\.\S+$/;
+  if (!emailRegex.test(email)) {
+    Alert.alert('Error', 'Please enter a valid email address');
+    return;
+  }
 
     if (password.length < 4) {
       Alert.alert('Error', 'Password must be at least 4 characters');
@@ -413,7 +498,10 @@ const handleLogin = async () => {
 
     try {
       const response = await api.post(`${API_BASE_URL}/api/providers/register`, {
-        name, email, phone, password
+          name: name.trim(),
+      email: email.toLowerCase().trim(),
+      phone: phone.trim(),
+      password
       });
       if (response.data.success) {
         setVerificationEmail(email);
@@ -426,7 +514,13 @@ const handleLogin = async () => {
       }
     } catch (error: any) {
       setIsRegisterSubmitted(false);
-      Alert.alert('Error', 'Registration failed');
+      if (error.response?.data?.error) {
+      Alert.alert('Registration Failed', error.response.data.error);
+    } else if (error.message?.includes('Network Error')) {
+      Alert.alert('Network Error', 'Please check your internet connection');
+    } else {
+      Alert.alert('Registration Failed', 'An unexpected error occurred');
+    }
     } finally {
       setIsLoading(false);
     }
@@ -477,6 +571,33 @@ const handleLogin = async () => {
     }
   };
 
+  const handleResendVerificationOTP = async () => {
+  if (!verificationEmail) {
+    Alert.alert('Error', 'No email address found');
+    return;
+  }
+
+  setIsLoading(true);
+
+  try {
+    const response = await api.post(`${API_BASE_URL}/api/providers/resend-otp`, {
+      email: verificationEmail
+    });
+
+    if (response.data.success) {
+      Alert.alert('Success', 'New OTP sent to your email');
+    } else {
+      Alert.alert('Error', response.data.error || 'Failed to resend OTP');
+    }
+  } catch (error: any) {
+    Alert.alert(
+      'Error',
+      error.response?.data?.error || 'Failed to resend OTP'
+    );
+  } finally {
+    setIsLoading(false);
+  }
+};
   // Forgot Password Functions
   const handleSendResetOTP = async () => {
     if (!forgotEmail || !/^\S+@\S+\.\S+$/.test(forgotEmail)) {
@@ -720,13 +841,21 @@ const handleLogin = async () => {
       <FloatingInput
         label="Full Name"
         value={name}
-        onChangeText={setName}
+       onChangeText={(text) => {
+    // Limit to letters and spaces
+    if (/^[a-zA-Z\s]*$/.test(text) || text === '') {
+      setName(text);
+    }
+  }}
+
         autoCapitalize="words"
         autoCorrect={false}
         inputRef={nameRef}
         onSubmitEditing={() => focusNextField(emailRef)}
         returnKeyType="next"
         editable={!isRegisterSubmitted}
+        maxLength={50}
+        placeholder="Enter your full name"
       />
 
       <FloatingInput
@@ -740,12 +869,20 @@ const handleLogin = async () => {
         onSubmitEditing={() => focusNextField(phoneRef)}
         returnKeyType="next"
         editable={!isRegisterSubmitted}
+         placeholder="example@domain.com"
       />
 
       <FloatingInput
         label="Phone Number"
         value={phone}
-        onChangeText={setPhone}
+        onChangeText={(text) => {
+    // Only allow numbers
+    const cleanedText = text.replace(/[^0-9]/g, '');
+    // Limit to 10 digits
+    if (cleanedText.length <= 10) {
+      setPhone(cleanedText);
+    }
+  }}
         keyboardType="phone-pad"
         autoCorrect={false}
         maxLength={10}
@@ -756,32 +893,34 @@ const handleLogin = async () => {
       />
 
       <FloatingInput
-        label="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry={!showPassword}
-        showPasswordToggle={true}
-        onTogglePassword={() => setShowPassword(!showPassword)}
-        autoCorrect={false}
-        inputRef={passwordRef}
-        onSubmitEditing={() => focusNextField(confirmPasswordRef)}
-        returnKeyType="next"
-        editable={!isRegisterSubmitted}
-      />
+  label="Password"
+  value={password}
+  onChangeText={setPassword}
+  secureTextEntry={!showPassword}
+  showPasswordToggle={true}
+  onTogglePassword={() => setShowPassword(!showPassword)}
+  autoCorrect={false}
+  inputRef={passwordRef}
+  onSubmitEditing={() => focusNextField(confirmPasswordRef)}
+  returnKeyType="next"
+  editable={!isRegisterSubmitted}
+  placeholder="Minimum 4 characters"
+/>
 
-      <FloatingInput
-        label="Confirm Password"
-        value={confirmPassword}
-        onChangeText={setConfirmPassword}
-        secureTextEntry={!showConfirmPassword}
-        showPasswordToggle={true}
-        onTogglePassword={() => setShowConfirmPassword(!showConfirmPassword)}
-        autoCorrect={false}
-        inputRef={confirmPasswordRef}
-        onSubmitEditing={handleRegister}
-        returnKeyType="done"
-        editable={!isRegisterSubmitted}
-      />
+     <FloatingInput
+  label="Confirm Password"
+  value={confirmPassword}
+  onChangeText={setConfirmPassword}
+  secureTextEntry={!showConfirmPassword}
+  showPasswordToggle={true}
+  onTogglePassword={() => setShowConfirmPassword(!showConfirmPassword)}
+  autoCorrect={false}
+  inputRef={confirmPasswordRef}
+  onSubmitEditing={handleRegister}
+  returnKeyType="done"
+  editable={!isRegisterSubmitted}
+  placeholder="Re-enter your password"
+/>
 
       {/* Register Button */}
       <TouchableOpacity
@@ -845,15 +984,15 @@ const handleLogin = async () => {
       </View>
 
       {/* Resend OTP */}
-      <TouchableOpacity 
-        style={styles.forgotPasswordContainer} 
-        onPress={resendOTP}
-        disabled={isLoading}
-      >
-        <Text  weight='bold' style={[styles.forgotPassword, isLoading && styles.disabledText]}>
-          Resend OTP
-        </Text>
-      </TouchableOpacity>
+     <TouchableOpacity 
+  style={styles.forgotPasswordContainer} 
+  onPress={handleResendVerificationOTP}
+  disabled={isLoading}
+>
+  <Text weight='bold' style={[styles.forgotPassword, isLoading && styles.disabledText]}>
+    Resend OTP
+  </Text>
+</TouchableOpacity>
 
       {/* Verify Button */}
       <TouchableOpacity

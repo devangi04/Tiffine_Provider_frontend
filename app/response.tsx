@@ -10,7 +10,8 @@ import {
   Dimensions,
   TextInput,
   Animated,
-  Modal
+  Modal,
+  Pressable
 } from 'react-native';
 import { Text } from '@/components/ztext';
 import { useRouter } from 'expo-router';
@@ -20,6 +21,7 @@ import { useNavigation } from 'expo-router';
 import moment from 'moment';
 import { API_URL } from './config/env';
 import { useAppSelector } from './store/hooks';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
 const API_BASE_URL = `${API_URL}/api`;
@@ -164,7 +166,19 @@ const isPastDate = (date: string): boolean => {
   const selectedDay = moment(date).startOf('day');
   return selectedDay.isBefore(today);
 };
-
+// Helper function to check if date is before provider creation date
+const isBeforeProviderCreation = (date: string): boolean => {
+  const providerCreatedAt = "2026-01-28T11:14:57.453+00:00"; // This should come from your provider data
+  const selectedDay = moment(date).startOf('day');
+  const creationDay = moment(providerCreatedAt).startOf('day');
+  return selectedDay.isBefore(creationDay);
+};
+// Helper function to check if a date is in the future (tomorrow or later)
+const isFutureDate = (date: string): boolean => {
+  const today = moment().startOf('day');
+  const selectedDay = moment(date).startOf('day');
+  return selectedDay.isAfter(today);
+};
   // Get available meal types based on preferences
   const getAvailableMealTypes = useCallback(() => {
     if (!mealPrefs) {
@@ -390,10 +404,34 @@ const isPastDate = (date: string): boolean => {
   }, [selectedDate, selectedMealType, providerId]);
 
   // Handle arrow button clicks
-  const handleDateArrowClick = useCallback((direction: 'left' | 'right') => {
-    const days = direction === 'left' ? -1 : 1;
-    handleDateChangeOptimized(days);
-  }, [handleDateChangeOptimized]);
+// Handle arrow button clicks
+// Handle arrow button clicks
+const handleDateArrowClick = useCallback((direction: 'left' | 'right') => {
+  const days = direction === 'left' ? -1 : 1;
+  const newDate = moment(selectedDate).add(days, 'days').format('YYYY-MM-DD');
+  
+  // Prevent navigation to future dates
+  if (isFutureDate(newDate)) {
+    Alert.alert(
+      'Future Date',
+      'Cannot view responses for future dates.',
+      [{ text: 'OK' }]
+    );
+    return;
+  }
+  
+  // Prevent navigation to dates before provider creation
+  if (isBeforeProviderCreation(newDate)) {
+    Alert.alert(
+      'Unavailable Date',
+      'Cannot view responses before your provider account was created.',
+      [{ text: 'OK' }]
+    );
+    return;
+  }
+  
+  handleDateChangeOptimized(days);
+}, [handleDateChangeOptimized, selectedDate, provider]);
 
  const updateResponse = async (customerId: string, newStatus: 'yes' | 'no') => {
   try {
@@ -609,13 +647,49 @@ const isPastDate = (date: string): boolean => {
     setCurrentMonth(newMonth);
   }, [currentMonth]);
 
-  const handleDaySelect = useCallback((day: number) => {
-    const selected = currentMonth.clone().date(day).format('YYYY-MM-DD');
-    setSelectedDate(selected);
+// In the calendar day selection handler
+// In the calendar day selection handler
+const handleDaySelect = useCallback((day: number) => {
+  const selected = currentMonth.clone().date(day).format('YYYY-MM-DD');
+  
+  // Prevent selection of future dates
+  if (isFutureDate(selected)) {
+    Alert.alert(
+      'Future Date',
+      'Cannot view responses for future dates.',
+      [{ text: 'OK' }]
+    );
+    return;
+  }
+  
+  // Prevent selection of dates before provider creation
+  if (isBeforeProviderCreation(selected)) {
+    Alert.alert(
+      'Unavailable Date',
+      'Cannot view responses before your provider account was created.',
+      [{ text: 'OK' }]
+    );
+    return;
+  }
+  
+  setSelectedDate(selected);
+  setCalendarVisible(false);
+  setShowMonthSelector(false);
+  setShowYearSelector(false);
+}, [currentMonth, provider]);
+
+// Also update the Today button in calendar
+<TouchableOpacity
+  style={styles.todayButton}
+  onPress={() => {
+    const todayDate = moment().format('YYYY-MM-DD');
+    setSelectedDate(todayDate);
+    setCurrentMonth(moment());
     setCalendarVisible(false);
-    setShowMonthSelector(false);
-    setShowYearSelector(false);
-  }, [currentMonth]);
+  }}
+>
+  <Text weight='extraBold' style={styles.todayButtonText}>Today</Text>
+</TouchableOpacity>
 
   const handleMonthSelect = useCallback((monthIndex: number) => {
     const newMonth = currentMonth.clone().month(monthIndex);
@@ -1256,32 +1330,36 @@ const renderResponseItem = useCallback(({ item }: { item: Response }) => {
                 const isToday = item.date === today;
                 const isCurrentMonth = moment(item.date).month() === currentMonth.month();
                 
-                return (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={[
-                      styles.calendarDay,
-                      isToday && styles.calendarDayToday,
-                      isSelected && styles.calendarDaySelected,
-                      !isCurrentMonth && styles.calendarDayOtherMonth
-                    ]}
-                    onPress={() => handleDaySelect(item.day)}
-                  >
-                    <Text weight='bold' style={[
-                      styles.calendarDayText,
-                      !isCurrentMonth && styles.calendarDayTextOtherMonth,
-                      isToday && styles.calendarDayTextToday,
-                      isSelected && styles.calendarDayTextSelected
-                    ]}>
-                      {item.day}
-                    </Text>
-                    
-                    {/* Dot indicator for responses */}
-                    {item.date === selectedDate && (
-                      <View style={styles.selectedIndicator} />
-                    )}
-                  </TouchableOpacity>
-                );
+               return (
+  <TouchableOpacity
+    key={item.id}
+    style={[
+      styles.calendarDay,
+      isToday && styles.calendarDayToday,
+      isSelected && styles.calendarDaySelected,
+      !isCurrentMonth && styles.calendarDayOtherMonth,
+      isBeforeProviderCreation(item.date) && styles.calendarDayDisabled
+    ]}
+    onPress={() => handleDaySelect(item.day)}
+    disabled={isBeforeProviderCreation(item.date) || isFutureDate(item.date)}
+  >
+    <Text weight='bold' style={[
+      styles.calendarDayText,
+      !isCurrentMonth && styles.calendarDayTextOtherMonth,
+      isToday && styles.calendarDayTextToday,
+      isSelected && styles.calendarDayTextSelected,
+      (isBeforeProviderCreation(item.date) || isFutureDate(item.date)) && 
+        styles.calendarDayTextDisabled
+    ]}>
+      {item.day}
+    </Text>
+    
+    {/* Dot indicator for responses */}
+    {item.date === selectedDate && (
+      <View style={styles.selectedIndicator} />
+    )}
+  </TouchableOpacity>
+);
               })}
             </View>
             
@@ -1425,12 +1503,21 @@ const renderResponseItem = useCallback(({ item }: { item: Response }) => {
     <View style={[styles.container]}>
       {/* Date Selector */}
    {/* Date Selector */}
+
+{/* Date Selector */}
 <View style={styles.dateSelector}>
   <TouchableOpacity 
-    style={styles.dateNavButton}
+    style={[styles.dateNavButton, 
+      (isBeforeProviderCreation(selectedDate) || isFutureDate(selectedDate)) && styles.disabledButton
+    ]}
     onPress={() => handleDateArrowClick('left')}
+    disabled={isBeforeProviderCreation(selectedDate) || isFutureDate(selectedDate)}
   >
-    <ChevronLeft size={20} color="#15803d" />
+    <ChevronLeft size={20} color={
+      (isBeforeProviderCreation(selectedDate) || isFutureDate(selectedDate)) 
+        ? "#CBD5E1" 
+        : "#15803d"
+    } />
   </TouchableOpacity>
   
   <TouchableOpacity 
@@ -1442,19 +1529,34 @@ const renderResponseItem = useCallback(({ item }: { item: Response }) => {
       {moment(selectedDate).format('MMM D, YYYY')}
     </Text>
     
-    {/* Add indicator for past dates */}
-    {isPastDate(selectedDate) && (
+    {/* Show indicator for dates before provider creation */}
+    {isBeforeProviderCreation(selectedDate) && (
+      <View style={styles.beforeCreationIndicator}>
+        <Text weight='bold' style={styles.beforeCreationText}>Before Account Creation</Text>
+      </View>
+    )}
+    
+    {/* Show indicator for past dates */}
+    {isPastDate(selectedDate) && !isBeforeProviderCreation(selectedDate) && (
       <View style={styles.pastDateIndicator}>
         <Text weight='bold' style={styles.pastDateText}>Past Date</Text>
+      </View>
+    )}
+    
+    {/* Show indicator for future dates */}
+    {isFutureDate(selectedDate) && (
+      <View style={styles.futureDateIndicator}>
+        <Text weight='bold' style={styles.futureDateText}>Future Date (Not Available)</Text>
       </View>
     )}
   </TouchableOpacity>
   
   <TouchableOpacity 
-    style={styles.dateNavButton}
+    style={[styles.dateNavButton, isFutureDate(selectedDate) && styles.disabledButton]}
     onPress={() => handleDateArrowClick('right')}
+    disabled={isFutureDate(selectedDate)}
   >
-    <ChevronRight size={20} color="#15803d" />
+    <ChevronRight size={20} color={isFutureDate(selectedDate) ? "#CBD5E1" : "#15803d"} />
   </TouchableOpacity>
 </View>
 
@@ -1477,16 +1579,27 @@ const renderResponseItem = useCallback(({ item }: { item: Response }) => {
           />
         </View>
         
-        <View style={styles.filterContainer}>
-          <TouchableOpacity 
-            style={styles.filterButton}
-            onPress={() => setShowFilterMenu(!showFilterMenu)}
-          >
-            <Filter size={18} color="#64748B" />
-          </TouchableOpacity>
-          
-          {renderFilterMenu()}
-        </View>
+       <View style={styles.filterContainer}>
+  <TouchableOpacity
+    style={styles.filterButton}
+    onPress={() => setShowFilterMenu((prev) => !prev)}
+  >
+    <Filter size={18} color="#64748B" />
+  </TouchableOpacity>
+
+  {showFilterMenu && (
+    <>
+      {/* 🔹 Tap outside to close */}
+      <Pressable
+        style={styles.backdrop}
+        onPress={() => setShowFilterMenu(false)}
+      />
+
+      {renderFilterMenu()}
+    </>
+  )}
+</View>
+
       </View>
 
       {/* Small Filter Badge */}
@@ -1860,6 +1973,15 @@ const styles = StyleSheet.create({
     marginLeft: 2,
     padding: 2,
   },
+  backdrop: {
+  position: 'absolute',
+  top: -1000,   // cover entire screen even if inside header
+  left: -1000,
+  right: -1000,
+  bottom: -1000,
+  zIndex: 999,
+},
+
   countInfoBar: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -2134,7 +2256,7 @@ const styles = StyleSheet.create({
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 48,
+    paddingVertical: 18,
   },
   emptyIcon: {
     width: 80,
@@ -2242,6 +2364,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
+  calendarDayDisabled: {
+  opacity: 0.3,
+},
+calendarDayTextDisabled: {
+  color: '#CBD5E1',
+},
+beforeCreationIndicator: {
+  backgroundColor: '#FEF2F2',
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  borderRadius: 6,
+  marginLeft: 8,
+  borderWidth: 1,
+  borderColor: '#FECACA',
+},
+beforeCreationText: {
+  fontSize: 10,
+  color: '#DC2626',
+},
   calendarContainer: {
     backgroundColor: '#fff',
     borderRadius: 20,
@@ -2559,6 +2700,24 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#DC2626',
   },
+  // Add these to your styles
+disabledButton: {
+  backgroundColor: '#F8FAFC',
+  borderColor: '#E2E8F0',
+},
+futureDateIndicator: {
+  backgroundColor: '#EFF6FF',
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  borderRadius: 6,
+  marginLeft: 8,
+  borderWidth: 1,
+  borderColor: '#BFDBFE',
+},
+futureDateText: {
+  fontSize: 10,
+  color: '#1D4ED8',
+},
 });
 
 export default ResponseScreen;

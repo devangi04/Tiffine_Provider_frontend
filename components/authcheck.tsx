@@ -15,6 +15,7 @@ export default function AuthChecker({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const dispatch = useDispatch<AppDispatch>();
   const redirectedRef = useRef(false);
+const trialPopupShownRef = useRef(false);
 
   // =========================
   // 🔐 AUTH STATE
@@ -34,6 +35,8 @@ export default function AuthChecker({ children }: { children: React.ReactNode })
   const subscription = provider.subscription;
   const trialStatus = provider.trialStatus;
 
+
+  
   // =========================
   // 🍽 MEAL PREFERENCES
   // =========================
@@ -68,41 +71,50 @@ export default function AuthChecker({ children }: { children: React.ReactNode })
   // =========================
   // 🎁 TRIAL POPUP (ONCE)
   // =========================
-  useEffect(() => {
-    const showTrialPopup = async () => {
-      if (!provider?.id || !trialStatus) return;
 
-      if (
-        trialStatus.isActive &&
-        trialStatus.hasTrial &&
-        subscription?.status !== 'active'
-      ) {
-        const key = `trial_welcome_shown_${provider.id}`;
-        const shown = await AsyncStorage.getItem(key);
+// =========================
+// 🎁 TRIAL POPUP (ONLY ONCE EVER)
+// =========================
+useEffect(() => {
+  const showTrialPopup = async () => {
+    if (!provider?.id || !trialStatus) return;
 
-        if (!shown) {
-          Alert.alert(
-            '🎁 Welcome to Your Free Trial',
-            `You have ${trialStatus.daysLeft} days of free access.`,
-            [
-              {
-                text: 'View Plans',
-                onPress: () => router.replace('/subscription'),
-              },
-              { text: 'Continue', style: 'cancel' },
-            ]
-          );
-          await AsyncStorage.setItem(key, 'true');
-        }
-      }
-    };
+    if (
+      trialStatus.isActive &&
+      trialStatus.hasTrial &&
+      subscription?.status !== 'active'
+    ) {
+      const key = `trial_popup_shown_${provider.id}`;
 
-    showTrialPopup();
-  }, [trialStatus, subscription?.status, provider?.id, router]);
+      const alreadyShown = await AsyncStorage.getItem(key);
+      if (alreadyShown === 'true') return; // ❌ never show again
+
+      Alert.alert(
+        '🎁 Welcome to Your Free Trial',
+        `You have ${trialStatus.daysLeft} days of free access.`,
+        [
+          {
+            text: 'View Plans',
+            onPress: () => router.replace('/subscription'),
+          },
+          { text: 'Continue', style: 'cancel' },
+        ]
+      );
+
+      await AsyncStorage.setItem(key, 'true'); // ✅ permanently saved
+    }
+  };
+
+  showTrialPopup();
+}, [provider?.id, trialStatus, subscription?.status]);
+
 
   // =========================
   // 🍽 FETCH MEAL PREFS
   // =========================
+  // true if meal preferences have been loaded from server
+const mealFetched = !mealLoading && (mealPreferences !== null || provider.hasMealPreferences);
+
   useEffect(() => {
     if (
       isAuthenticated &&
@@ -159,9 +171,10 @@ export default function AuthChecker({ children }: { children: React.ReactNode })
     // =========================
     
     // ✅ Use ONLY provider.hasMealPreferences (single source of truth)
-    const hasMealPreferences = provider.hasMealPreferences || justSaved;
-    
-
+const hasMealPreferences =
+  provider.hasMealPreferences ||  // Redux flag
+  mealPreferences?.hasMealPreferences ||  // fetched from backend
+  justSaved;
     // Routes that require meal preferences
     const protectedRoutes = [
       '/dashboard',
@@ -178,16 +191,20 @@ export default function AuthChecker({ children }: { children: React.ReactNode })
     const isMealSetupScreen = pathname === '/providerseetingscreen';
 
     // 🚨 Redirect to meal setup if needed
-    if (
-      !hasMealPreferences &&
-      isProtectedRoute &&
-      !isMealSetupScreen &&
-      !redirectedRef.current
-    ) {
-      redirectedRef.current = true;
-      router.replace('/providerseetingscreen');
-      return;
-    }
+   if (
+  !hasMealPreferences &&
+  isProtectedRoute &&
+  !isMealSetupScreen &&
+  mealFetched &&
+  !redirectedRef.current
+) {
+  // Wait 100ms to allow slice updates to propagate
+  setTimeout(() => {
+    redirectedRef.current = true;
+    router.replace('/providerseetingscreen');
+  }, 100);
+  return;
+}
 
     // =========================
     // 💳 SUBSCRIPTION CHECK

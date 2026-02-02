@@ -10,6 +10,8 @@ import { View, StyleSheet, Text,ActivityIndicator } from 'react-native';
 import 'react-native-reanimated';
 import { useFonts } from "expo-font";
 import * as SplashScreen from 'expo-splash-screen';
+import { useSelector } from 'react-redux';
+import type { RootState } from './store';
 
 import {
   NunitoSans_200ExtraLight,
@@ -69,6 +71,9 @@ function LayoutContent() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
 
+const hasMealPreferences = useSelector(
+  (state: RootState) => state.provider.hasMealPreferences
+);
   // ✅ Route config with header + navbar visibility
   const routeConfig: Record<
     string,
@@ -123,19 +128,28 @@ function LayoutContent() {
         headerType: 'none' as const 
       };
 
-  const renderHeader = () => {
-    if (!headerData.showHeader) return null;
+const renderHeader = () => {
+  if (!headerData.showHeader) return null;
 
-    switch (headerData.headerType) {
-      case 'dashboard':
-        return <DashboardHeader />;
-      case 'default':
-        return <Header title={headerData.title} subtitle={headerData.subtitle} />;
-      case 'none':
-      default:
-        return null;
-    }
-  };
+  switch (headerData.headerType) {
+    case 'dashboard':
+      return <DashboardHeader />;
+
+    case 'default':
+      return (
+        <Header
+          title={headerData.title}
+          subtitle={headerData.subtitle}
+          showBackButton={hasMealPreferences}
+          showUserButton={hasMealPreferences}
+        />
+      );
+
+    case 'none':
+    default:
+      return null;
+  }
+};
 
   return (
     <View style={styles.container}>

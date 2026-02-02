@@ -1,4 +1,4 @@
-// ProfileScreen.tsx - Updated with double-tap prevention
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   View, 
@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
-  SafeAreaView
 } from 'react-native';
 import { useRouter, useNavigation } from 'expo-router';
 import api from './api/api';
@@ -20,6 +19,7 @@ import { persistor } from './store/index';
 import { API_URL } from './config/env';
 import { logoutProvider } from './store/slices/providerslice';
 import { resetAppState } from './store/slices/appslice'; // Add this import
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const API_BASE_URL = API_URL;
 
@@ -300,7 +300,7 @@ const handleLogout = () => {
   const isDisabled = isLoggingOut || isNavigating;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView  edges={['left', 'right', 'bottom']} style={styles.safeArea}>
       <View style={styles.container}>
         <ScrollView 
           contentContainerStyle={styles.scrollContent}

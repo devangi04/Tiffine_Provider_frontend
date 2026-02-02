@@ -10,6 +10,7 @@ import api from './api/api';
 import { useAppSelector } from './store/hooks';
 import { Text } from '@/components/ztext';
 import { API_URL } from './config/env';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const DISH_API_URL = `${API_URL}/api/dish`;
 const CATEGORY_API_URL = `${API_URL}/api/category`;
@@ -400,7 +401,7 @@ const DishItem: React.FC<{ dish: Dish; categoryId: string; isLast: boolean;}> = 
   }
 
   return (
-  <View style={styles.container}>
+  <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
   <KeyboardAwareScrollView
    ref={scrollRef} 
     style={styles.mainContent} 
@@ -481,7 +482,7 @@ const DishItem: React.FC<{ dish: Dish; categoryId: string; isLast: boolean;}> = 
       </View>
     )}
   </KeyboardAwareScrollView>
-</View>
+</SafeAreaView>
   );
 };
 

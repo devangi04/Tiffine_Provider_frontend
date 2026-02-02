@@ -289,9 +289,9 @@ const AddCustomerScreen: React.FC<Props> = ({ navigation, route }) => {
       setState(result.state || '');
       
       // Auto-fill area with city if area is empty
-      if (!area.trim() && result.city) {
-        setArea(result.city);
-      }
+      // if (!area.trim() && result.city) {
+      //   setArea(result.city);
+      // }
       
     } catch (error: any) {
       Alert.alert(
@@ -400,103 +400,166 @@ const AddCustomerScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   }, [nav, currentCustomer]);
 
-  useEffect(() => {
-    return () => {
-      if (!loading && !submitting) {
-        dispatch(setCurrentCustomer(null));
-        hasInitializedFromRedux.current = false;
-      }
-    };
-  }, [loading, submitting, dispatch]);
+  // useEffect(() => {
+  //   return () => {
+  //     if (!loading && !submitting) {
+  //       dispatch(setCurrentCustomer(null));
+  //       hasInitializedFromRedux.current = false;
+  //     }
+  //   };
+  // }, [loading, submitting, dispatch]);
 
-  const handleSubmit = async () => {
-    if (submitting) return;
+const extractDuplicateFieldError = (errorMessage: string): string => {
+  const lowerCaseMessage = errorMessage.toLowerCase();
+  
+  if (lowerCaseMessage.includes('phone') && 
+      (lowerCaseMessage.includes('exists') || 
+       lowerCaseMessage.includes('duplicate') ||
+       lowerCaseMessage.includes('already') ||
+       lowerCaseMessage.includes('taken'))) {
+    return 'This phone number is already registered. Please use a different phone number.';
+  }
+  
+  if (lowerCaseMessage.includes('email') && 
+      (lowerCaseMessage.includes('exists') || 
+       lowerCaseMessage.includes('duplicate') ||
+       lowerCaseMessage.includes('already') ||
+       lowerCaseMessage.includes('taken'))) {
+    return 'This email address is already registered. Please use a different email.';
+  }
+  
+  if (lowerCaseMessage.includes('unique') && lowerCaseMessage.includes('phone')) {
+    return 'Phone number must be unique. This phone number is already in use.';
+  }
+  
+  if (lowerCaseMessage.includes('unique') && lowerCaseMessage.includes('email')) {
+    return 'Email must be unique. This email address is already in use.';
+  }
+  
+  if (lowerCaseMessage.includes('validation failed') && lowerCaseMessage.includes('phone')) {
+    return 'Phone number validation failed. The phone number might already be registered.';
+  }
+  
+  return errorMessage || `Failed to ${isEditing ? 'update' : 'add'} customer. Please try again.`;
+};
+const handleSubmit = async () => {
+  if (submitting) return;
 
-    // Mark all fields as touched
-    setTouchedFields({
-      name: true,
-      phone: true,
-      email: true,
-      address: true,
-      pincode: true,
-      city: true,
-      state: true,
-      area: true,
-    });
+  // Mark all fields as touched
+  setTouchedFields({
+    name: true,
+    phone: true,
+    email: true,
+    address: true,
+    pincode: true,
+    city: true,
+    state: true,
+    area: true,
+  });
 
-    // Validate all fields
-    if (!validateAllFields()) {
-      Alert.alert('Validation Error', 'Please correct the errors in the form');
-      return;
-    }
+  // Validate all fields
+  if (!validateAllFields()) {
+    Alert.alert('Validation Error', 'Please correct the errors in the form');
+    return;
+  }
 
-    if (!providerId) {
-      Alert.alert('Error', 'Provider information is missing. Please try again.');
-      return;
-    }
+  if (!providerId) {
+    Alert.alert('Error', 'Provider information is missing. Please try again.');
+    return;
+  }
 
-    setSubmitting(true);
+  setSubmitting(true);
 
-    const normalizedEmail = email.toLowerCase().trim();
-    const customerData = {
-      name: name.trim(),
-      phone: phone.trim(),
-      email: normalizedEmail,
-      address: address.trim(),
-      pincode: pincode.trim(),
-      city: city.trim(),
-      state: state.trim(),
-      area: area.trim(),
-      preference,
-      isActive,
-      providerId,
-    };
-
-    try {
-      if (isEditing && currentCustomer?._id) {
-        await dispatch(updateCustomer({ id: currentCustomer._id, customerData })).unwrap();
-        dispatch(setCurrentCustomer(null));
-        Alert.alert(
-          'Success',
-          'Customer updated successfully!',
-          [{ text: 'OK', onPress: () => { setSubmitting(false); nav.goBack(); }}]
-        );
-      } else {
-        await dispatch(createCustomer(customerData)).unwrap();
-        Alert.alert(
-          'Success',
-          'Customer added successfully!',
-          [
-            {
-              text: 'Add Another',
-              onPress: () => {
-                resetForm();
-                setSubmitting(false);
-                hasInitializedFromRedux.current = false;
-              }
-            },
-            {
-              text: 'Done',
-              onPress: () => {
-                setSubmitting(false);
-                nav.goBack();
-              }
-            }
-          ]
-        );
-      }
-    } catch (error: any) {
-      setSubmitting(false);
-      if (error.response?.data?.error) {
-        Alert.alert('Error', error.response.data.error);
-      } else if (error.message && error.message.includes('Phone number already exists')) {
-        Alert.alert('Error', 'This phone number is already registered for a customer');
-      } else {
-        Alert.alert('Error', `Failed to ${isEditing ? 'update' : 'add'} customer. Please try again.`);
-      }
-    }
+  const normalizedEmail = email.toLowerCase().trim();
+  const customerData = {
+    name: name.trim(),
+    phone: phone.trim(),
+    email: normalizedEmail,
+    address: address.trim(),
+    pincode: pincode.trim(),
+    city: city.trim(),
+    state: state.trim(),
+    area: area.trim(),
+    preference,
+    isActive,
+    providerId,
   };
 
+  try {
+    if (isEditing && currentCustomer?._id) {
+      await dispatch(updateCustomer({ id: currentCustomer._id, customerData })).unwrap();
+      dispatch(setCurrentCustomer(null));
+      Alert.alert(
+        'Success',
+        'Customer updated successfully!',
+        [{ text: 'OK', onPress: () => { setSubmitting(false); nav.goBack(); }}]
+      );
+    } else {
+      await dispatch(createCustomer(customerData)).unwrap();
+      Alert.alert(
+        'Success',
+        'Customer added successfully!',
+        [
+          {
+            text: 'Add Another',
+            onPress: () => {
+              resetForm();
+              setSubmitting(false);
+              hasInitializedFromRedux.current = false;
+            }
+          },
+          {
+            text: 'Done',
+            onPress: () => {
+              setSubmitting(false);
+              nav.goBack();
+            }
+          }
+        ]
+      );
+    }
+  } catch (error: any) {
+    setSubmitting(false);
+    
+    // The error is now the string message from rejectWithValue
+    const errorMessage = error.message || error.toString() || '';
+    
+    console.log('Error caught in handleSubmit:', errorMessage);
+    
+    let userFriendlyMessage = `Failed to ${isEditing ? 'update' : 'add'} customer. Please try again.`;
+    
+    if (errorMessage) {
+      const lowerError = errorMessage.toLowerCase();
+      console.log('Lowercase error for matching:', lowerError);
+      
+      if (lowerError.includes('email already exists')) {
+        userFriendlyMessage = 'This email address is already registered. Please use a different email.';
+        setFieldErrors(prev => ({ ...prev, email: true }));
+        setTouchedFields(prev => ({ ...prev, email: true }));
+        
+      } else if (lowerError.includes('phone number already exists') || 
+                 lowerError.includes('phone already exists')) {
+        userFriendlyMessage = 'This phone number is already registered. Please use a different phone number.';
+        setFieldErrors(prev => ({ ...prev, phone: true }));
+        setTouchedFields(prev => ({ ...prev, phone: true }));
+        
+      } else if (lowerError.includes('duplicate key')) {
+        if (lowerError.includes('email')) {
+          userFriendlyMessage = 'This email address is already registered.';
+          setFieldErrors(prev => ({ ...prev, email: true }));
+        } else if (lowerError.includes('phone')) {
+          userFriendlyMessage = 'This phone number is already registered.';
+          setFieldErrors(prev => ({ ...prev, phone: true }));
+        }
+      } else {
+        // Use the backend error message directly
+        userFriendlyMessage = errorMessage;
+      }
+    }
+    
+    Alert.alert('Error', userFriendlyMessage);
+  }
+};
   const resetForm = () => {
     setName('');
     setPhone('');
@@ -540,11 +603,11 @@ const AddCustomerScreen: React.FC<Props> = ({ navigation, route }) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
+      <StatusBar barStyle="light-content" backgroundColor="transparent" />
       
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <ScrollView
@@ -794,7 +857,16 @@ const AddCustomerScreen: React.FC<Props> = ({ navigation, route }) => {
         </ScrollView>
 
         {/* Fixed Submit Button */}
-        <View style={[styles.fixedBottomContainer, { paddingBottom: insets.bottom}]}>
+      <View
+  style={[
+    styles.fixedBottomContainer,
+    {
+      paddingBottom:
+        insets.bottom + (Platform.OS === 'android' ? 16 : 0),
+    },
+  ]}
+>
+
           <TouchableOpacity
             style={[styles.submitButton, (loading || submitting) && styles.submitButtonDisabled]}
             onPress={handleSubmit}
@@ -936,7 +1008,7 @@ const styles = StyleSheet.create({
   },
   multilineInput: {
     minHeight: 100,
-    paddingVertical: 14,
+    paddingVertical:40 ,
     textAlignVertical: 'top',
     ...Platform.select({
       android: {
@@ -944,6 +1016,7 @@ const styles = StyleSheet.create({
       },
     }),
   },
+
   inputDisabled: {
     color: '#9CA3AF',
   },
@@ -1075,8 +1148,9 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   fixedBottomContainer: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 30,
     paddingTop: 16,
+    paddingBottom: 20,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',

@@ -3,7 +3,6 @@
     "name": "Tiffine Provider",
     "slug": "tiffinprovider",
     "version": "1.0.0",
-
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "automatic",
@@ -12,10 +11,9 @@
     "android": {
       "package": "com.triospheretech.tiffineprovider",
       "versionCode": 1,
-
       "statusBar": {
     "translucent": true,
-    "backgroundColor": "#00000000",
+    "backgroundColor": "transparent",
     "barStyle": "light-content"
   },
       "enableProguardInReleaseBuilds":true,
@@ -52,7 +50,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/notification.png",
+          "icon": "./assets/images/splash2.png",
           "color": "#ffffff",
           "androidMode": "default",
           "androidCollapsedTitle": "New Notification"

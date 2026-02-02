@@ -10,7 +10,8 @@ import {
   Modal, 
   Platform,
   Dimensions,
-  SafeAreaView
+  KeyboardAvoidingView,
+  Image
 } from 'react-native';
 import api from './api/api';
 import { Text } from '@/components/ztext';
@@ -22,6 +23,7 @@ import { API_URL } from './config/env';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/app/store';
 import axios from 'axios';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface Plan {
   _id: string;
@@ -52,7 +54,8 @@ interface TrialStatus {
 
 type PaymentStatus = 'idle' | 'processing' | 'success' | 'failed';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
+const isTablet = width >= 768;
 
 const SubscriptionPlans = () => {
   const router = useRouter();
@@ -66,15 +69,15 @@ const SubscriptionPlans = () => {
   const [paymentLink, setPaymentLink] = useState<string | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('idle');
   const [activeTab, setActiveTab] = useState<'monthly' | 'yearly'>('monthly');
-  
- 
   const [showTrialWelcome, setShowTrialWelcome] = useState(false);
-const provider = useSelector((state: RootState) => state.provider);
+  const [isPaymentScreen, setIsPaymentScreen] = useState(false);
+  
+  const provider = useSelector((state: RootState) => state.provider);
+  const providerId = provider.id;
+  const providerEmail = provider.email;
+  const trialStatus = provider.trialStatus;
+  const hasActiveSubscription = provider.subscription?.status === 'active';
 
-const providerId = provider.id;
-const providerEmail = provider.email;
-const trialStatus = provider.trialStatus;
-const hasActiveSubscription = provider.subscription?.status === 'active';
   useEffect(() => {
     if (!providerId) {
       Alert.alert('Error', 'Provider information missing. Please login again.');
@@ -82,37 +85,42 @@ const hasActiveSubscription = provider.subscription?.status === 'active';
     }
   }, [providerId]);
 
-  // Fetch trial status and plans
-useEffect(() => {
-  const fetchPlans = async () => {
-    try {
-      setLoading(true);
-
-      const plansRes = await axios.get(`${API_URL}/api/plans`);
-
-      if (plansRes.data.success) {
-        console.log('ALL PLANS FROM API 👉', plans);
-        setPlans(plansRes.data.data || []);
-        setError(null);
-      } else {
-        throw new Error(plansRes.data.error || 'Failed to fetch plans');
+  // Check if user came for payment
+  useEffect(() => {
+    if (params.payment === 'true' || params.planId) {
+      setIsPaymentScreen(true);
+      if (params.planId) {
+        handleSubscribe(params.planId as string);
       }
-
-    }  catch (err: any) {
-  if (err?.response?.status === 404) {
-    setPlans([]); // no plans available
-    return;
-  }
-
-  setError(err?.response?.data?.error || err?.message || 'Something went wrong');
-} finally {
-      setLoading(false);
     }
-  };
+  }, [params]);
 
-  fetchPlans();
-}, []);
+  // Fetch plans
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        setLoading(true);
+        const plansRes = await axios.get(`${API_URL}/api/plans`);
 
+        if (plansRes.data.success) {
+          setPlans(plansRes.data.data || []);
+          setError(null);
+        } else {
+          throw new Error(plansRes.data.error || 'Failed to fetch plans');
+        }
+      } catch (err: any) {
+        if (err?.response?.status === 404) {
+          setPlans([]);
+          return;
+        }
+        setError(err?.response?.data?.error || err?.message || 'Something went wrong');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPlans();
+  }, []);
 
   const handleSubscribe = async (planId: string) => {
     if (!providerId) {
@@ -123,6 +131,7 @@ useEffect(() => {
     try {
       setSelectedPlanId(planId);
       setPaymentStatus('processing');
+      setIsPaymentScreen(true);
 
       const res = await axios.post(`${API_URL}/api/subscription/create`, {
         providerId,
@@ -137,26 +146,107 @@ useEffect(() => {
       const selectedPlan = plans.find((p) => p._id === planId);
       if (!selectedPlan) throw new Error('Plan not found');
 
-      // Mobile flow - use WebView
-      if (Platform.OS !== 'web') {
-        const razorpayHtml = `
+      // Create payment HTML
+      const razorpayHtml = `
 <!DOCTYPE html>
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Complete Your Payment</title>
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding-top: 20px; /* Added for extra safety on Android */
+    }
+    .title {
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 20px;
+      padding-top: 20px; /* Added padding-top for Android devices */
+    }
+    .container {
+      max-width: 500px;
+      width: 100%;
+      padding: 20px;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+      padding-top: 20px; /* Alternative: Add padding to header instead */
+    }
+    .logo {
+      font-size: 24px;
+      font-weight: bold;
+      color: #15803d;
+      margin-bottom: 10px;
+      padding-top: 10px; /* You can also add padding to logo specifically */
+    }
+    .subtitle {
+      color: #64748b;
+      font-size: 14px;
+    }
+    .payment-info {
+      background: white;
+      border-radius: 16px;
+      padding: 25px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    .plan-name {
+      font-size: 20px;
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 5px;
+    }
+    .plan-price {
+      font-size: 32px;
+      font-weight: bold;
+      color: #15803d;
+      margin-bottom: 15px;
+    }
+    .features {
+      margin-top: 20px;
+    }
+    .feature {
+      display: flex;
+      align-items: center;
+      margin-bottom: 12px;
+      color: #475569;
+    }
+    .feature-icon {
+      margin-right: 10px;
+      color: #15803d;
+    }
+  </style>
 </head>
 <body>
+  <div class="container">
+    <div class="header">
+    <div id="razorpay-container"></div>
+  </div>
+
   <script>
     var options = {
       key: "${key}",
       subscription_id: "${subscriptionId}",
       name: "Tiffin Service",
       description: "${selectedPlan.name}",
+      image: "https://Lichi/logo.png",
       prefill: {
         email: "${providerEmail}",
+        contact: ""
       },
-      theme: { color: "#15803d" },
+      theme: { 
+        color: "#15803d",
+        backdrop_color: "#f8fafc"
+      },
       handler: function(response) {
         window.ReactNativeWebView.postMessage(JSON.stringify({
           type: 'payment_success',
@@ -169,6 +259,9 @@ useEffect(() => {
             type: 'modal_closed'
           }));
         }
+      },
+      notes: {
+        service: "Tiffin Service Subscription"
       }
     };
     
@@ -181,14 +274,17 @@ useEffect(() => {
       }));
     });
     
-    rzp.open();
+    // Auto-open payment modal
+    setTimeout(function() {
+      rzp.open();
+    }, 500);
   </script>
 </body>
 </html>`;
-        setPaymentLink(razorpayHtml);
-      }
+      setPaymentLink(razorpayHtml);
     } catch (err) {
       setPaymentStatus('failed');
+      setIsPaymentScreen(false);
       Alert.alert(
         'Payment Failed', 
         err instanceof Error ? err.message : 'Unknown error occurred. Please try again.'
@@ -210,13 +306,14 @@ useEffect(() => {
       if (res.data.success) {
         setPaymentStatus('success');
         setPaymentLink(null);
+        setIsPaymentScreen(false);
         
         Alert.alert(
           'Success! 🎉', 
           'Payment completed successfully! Your subscription is now active.',
           [
             {
-              text: 'Go to Dashboard',
+              text: 'continue',
               onPress: () => {
                 router.replace({
                   pathname: '/dashboard',
@@ -232,6 +329,7 @@ useEffect(() => {
     } catch (error) {
       setPaymentStatus('failed');
       setPaymentLink(null);
+      setIsPaymentScreen(false);
       Alert.alert(
         'Verification Failed',
         'Payment was successful but verification failed. Please check your subscription status in dashboard.'
@@ -251,11 +349,13 @@ useEffect(() => {
         case 'payment_failed':
           setPaymentStatus('failed');
           setPaymentLink(null);
-          Alert.alert('Payment Failed', 'Payment failed. Please try again.');
+          setIsPaymentScreen(false);
+          Alert.alert('Payment Failed', data.error?.description || 'Payment failed. Please try again.');
           break;
           
         case 'modal_closed':
           setPaymentLink(null);
+          setIsPaymentScreen(false);
           setPaymentStatus('idle');
           break;
           
@@ -266,181 +366,78 @@ useEffect(() => {
     }
   };
 
-  const handleWebViewNavigation = (navState: any) => {
-    if (navState.url && !navState.url.includes('razorpay.com')) {
-      return false;
-    }
-    return true;
-  };
-
-  // ========== COMPONENTS ==========
-
-  // Trial Welcome Modal
-  const TrialWelcomeModal = () => (
-    <Modal
-      visible={showTrialWelcome}
-      transparent={true}
-      animationType="slide"
-      onRequestClose={() => setShowTrialWelcome(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <LinearGradient
-            colors={['#15803d', '#16a34a']}
-            style={styles.modalGradient}
-          >
-            <View style={styles.modalIcon}>
-              <Ionicons name="gift" size={80} color="#fff" />
-            </View>
-            <Text style={styles.modalTitle}>🎁 Welcome to Your Free Trial!</Text>
-          </LinearGradient>
-          
-          <View style={styles.modalBody}>
-            <Text style={styles.modalSubtitle}>
-              You have <Text style={styles.trialHighlight}>{trialStatus?.daysLeft || 7} days</Text> of full access
-            </Text>
-            
-            <View style={styles.featuresList}>
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={22} color="#10b981" />
-                <Text style={styles.featureText}>Full access to all features</Text>
-              </View>
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={22} color="#10b981" />
-                <Text style={styles.featureText}>No credit card required</Text>
-              </View>
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={22} color="#10b981" />
-                <Text style={styles.featureText}>Cancel anytime</Text>
-              </View>
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={22} color="#10b981" />
-                <Text style={styles.featureText}>Unlimited customers during trial</Text>
-              </View>
-            </View>
-            
-            <Text style={styles.modalNote}>
-              After {trialStatus?.daysLeft || 7} days, you'll need to choose a subscription plan to continue.
-            </Text>
-          </View>
-          
-          <View style={styles.modalButtons}>
-            <TouchableOpacity
-              style={styles.modalButtonPrimary}
-              onPress={() => {
-                setShowTrialWelcome(false);
-                router.replace('/dashboard');
-              }}
-            >
-              <Text style={styles.modalButtonPrimaryText}>Start Free Trial</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.modalButtonSecondary}
-              onPress={() => setShowTrialWelcome(false)}
-            >
-              <Text style={styles.modalButtonSecondaryText}>View Plans Now</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-
-  // Trial Status Card
-  const TrialStatusCard = () => {
-    if (hasActiveSubscription) {
-      return (
-        <View style={[styles.statusCard, styles.subscriptionActiveCard]}>
-          <View style={styles.statusHeader}>
-            <Ionicons name="checkmark-circle" size={24} color="#10b981" />
-            <Text style={styles.statusTitle}>Subscription Active</Text>
-          </View>
-          <Text style={styles.statusText}>
-            Your subscription is active. Enjoy full access to all features!
-          </Text>
+  // If payment screen is active, show payment UI
+  if (isPaymentScreen && paymentLink) {
+    return (
+      <SafeAreaView  style={styles.safeArea}>
+        <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
+        <View style={styles.paymentHeader}>
           <TouchableOpacity 
-            style={styles.dashboardButton}
-            onPress={() => router.replace('/dashboard')}
+            style={styles.backButton}
+            onPress={() => {
+              setPaymentLink(null);
+              setIsPaymentScreen(false);
+            }}
           >
-            <Text style={styles.dashboardButtonText}>Go to Dashboard →</Text>
+            {/* <Ionicons name="arrow-back" size={24} color="#333" /> */}
+          </TouchableOpacity>
+         
+          <View style={{ width: 40 }} />
+        </View>
+        
+        <View style={styles.webviewWrapper}>
+          <WebView
+            source={{ html: paymentLink }}
+            onMessage={handleWebViewMessage}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            startInLoadingState={true}
+            renderLoading={() => (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#15803d" />
+                <Text style={styles.loadingText}>Loading payment gateway...</Text>
+              </View>
+            )}
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Loading State
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#15803d" />
+          <Text style={styles.loadingText}>Loading plans...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Error State
+  if (error) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.centerContainer}>
+          <Ionicons name="alert-circle-outline" size={60} color="#dc3545" />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity 
+            style={styles.retryButton} 
+            onPress={() => window.location.reload()}
+          >
+            <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
-      );
-    }
+      </SafeAreaView>
+    );
+  }
 
-    if (trialStatus?.isActive) {
-      const daysLeft = trialStatus.daysLeft || 0;
-      const isLastDay = daysLeft <= 1;
-      
-      return (
-        <View style={[
-          styles.statusCard, 
-          isLastDay ? styles.trialWarningCard : styles.trialActiveCard
-        ]}>
-          <View style={styles.statusHeader}>
-            <Ionicons 
-              name={isLastDay ? "alert-circle" : "gift"} 
-              size={24} 
-              color={isLastDay ? "#f59e0b" : "#15803d"} 
-            />
-            <Text style={styles.statusTitle}>
-              {isLastDay ? 'Last Day of Free Trial!' : 'You\'re on Free Trial'}
-            </Text>
-          </View>
-          
-          <View style={styles.trialCountdown}>
-            <View style={styles.countdownBox}>
-              <Text style={styles.countdownNumber}>{daysLeft}</Text>
-              <Text style={styles.countdownLabel}>DAYS</Text>
-            </View>
-            <View style={styles.countdownBox}>
-              <Text style={styles.countdownNumber}>{trialStatus.hoursLeft % 24}</Text>
-              <Text style={styles.countdownLabel}>HOURS</Text>
-            </View>
-          </View>
-          
-          <Text style={styles.statusText}>
-            {isLastDay 
-              ? 'Your trial ends today! Subscribe now to avoid interruption.'
-              : `Full access for ${daysLeft} more day${daysLeft === 1 ? '' : 's'}. After trial ends, choose a plan below.`
-            }
-          </Text>
-          
-          {!isLastDay && (
-            <TouchableOpacity 
-              style={styles.dashboardButton}
-              onPress={() => router.replace('/dashboard')}
-            >
-              <Text style={styles.dashboardButtonText}>Continue to Dashboard →</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      );
-    }
-
-    if (trialStatus?.requiresSubscription) {
-      return (
-        <View style={[styles.statusCard, styles.trialExpiredCard]}>
-          <View style={styles.statusHeader}>
-            <Ionicons name="time-outline" size={24} color="#dc3545" />
-            <Text style={styles.statusTitle}>Trial Period Expired</Text>
-          </View>
-          <Text style={styles.statusText}>
-            Your 7-day free trial has ended. To continue using our services, please choose a subscription plan below.
-          </Text>
-          <View style={styles.expiredNote}>
-            <Ionicons name="information-circle" size={16} color="#6b7280" />
-            <Text style={styles.expiredNoteText}>
-              All your data is safe. Subscribe to regain access.
-            </Text>
-          </View>
-        </View>
-      );
-    }
-
-    return null;
-  };
+  const filteredPlans = plans.filter(plan => {
+    if (!plan.isVisible) return false;
+    return plan.interval === (activeTab === 'monthly' ? 'month' : 'year');
+  });
 
   // Plan Card Component
   const renderPlanCard = (plan: Plan) => {
@@ -455,74 +452,65 @@ useEffect(() => {
       ]}>
         {isPopular && (
           <View style={styles.popularBadge}>
-            <Ionicons name="star" size={14} color="#fff" />
-            <Text style={styles.popularBadgeText}>MOST POPULAR</Text>
+            <Ionicons name="star" size={12} color="#fff" />
+            <Text style={styles.popularBadgeText}>POPULAR</Text>
           </View>
         )}
         
         <View style={styles.planHeader}>
-          <Text style={styles.planName}>{plan.name}</Text>
+          <View>
+            <Text style={styles.planName}>{plan.name}</Text>
+            <View style={styles.priceContainer}>
+              <Text style={styles.planPrice}>₹{plan.price}</Text>
+              <Text style={styles.planInterval}>/{plan.interval === 'month' ? 'month' : 'year'}</Text>
+            </View>
+          </View>
           {isPopular && (
             <View style={styles.recommendedTag}>
+              <Ionicons name="checkmark-circle" size={16} color="#15803d" />
               <Text style={styles.recommendedText}>Recommended</Text>
             </View>
           )}
         </View>
         
-        <View style={styles.priceContainer}>
-          <Text style={styles.planPrice}>₹{plan.price}</Text>
-          <Text style={styles.planInterval}>/{plan.interval === 'month' ? 'month' : 'year'}</Text>
-        </View>
-        
-        {plan.interval === 'year' && (
-          <View style={styles.yearlySavings}>
-            <Ionicons name="pricetag" size={14} color="#10b981" />
-            <Text style={styles.savingsText}>Save ₹{Math.round((plan.price * 12) - (plan.price * 10))} annually</Text>
-          </View>
-        )}
-        
         <View style={styles.featuresContainer}>
           <View style={styles.featureItem}>
-            <Ionicons name="people-outline" size={18} color="#15803d" />
+            <Ionicons name="people" size={16} color="#15803d" />
             <Text style={styles.featureText}>
-              <Text style={styles.featureBold}>Max {plan.features.maxCustomers} customers</Text>
+              <Text style={styles.featureBold}>{plan.features.maxCustomers}</Text> customers
             </Text>
           </View>
           
           {plan.features.analytics && (
             <View style={styles.featureItem}>
-              <Ionicons name="analytics-outline" size={18} color="#15803d" />
-              <Text style={styles.featureText}>Advanced Analytics Dashboard</Text>
+              <Ionicons name="analytics" size={16} color="#15803d" />
+              <Text style={styles.featureText}>Advanced Analytics</Text>
             </View>
           )}
           
           <View style={styles.featureItem}>
-            <Ionicons name="notifications-outline" size={18} color="#15803d" />
+            <Ionicons name="notifications" size={16} color="#15803d" />
             <Text style={styles.featureText}>Push Notifications</Text>
           </View>
           
           <View style={styles.featureItem}>
-            <Ionicons name="cloud-outline" size={18} color="#15803d" />
+            <Ionicons name="cloud" size={16} color="#15803d" />
             <Text style={styles.featureText}>Cloud Backup</Text>
           </View>
           
           {plan.features.supportPriority && (
             <View style={styles.featureItem}>
               <Ionicons 
-                name={plan.features.supportPriority === 'priority' ? 'star' : 'help-buoy-outline'} 
-                size={18} 
+                name={plan.features.supportPriority === 'priority' ? 'star' : 'headset'} 
+                size={16} 
                 color="#15803d" 
               />
               <Text style={styles.featureText}>
-                {plan.features.supportPriority === 'priority' ? 'Priority 24/7 Support' : 'Standard Support'}
+                {plan.features.supportPriority === 'priority' ? 'Priority Support' : 'Standard Support'}
               </Text>
             </View>
           )}
         </View>
-
-        {plan.description && (
-          <Text style={styles.planDescription}>{plan.description}</Text>
-        )}
 
         <TouchableOpacity
           style={[
@@ -536,218 +524,194 @@ useEffect(() => {
           {paymentStatus === 'processing' && isSelected ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
-            <>
-              <Text style={styles.buttonText}>
-                {trialStatus?.isActive ? 'Subscribe Now' : 'Get Started'}
-              </Text>
-              {trialStatus?.isActive && (
-                <Text style={styles.buttonSubtext}>
-                  Start after {trialStatus.daysLeft} days of free trial
-                </Text>
-              )}
-            </>
+            <Text style={styles.buttonText}>
+              {trialStatus?.isActive ? 'Subscribe Now' : 'Get Started'}
+            </Text>
           )}
         </TouchableOpacity>
       </View>
     );
   };
-  if (error) {
-    return (
-      <View style={styles.centerContainer}>
-        <Ionicons name="alert-circle-outline" size={50} color="#dc3545" />
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity 
-          style={styles.retryButton} 
-          onPress={() => window.location.reload()}
-        >
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-const filteredPlans = plans.filter(plan => {
-  if (!plan.isVisible) return false;
-
-  if (activeTab === 'monthly') {
-    return plan.interval === 'month'; // just check interval
-  }
-
-  if (activeTab === 'yearly') {
-    return plan.interval === 'year';
-  }
-
-  return false;
-});
-
-
-
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
       
-      <TrialWelcomeModal />
-      
-      {/* Sticky Header */}
-      <View style={styles.stickyHeader}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        
-        <View style={styles.headerContent}>
-          <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
-            {trialStatus?.requiresSubscription 
-              ? 'Subscribe to Continue' 
-              : 'Choose Your Plan'}
-          </Text>
-          <Text style={styles.subtitle} numberOfLines={1} ellipsizeMode="tail">
-            {trialStatus?.isActive 
-              ? `Enjoy ${trialStatus.daysLeft} days free, then choose a plan`
-              : 'Select the perfect plan for your tiffin business'}
-          </Text>
-        </View>
-      </View>
-
-      <ScrollView 
-        contentContainerStyle={styles.container}
-        stickyHeaderIndices={[]}
-        showsVerticalScrollIndicator={true}
+      <KeyboardAvoidingView 
+        style={styles.keyboardAvoid}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {/* Trial/Subscription Status Card */}
-        <TrialStatusCard />
-
-        {/* Pricing Toggle */}
-        <View style={styles.tabContainer}>
-          <View style={styles.tabSwitch}>
+        {/* Fixed Header */}
+        <View style={styles.header}>
+          <View style={styles.headerTop}>
+            {/* <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => router.back()}
+            >
+              <Ionicons name="arrow-back" size={24} color="#333" />
+            </TouchableOpacity> */}
+            
+            <View style={styles.headerContent}>
+              <Text style={styles.title}>
+                {trialStatus?.requiresSubscription 
+                  ? 'Subscribe to Continue' 
+                  : 'Choose Your Plan'}
+              </Text>
+              <Text style={styles.subtitle}>
+                {trialStatus?.isActive 
+                  ? `Enjoy ${trialStatus.daysLeft} days free, then choose a plan`
+                  : 'Select the perfect plan for your tiffin business'}
+              </Text>
+            </View>
+          </View>
+          
+          {/* Tabs */}
+          <View style={styles.tabContainer}>
             <TouchableOpacity 
               style={[styles.tab, activeTab === 'monthly' && styles.activeTab]}
               onPress={() => setActiveTab('monthly')}
             >
               <Text style={[styles.tabText, activeTab === 'monthly' && styles.activeTabText]}>
-                Monthly
+                Monthly Billing
               </Text>
-              {/* <Text style={styles.tabSubtext}>Flexible</Text> */}
+              {/* {activeTab === 'monthly' && (
+                <Text style={styles.tabSubtext}>Flexible</Text>
+              )} */}
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.tab, activeTab === 'yearly' && styles.activeTab]}
               onPress={() => setActiveTab('yearly')}
             >
               <Text style={[styles.tabText, activeTab === 'yearly' && styles.activeTabText]}>
-                Yearly
+                Yearly Billing
               </Text>
-              {/* <Text style={styles.tabSubtext}>Save 20%</Text> */}
+              {/* {activeTab === 'yearly' && (
+                <Text style={styles.tabSubtext}>Save 20%</Text>
+              )} */}
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Plans Grid */}
-        <View style={styles.plansContainer}>
-          {filteredPlans.length > 0 ? (
-            filteredPlans.map(renderPlanCard)
-          ) : (
-            <View style={styles.noPlansContainer}>
-              <Ionicons name="document-text-outline" size={50} color="#ccc" />
-              <Text style={styles.noPlansText}>
-                No {activeTab} plans available
-              </Text>
+        <ScrollView 
+          contentContainerStyle={styles.container}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          {/* Status Card */}
+          {(trialStatus?.isActive || hasActiveSubscription || trialStatus?.requiresSubscription) && (
+            <View style={[
+              styles.statusCard,
+              hasActiveSubscription ? styles.subscriptionActiveCard :
+              trialStatus?.isActive ? styles.trialActiveCard :
+              styles.trialExpiredCard
+            ]}>
+              <View style={styles.statusHeader}>
+                <Ionicons 
+                  name={
+                    hasActiveSubscription ? "checkmark-circle" :
+                    trialStatus?.isActive ? "gift" : "time-outline"
+                  } 
+                  size={24} 
+                  color={
+                    hasActiveSubscription ? "#10b981" :
+                    trialStatus?.isActive ? "#15803d" : "#dc3545"
+                  } 
+                />
+                <View style={styles.statusTextContainer}>
+                  <Text style={styles.statusTitle}>
+                    {hasActiveSubscription ? 'Subscription Active' :
+                     trialStatus?.isActive ? `Free Trial - ${trialStatus.daysLeft} days left` :
+                     'Trial Expired'}
+                  </Text>
+                  <Text style={styles.statusDescription}>
+                    {hasActiveSubscription ? 'Enjoy full access to all features!' :
+                     trialStatus?.isActive ? `Full access for ${trialStatus.daysLeft} more days` :
+                     'Subscribe now to continue using our services'}
+                  </Text>
+                </View>
+              </View>
+              {trialStatus?.isActive && !hasActiveSubscription && (
+                <TouchableOpacity 
+                  style={styles.dashboardButton}
+                  onPress={() => router.replace('/dashboard')}
+                >
+                  <Text style={styles.dashboardButtonText}>Continue </Text>
+                  <Ionicons name="arrow-forward" size={16} color="#fff" />
+                </TouchableOpacity>
+              )}
             </View>
           )}
-        </View>
 
-        {/* FAQ Section */}
-        <View style={styles.faqContainer}>
-          <Text style={styles.faqTitle}>Frequently Asked Questions</Text>
-          
-          <View style={styles.faqItem}>
-            <Text style={styles.faqQuestion}>How does the 7-day free trial work?</Text>
-            <Text style={styles.faqAnswer}>
-              You get full access to all features for 7 days. No credit card required during trial. After 7 days, choose a plan to continue.
-            </Text>
+          {/* Plans Grid */}
+          <View style={styles.plansContainer}>
+            {filteredPlans.length > 0 ? (
+              filteredPlans.map(renderPlanCard)
+            ) : (
+              <View style={styles.noPlansContainer}>
+                <Ionicons name="document-text-outline" size={60} color="#e5e7eb" />
+                <Text style={styles.noPlansText}>
+                  No {activeTab} plans available at the moment
+                </Text>
+                <Text style={styles.noPlansSubtext}>
+                  Please check back later or contact support
+                </Text>
+              </View>
+            )}
           </View>
-          
-          <View style={styles.faqItem}>
-            <Text style={styles.faqQuestion}>What happens after trial ends?</Text>
-            <Text style={styles.faqAnswer}>
-              Your account will be paused. You can subscribe at any time to regain access. All your data is safe.
-            </Text>
-          </View>
-          
-          <View style={styles.faqItem}>
-            <Text style={styles.faqQuestion}>Can I cancel anytime?</Text>
-            <Text style={styles.faqAnswer}>
-              Yes! You can cancel your subscription anytime. No long-term contracts.
-            </Text>
-          </View>
-          
-          <View style={styles.faqItem}>
-            <Text style={styles.faqQuestion}>What payment methods do you accept?</Text>
-            <Text style={styles.faqAnswer}>
-              We accept all major credit/debit cards, UPI, and net banking via Razorpay.
-            </Text>
-          </View>
-        </View>
 
-        {/* Continue with Trial Button */}
-        {trialStatus?.isActive && !hasActiveSubscription && (
-          <TouchableOpacity
-            style={styles.trialContinueButton}
-            onPress={() => {
-              Alert.alert(
-                'Continue with Free Trial',
-                `You have ${trialStatus.daysLeft} days left in your free trial. You can subscribe anytime from dashboard.`,
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  { 
-                    text: 'Continue to Dashboard', 
-                    onPress: () => router.replace('/dashboard') 
-                  }
-                ]
-              );
-            }}
-          >
-            <Ionicons name="rocket-outline" size={20} color="#15803d" />
-            <Text style={styles.trialContinueText}>
-              Continue with Free Trial ({trialStatus.daysLeft} days left)
-            </Text>
-          </TouchableOpacity>
-        )}
-        
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Need help choosing? Contact us at support@tiffinservice.com
-          </Text>
-        </View>
-      </ScrollView>
+          {/* FAQ Section */}
+          <View style={styles.faqContainer}>
+            <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
+            
+            <View style={styles.faqItem}>
+              <View style={styles.faqIcon}>
+                <Ionicons name="help-circle" size={20} color="#15803d" />
+              </View>
+              <View style={styles.faqContent}>
+                <Text style={styles.faqQuestion}>How does the free trial work?</Text>
+                <Text style={styles.faqAnswer}>
+                  Enjoy full access to all features for 7 days. No credit card required.
+                </Text>
+              </View>
+            </View>
+            
+            <View style={styles.faqItem}>
+              <View style={styles.faqIcon}>
+                <Ionicons name="calendar" size={20} color="#15803d" />
+              </View>
+              <View style={styles.faqContent}>
+                <Text style={styles.faqQuestion}>Can I renew anytime?</Text>
+                <Text style={styles.faqAnswer}>
+                  Yes! renew your subscription after your subscription period end with no hidden fees.
+                </Text>
+              </View>
+            </View>
+            
+            <View style={styles.faqItem}>
+              <View style={styles.faqIcon}>
+                <Ionicons name="card" size={20} color="#15803d" />
+              </View>
+              <View style={styles.faqContent}>
+                <Text style={styles.faqQuestion}>What payment methods are accepted?</Text>
+                <Text style={styles.faqAnswer}>
+                  All major credit/debit cards, UPI, and net banking via Razorpay.
+                </Text>
+              </View>
+            </View>
+          </View>
 
-      {/* Payment Modal */}
-      <Modal 
-        visible={!!paymentLink} 
-        transparent={false} 
-        animationType="slide"
-        onRequestClose={() => setPaymentLink(null)}
-      >
-        <View style={styles.webviewContainer}>
-          <WebView
-            source={{ html: paymentLink || '' }}
-            onMessage={handleWebViewMessage}
-            onNavigationStateChange={handleWebViewNavigation}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-            startInLoadingState={true}
-            allowsBackNavigation={false}
-          />
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => setPaymentLink(null)}
-          >
-            <Ionicons name="close" size={24} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </Modal>
+          {/* Footer */}
+          <View style={styles.footer}>
+            {/* <View style={styles.securityBadge}>
+              <Ionicons name="shield-checkmark" size={16} color="#15803d" />
+              <Text style={styles.securityText}>Secure Payment • 256-bit SSL</Text>
+            </View> */}
+            <Text style={styles.footerText}>
+              Need help? Contact us at support@tiffinservice.com
+            </Text>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -757,23 +721,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
-  container: {
-    flexGrow: 1,
-    padding: 20,
-    paddingTop: 120, // Added padding to account for sticky header
-    paddingBottom: 40,
+  keyboardAvoid: {
+    flex: 1,
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f8fafc',
   },
   loadingText: {
-    marginTop: 10,
-    color: '#666',
+    marginTop: 20,
     fontSize: 16,
+    color: '#64748b',
   },
   errorText: {
     fontSize: 16,
@@ -781,81 +741,116 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginVertical: 20,
     paddingHorizontal: 20,
+    lineHeight: 24,
   },
   retryButton: {
     backgroundColor: '#15803d',
-    padding: 12,
-    borderRadius: 8,
-    width: 150,
+    paddingHorizontal: 30,
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginTop: 20,
   },
   retryButtonText: {
     color: '#fff',
-    textAlign: 'center',
     fontWeight: '600',
     fontSize: 16,
   },
   
-  // Sticky Header
-  stickyHeader: {
-    position: 'absolute',
-    top: 2,
-    left: 0,
-    right: 0,
-    zIndex: 1000,
+  // Header Styles
+  header: {
     backgroundColor: '#f8fafc',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 5,
-    paddingTop: Platform.OS === 'ios' ? 50 : 20,
+    paddingTop: Platform.OS === 'ios' ? 10 : 20,
     paddingBottom: 15,
     paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 15,
   },
-  backButton: {
-    marginRight: 15,
-    padding: 5,
-  },
+
   headerContent: {
     flex: 1,
+    alignItems: 'center',
+     
   },
   title: {
-    paddingTop:20,
     fontSize: 22,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: '#1a1a1a',
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 14,
-    color: '#666',
-    lineHeight: 18,
+    color: '#64748b',
+    lineHeight: 20,
   },
   
-  // Status Cards
-  statusCard: {
+  // Tab Styles
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#e2e8f0',
+    borderRadius: 12,
+    padding: 4,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  activeTab: {
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  activeTabText: {
+    color: '#15803d',
+  },
+  tabSubtext: {
+    fontSize: 12,
+    color: '#94a3b8',
+    marginTop: 2,
+  },
+  
+  // Container
+  container: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  
+  // Status Card
+statusCard: {
     borderRadius: 16,
     padding: 24,
     marginBottom: 30,
+     backgroundColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
     shadowRadius: 12,
-    elevation: 5,
+  
   },
   trialActiveCard: {
-    backgroundColor: '#e8f5e9',
+    backgroundColor: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)',
     borderLeftWidth: 4,
     borderLeftColor: '#15803d',
-  },
-  trialWarningCard: {
-    backgroundColor: '#fef3c7',
-    borderLeftWidth: 4,
-    borderLeftColor: '#f59e0b',
   },
   trialExpiredCard: {
     backgroundColor: '#fee2e2',
@@ -872,65 +867,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 15,
   },
+  statusTextContainer: {
+    marginLeft: 12,
+    flex: 1,
+  },
   statusTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginLeft: 10,
-  },
-  statusText: {
-    fontSize: 15,
-    color: '#444',
-    lineHeight: 22,
-    marginBottom: 15,
-  },
-  trialCountdown: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginVertical: 15,
-    gap: 20,
-  },
-  countdownBox: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    padding: 15,
-    borderRadius: 12,
-    minWidth: 80,
-  },
-  countdownNumber: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#15803d',
-  },
-  countdownLabel: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: 18,
     fontWeight: '600',
-    marginTop: 5,
+    color: '#1a1a1a',
+    marginBottom: 4,
   },
-  trialHighlight: {
-    fontWeight: 'bold',
-    color: '#15803d',
-  },
-  expiredNote: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.8)',
-    padding: 10,
-    borderRadius: 8,
-    marginTop: 10,
-  },
-  expiredNoteText: {
-    fontSize: 13,
-    color: '#666',
-    marginLeft: 8,
-    fontStyle: 'italic',
+  statusDescription: {
+    fontSize: 14,
+    color: '#475569',
+    lineHeight: 20,
   },
   dashboardButton: {
     backgroundColor: '#15803d',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     padding: 14,
     borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 10,
+    gap: 8,
   },
   dashboardButtonText: {
     color: '#fff',
@@ -938,178 +897,121 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   
-  // Tabs
-  tabContainer: {
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  tabSwitch: {
-    flexDirection: 'row',
-    backgroundColor: '#f0f0f0',
-    borderRadius: 50,
-    padding: 5,
-    width: width * 0.8,
-    maxWidth: 400,
-  },
-  tab: {
-    flex: 1,
-    padding: 15,
-    borderRadius: 50,
-    alignItems: 'center',
-  },
-  activeTab: {
-    backgroundColor: '#15803d',
-  },
-  tabText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  activeTabText: {
-    color: '#fff',
-  },
-  tabSubtext: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  
-  // Plans
+  // Plans Container
   plansContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
     gap: 20,
     marginBottom: 30,
   },
   planCard: {
     backgroundColor: '#fff',
     borderRadius: 20,
-    padding: 25,
-    width: width > 768 ? (width * 0.45) - 30 : width - 40,
-    maxWidth: 400,
-    minWidth: 280,
+    padding: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 8,
-    marginBottom: 10,
-    position: 'relative',
+    shadowRadius: 15,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
   },
   popularPlanCard: {
     borderWidth: 2,
     borderColor: '#15803d',
-    transform: [{ scale: 1.02 }],
+    backgroundColor: '#f0fdf4',
   },
   selectedPlanCard: {
     borderWidth: 2,
-    borderColor: '#3b82f6',
+    borderColor: '#15803d',
   },
   popularBadge: {
     position: 'absolute',
-    top: -12,
-    left: '50%',
-    transform: [{ translateX: -70 }],
+    top: -10,
+    left: 20,
     backgroundColor: '#15803d',
-    paddingHorizontal: 15,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
   },
   popularBadgeText: {
     color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   planHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 15,
+    alignItems: 'flex-start',
+    marginBottom: 20,
   },
   planName: {
-    fontSize: 22,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '700',
     color: '#1a1a1a',
-  },
-  recommendedTag: {
-    backgroundColor: '#fef3c7',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  recommendedText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#92400e',
+    marginBottom: 8,
   },
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    marginBottom: 5,
   },
   planPrice: {
-    fontSize: 42,
-    fontWeight: 'bold',
+    fontSize: 36,
+    fontWeight: '800',
     color: '#15803d',
   },
   planInterval: {
-    fontSize: 18,
-    color: '#777',
+    fontSize: 16,
+    color: '#64748b',
     fontWeight: '500',
-    marginLeft: 5,
+    marginLeft: 4,
   },
-  yearlySavings: {
+  recommendedTag: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#d1fae5',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    alignSelf: 'flex-start',
-    marginBottom: 20,
-    gap: 5,
+    gap: 6,
   },
-  savingsText: {
+  recommendedText: {
     fontSize: 12,
     fontWeight: '600',
     color: '#065f46',
   },
   featuresContainer: {
-    width: '100%',
-    marginBottom: 20,
+    marginBottom: 25,
   },
   featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: '#f1f5f9',
   },
   featureText: {
     fontSize: 15,
-    color: '#555',
+    color: '#475569',
     marginLeft: 12,
     flex: 1,
   },
   featureBold: {
-    fontWeight: '600',
-    color: '#333',
-  },
-  planDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 20,
-    fontStyle: 'italic',
-    textAlign: 'center',
-    lineHeight: 20,
+    fontWeight: '700',
+    color: '#1e293b',
   },
   subscribeButton: {
     backgroundColor: '#15803d',
     padding: 18,
     borderRadius: 12,
     alignItems: 'center',
+    shadowColor: '#15803d',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   popularSubscribeButton: {
     backgroundColor: '#0f766e',
@@ -1119,47 +1021,65 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 17,
-  },
-  buttonSubtext: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 12,
-    marginTop: 4,
+    fontWeight: '700',
+    fontSize: 16,
   },
   noPlansContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     padding: 40,
+    backgroundColor: '#f8fafc',
+    borderRadius: 20,
+    marginVertical: 20,
   },
   noPlansText: {
     fontSize: 18,
-    color: '#999',
+    color: '#64748b',
     marginTop: 15,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  noPlansSubtext: {
+    fontSize: 14,
+    color: '#94a3b8',
+    marginTop: 8,
     textAlign: 'center',
   },
   
-  // FAQ
+  // FAQ Section
   faqContainer: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 25,
+    borderRadius: 20,
+    padding: 24,
     marginBottom: 30,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 12,
-    elevation: 5,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
   },
-  faqTitle: {
+  sectionTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: '#1a1a1a',
     marginBottom: 20,
     textAlign: 'center',
   },
   faqItem: {
+    flexDirection: 'row',
     marginBottom: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  faqIcon: {
+    marginRight: 12,
+    marginTop: 2,
+  },
+  faqContent: {
+    flex: 1,
   },
   faqQuestion: {
     fontSize: 16,
@@ -1170,26 +1090,7 @@ const styles = StyleSheet.create({
   faqAnswer: {
     fontSize: 14,
     color: '#6b7280',
-    lineHeight: 20,
-  },
-  
-  // Trial Continue Button
-  trialContinueButton: {
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#15803d',
-    padding: 18,
-    borderRadius: 12,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 10,
-    marginBottom: 20,
-  },
-  trialContinueText: {
-    color: '#15803d',
-    fontWeight: 'bold',
-    fontSize: 16,
+    lineHeight: 22,
   },
   
   // Footer
@@ -1199,110 +1100,53 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
   },
+  securityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0fdf4',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginBottom: 12,
+    gap: 6,
+  },
+  securityText: {
+    fontSize: 13,
+    color: '#15803d',
+    fontWeight: '600',
+  },
   footerText: {
     fontSize: 14,
-    color: '#6b7280',
+    color: '#64748b',
     textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  
-  // WebView
-  webviewContainer: {
-    flex: 1,
-    position: 'relative',
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 40,
-    right: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  
-  // Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    width: '95%',
-    maxWidth: 500,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  modalGradient: {
-    padding: 30,
-    alignItems: 'center',
-  },
-  modalIcon: {
-    marginBottom: 15,
-  },
-  modalTitle: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  modalBody: {
-    padding: 30,
-  },
-  modalSubtitle: {
-    fontSize: 18,
-    color: '#1a1a1a',
-    textAlign: 'center',
-    marginBottom: 25,
-    lineHeight: 26,
-  },
-  featuresList: {
-    marginBottom: 25,
-  },
-  modalNote: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-    fontStyle: 'italic',
     lineHeight: 20,
   },
-  modalButtons: {
-    padding: 20,
-    paddingTop: 0,
-    gap: 12,
-  },
-  modalButtonPrimary: {
-    backgroundColor: '#15803d',
-    padding: 18,
-    borderRadius: 12,
+  
+  // Payment Screen Styles
+  paymentHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
   },
-  modalButtonPrimaryText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  modalButtonSecondary: {
-    backgroundColor: '#f3f4f6',
-    padding: 18,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  modalButtonSecondaryText: {
-    color: '#374151',
+  paymentHeaderTitle: {
+    fontSize: 18,
     fontWeight: '600',
-    fontSize: 16,
+    color: '#1a1a1a',
+  },
+  webviewWrapper: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
   },
 });
 

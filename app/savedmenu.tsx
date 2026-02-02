@@ -18,12 +18,13 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useNavigation, useFocusEffect } from 'expo-router';
 import { Plus, Copy, Edit, Trash2, ChevronDown, ChevronUp, Sun, Moon, Utensils, X, Send, IndianRupee, Info } from 'lucide-react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useAppSelector } from './store/hooks';
 import { Text } from '@/components/ztext';
 import { API_URL } from './config/env';
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const API_BASE_URL = `${API_URL}/api`;
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -376,46 +377,34 @@ const SavedMenusScreen: React.FC = () => {
   }, [selectedFilter, groupedMenus]);
 
   // Edit Modal Handlers
-  const setupEditModal = useCallback((menu: MenuWithPopulatedData) => {
-    if (!menu) return;
-    
-    setSelectedMenu(menu);
-    setEditMenuName(menu.name || '');
-    setSpecialNotes(menu.note || '');
-    
-    // Set price fields
-    if (menu.pricing) {
-      setEditPrice(menu.pricing.price);
-      setEditOriginalPrice(menu.pricing.originalPrice);
-      setIsSpecialPrice(menu.pricing.isSpecialPrice || false);
-    } else {
-      setEditPrice(null);
-      setEditOriginalPrice(null);
-      setIsSpecialPrice(false);
+const handleEditMenu = useCallback((menu: MenuWithPopulatedData) => {
+  if (!menu) return;
+  
+  // Navigate to DailyMenuScreen with menu data as params
+  router.push({
+    pathname: '/menu',
+    params: {
+      editMode: 'true',
+      menuId: menu._id,
+      day: menu.day,
+      mealType: menu.mealType,
+      menuName: menu.name || '',
+      note: menu.note || '',
+      price: menu.pricing?.price?.toString() || '0',
+      originalPrice: menu.pricing?.originalPrice?.toString() || '0',
+      isSpecialPrice: menu.pricing?.isSpecialPrice?.toString() || 'false',
+      // We'll pass the selected dish IDs in a query param
+      selectedDishes: JSON.stringify(
+        menu.items.reduce((acc: any, item) => {
+          if (item.categoryId && item.dishIds) {
+            acc[item.categoryId] = item.dishIds;
+          }
+          return acc;
+        }, {})
+      )
     }
-    
-    const editItemsData: MenuItemWithIds[] = (menu.items || []).map(item => {
-      if (!item) return null;
-      
-      return {
-        categoryId: item.categoryId,
-        dishIds: item.dishIds || []
-      };
-    }).filter(item => item !== null && item.categoryId) as MenuItemWithIds[];
-    
-    setEditItems(editItemsData);
-    
-    // Auto-expand categories with selected dishes
-    const initialExpanded: Record<string, boolean> = {};
-    editItemsData.forEach(item => {
-      if (item.dishIds.length > 0) {
-        initialExpanded[item.categoryId] = true;
-      }
-    });
-    setExpandedCategories(initialExpanded);
-    
-    setIsEditModalVisible(true);
-  }, []);
+  });
+}, [router]);
 
   const handleUpdateMenu = useCallback(async () => {
     if (!selectedMenu) return;
@@ -572,13 +561,13 @@ const SavedMenusScreen: React.FC = () => {
         setSelectedMenu(menu);
         setIsDuplicateModalVisible(true);
       }}
-      onEdit={setupEditModal}
+      onEdit={handleEditMenu}
       onDelete={(menu) => {
         setSelectedMenu(menu);
         setIsDeleteModalVisible(true);
       }}
     />
-  ), [setupEditModal]);
+  ), [handleEditMenu]);
 
   const DayAccordion = useCallback(({ 
     day, 
@@ -798,7 +787,7 @@ const SavedMenusScreen: React.FC = () => {
   }
 
   return (
-    <View style={[styles.container]}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.container]}>
       {/* Meal Type Filter */}
       {showMealTabs && (
         <View style={styles.mealTypeFilter}>
@@ -846,44 +835,58 @@ const SavedMenusScreen: React.FC = () => {
       )}
 
       {/* Day Filter */}
-      <View style={styles.dayFilter}>
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          data={DAYS}
-          keyExtractor={(day) => day}
-          renderItem={({ item: day, index }) => {
-            const dayMenus = groupedMenus[day];
-            const count = dayMenus ? dayMenus.lunch.length + dayMenus.dinner.length : 0;
-            const isSelected = selectedFilter === day;
-            
-            if (selectedFilter === 'all' && count === 0) return null;
-            
-            return (
-              <TouchableOpacity
-                style={[
-                  styles.dayFilterBtn,
-                  isSelected && styles.dayFilterBtnActive
-                ]}
-                onPress={() => setSelectedFilter(isSelected ? 'all' : day)}
-              >
-                <Text weight='bold' style={[
-                  styles.dayFilterText,
-                  isSelected && styles.dayFilterTextActive
+  
+{/* Day Filter */}
+<View style={styles.daysContainer}>
+  <View style={styles.daysGrid}>
+    {DAYS.map((day, index) => {
+      const dayMenus = groupedMenus[day];
+      const count = dayMenus ? dayMenus.lunch.length + dayMenus.dinner.length : 0;
+      const isSelected = selectedFilter === day;
+      const dayName = DAY_NAMES[index];
+      
+      // Show all days, not filtering based on count
+      return (
+        <LinearGradient
+          key={day}
+          colors={isSelected ? ['#15803d', '#16a34a'] : ['transparent', 'transparent']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.dayTab, isSelected && styles.activeDayTab]}
+        >
+          <TouchableOpacity
+            style={styles.dayTabContent}
+            onPress={() => setSelectedFilter(isSelected ? 'all' : day)}
+            activeOpacity={0.9}
+          >
+            {/* Menu Count Badge */}
+            {count > 0 && (
+              <View style={[
+                styles.dayCountBadge,
+                isSelected && styles.activeDayCountBadge
+              ]}>
+                <Text weight='extraBold' style={[
+                  styles.dayCountText,
+                  isSelected && styles.activeDayCountText
                 ]}>
-                  {DAY_NAMES[index].slice(0, 3)}
+                  {count}
                 </Text>
-                {count > 0 && (
-                  <View style={styles.dayCountBadge}>
-                    <Text weight='bold' style={[styles.dayCountText,isSelected && styles.daycountTextActive]}>{count}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            );
-          }}
-          contentContainerStyle={styles.dayFilterList}
-        />
-      </View>
+              </View>
+            )}
+            
+            <Text weight='extraBold' style={[
+              styles.dayText,
+              isSelected && styles.activeDayText,
+              !isSelected && count === 0 && styles.inactiveDayText
+            ]}>
+              {dayName.slice(0, 3)}
+            </Text>
+          </TouchableOpacity>
+        </LinearGradient>
+      );
+    })}
+  </View>
+</View>
 
       {/* Main Content */}
       <FlatList
@@ -1313,7 +1316,7 @@ const SavedMenusScreen: React.FC = () => {
           </BlurView>
         </Modal>
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -1321,7 +1324,7 @@ const styles = StyleSheet.create({
   container: {
     // paddingTop:130,
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#F8FAFC',
   },
   // Meal Type Filter
   mealTypeFilter: {
@@ -1356,53 +1359,97 @@ const styles = StyleSheet.create({
   mealTypeFilterTextActive: {
     color: '#fff',
   },
-  // Day Filter
-  dayFilter: {
-    marginBottom: 10,
-    backgroundColor: '#fff',
-    paddingVertical: 8,
+  daysContainer: {
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-  },
-  dayFilterList: {
-    paddingHorizontal: 12,
-  },
-  dayFilterBtn: {
+    borderBottomColor: 'rgba(226, 232, 240, 0.3)',
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#F8FAFC',
-    marginHorizontal: 4,
+    paddingTop: 12,
+    paddingBottom: 12,
+  },
+  daysGrid: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 6,
   },
-  dayFilterBtnActive: {
-    backgroundColor: '#15803d',
+  dayTab: {
+    flex: 1,
+    borderRadius: 12,
+    marginHorizontal: 2,
+    minHeight: 50,
+    overflow: 'hidden',
   },
-  dayFilterText: {
-    fontSize: 14,
-    fontWeight: '500',
+  dayTabContent: {
+    flex: 1,
+    padding: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    position: 'relative',
+  },
+  activeDayTab: {
+    shadowColor: '#15803d',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 3,
+    transform: [{ translateY: -2 }],
+  },
+  dayText: {
+    fontSize: 13,
+    fontWeight: '600',
     color: '#64748B',
   },
-  dayFilterTextActive: {
+  
+  activeDayText: {
     color: '#fff',
   },
+  inactiveDayText: {
+    color: '#0c0c0c',
+  },
+  
+  // Updated Day Count Badge styles
+  dayCountBadge: {
+       position: 'absolute',
+    top: -3, // Negative to go above daysContainer
+    right: -12, // Centered horizontally
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    zIndex: 100, // Very high z-index
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    transform: [{ translateX: -10 }],
+  },
+  activeDayCountBadge: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#15803d',
+  },
+  dayCountText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#15803d',
+  },
+  activeDayCountText: {
+    color: '#15803d',
+  },
+  
+  // Keep all your existing styles below...
+  // Meal Type Filter
   daycountTextActive: {
     color: '#fff',
 
   },
-  dayCountBadge: {
-    backgroundColor: 'rgba(242, 240, 240, 0.19)',
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  dayCountText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#475569',
-  },
+
   // Scroll Container
   scrollContainer: {
     paddingBottom: 100,
@@ -1410,6 +1457,7 @@ const styles = StyleSheet.create({
   },
   // Day Accordion Styles
   dayAccordion: {
+  marginTop:10,
     marginBottom: 16,
     borderRadius: 16,
     overflow: 'hidden',

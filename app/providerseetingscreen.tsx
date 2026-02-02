@@ -32,6 +32,8 @@ import { MealService, MealType } from './store/types/meals';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { setHasMealPreferences } from './store/slices/providerslice';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
@@ -71,6 +73,7 @@ const TimePickerModal = ({
   const hourWheelRef = useRef<ScrollView>(null);
   const minuteWheelRef = useRef<ScrollView>(null);
   const ampmWheelRef = useRef<ScrollView>(null);
+
 
   const ITEM_HEIGHT = 44;
   const VISIBLE_ITEMS = 5;
@@ -432,7 +435,7 @@ const MealPreferencesScreen = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
   const dispatch = useAppDispatch();
-  
+  const insets = useSafeAreaInsets();
   const hasRedirectedRef = useRef(false);
 
   const provider = useAppSelector((state) => state.provider);
@@ -518,6 +521,18 @@ useEffect(() => {
     router.replace(redirectFrom || '/dashboard');
   }, 800);
 }, [hasJustSaved, preferences, isRequiredSetup, redirectFrom]);
+
+useEffect(() => {
+  if (!loading && preferences?.mealService) {
+    const hasMealPreferences =
+      preferences.mealService.lunch?.enabled || preferences.mealService.dinner?.enabled;
+
+    // If provider already has meal preferences, redirect to dashboard
+    if (hasMealPreferences && isRequiredSetup) {
+      router.replace('/dashboard');
+    }
+  }
+}, [loading, preferences, isRequiredSetup, router]);
 
   useEffect(() => {
     if (error) {      
@@ -631,51 +646,81 @@ useEffect(() => {
     }
   };
 
-  const handleSavePreferences = async (): Promise<void> => {
-    try {
-      if (!providerId) {
-        Alert.alert('Error', 'Authentication required. Please login again.');
+const handleSavePreferences = async () => {
+  try {
+    const isAnyMealEnabled =
+      !!mealService.lunch?.enabled || !!mealService.dinner?.enabled;
+
+    // ❌ Block save if no meal is enabled
+    if (!isAnyMealEnabled) {
+      Alert.alert(
+        'Meal Required',
+        'Please enable at least one meal (Lunch or Dinner) to continue.'
+      );
+      return;
+    }
+
+    // ❌ Validate price only for enabled meals
+    for (const mealType of ['lunch', 'dinner'] as MealType[]) {
+      const meal = mealService[mealType];
+
+      if (
+        meal?.enabled &&
+        (!meal.price || Number(meal.price) <= 0)
+      ) {
+        Alert.alert(
+          'Invalid Price',
+          `Please enter a valid price for ${mealType}`
+        );
         return;
       }
-
-      for (const mealType of ['lunch', 'dinner'] as MealType[]) {
-        const meal = mealService[mealType];
-        if (meal?.enabled && (!meal.price || parseFloat(meal.price) <= 0)) {
-          Alert.alert('Error', `Please enter a valid price for ${mealType}`);
-          return;
-        }
-      }
-
-      const payload: any = {
-        lunch: mealService.lunch?.enabled ? {
-          ...mealService.lunch,
-          price: parseFloat(mealService.lunch.price) || 0,
-        } : {
-          enabled: false,
-          price: 0,
-          cutoffTime: ""
-        },
-        dinner: mealService.dinner?.enabled ? {
-          ...mealService.dinner,
-          price: parseFloat(mealService.dinner.price) || 0,
-        } : {
-          enabled: false,
-          price: 0,
-          cutoffTime: ""
-        },
-      };
-
-      const result = await dispatch(updateMealPreferences(payload)).unwrap();
-      
-      if (result) {
-        Alert.alert('Success', 'Meal preferences updated successfully!');
-        router.push('/dashboard');
-        setHasJustSaved(true);
-      }
-    } catch (error: any) {
-      // Error handled by reducer
     }
-  };
+
+    // ✅ Clean payload (backend-safe)
+    const payload = {
+      lunch: mealService.lunch?.enabled
+        ? {
+            ...mealService.lunch,
+            price: Number(mealService.lunch.price),
+          }
+        : {
+            enabled: false,
+            price: 0,
+            cutoffTime: '',
+          },
+
+      dinner: mealService.dinner?.enabled
+        ? {
+            ...mealService.dinner,
+            price: Number(mealService.dinner.price),
+          }
+        : {
+            enabled: false,
+            price: 0,
+            cutoffTime: '',
+          },
+    };
+
+    await dispatch(updateMealPreferences(payload)).unwrap();
+
+    // ✅ Sync provider state immediately
+    dispatch(setHasMealPreferences(true));
+
+    Alert.alert('Success', 'Meal preferences saved successfully!');
+    router.replace('/dashboard');
+
+  } catch (error: any) {
+    console.error('Error saving meal preferences:', error);
+    Alert.alert(
+      'Error',
+      error?.message || 'Something went wrong while saving preferences'
+    );
+  }
+};
+
+
+
+
 
   const renderMealSection = (mealType: MealType, mealName: string) => {
     const meal = mealService[mealType];
@@ -783,7 +828,6 @@ useEffect(() => {
       </SafeAreaView>
     );
   }
-
   return (
     <KeyboardAvoidingView 
       style={styles.container}
@@ -811,29 +855,37 @@ useEffect(() => {
         />
 
         {/* Fixed Save Button */}
-        <View style={styles.footer}>
-          <TouchableOpacity 
-            style={[styles.saveButton, (saving || savingUpi) && styles.saveButtonDisabled]}
-            onPress={handleSavePreferences}
-            disabled={saving || savingUpi}
-          >
-            <LinearGradient
-              colors={['#15803d', '#15803d']}
-              style={[styles.saveButtonGradient, (saving || savingUpi) && styles.saveButtonGradientDisabled]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-            >
-              {saving ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <>
-                  <Icon name="save" size={20} color="#fff" />
-                  <Text style={styles.saveButtonText}>Save All Settings</Text>
-                </>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
+      {/* Fixed Save Button */}
+<View
+  style={[
+    styles.footer,
+    {
+      paddingBottom: insets.bottom + 12, // 👈 SAME BEHAVIOR
+    },
+  ]}
+>
+  <TouchableOpacity
+    style={[styles.saveButton, (saving || savingUpi) && styles.saveButtonDisabled]}
+    onPress={handleSavePreferences}
+    disabled={saving || savingUpi}
+    activeOpacity={0.9}
+  >
+    <LinearGradient
+      colors={['#15803d', '#15803d']}
+      style={styles.saveButtonGradient}
+    >
+      {saving ? (
+        <ActivityIndicator color="#fff" />
+      ) : (
+        <>
+          <Icon name="save" size={20} color="#fff" />
+          <Text style={styles.saveButtonText}>Save All Settings</Text>
+        </>
+      )}
+    </LinearGradient>
+  </TouchableOpacity>
+</View>
+
       </SafeAreaView>
     </KeyboardAvoidingView>
   );

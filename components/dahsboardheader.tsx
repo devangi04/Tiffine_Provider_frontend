@@ -1,11 +1,11 @@
 // DashboardHeader.tsx - Header without search
 import React from 'react';
-import { View, TouchableOpacity, StyleSheet, Platform ,StatusBar} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAppSelector } from '../app/store/hooks';
 import { Text } from '@/components/ztext';
-import { ArrowLeft, User } from "lucide-react-native";
+import { User } from "lucide-react-native";
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface DashboardHeaderProps {
   profileImage?: string;
@@ -16,6 +16,8 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ profileImage }) => {
   const provider = useAppSelector((state) => state.provider);
   const providerName = provider.name || 'User';
   
+  const insets = useSafeAreaInsets(); // <-- Get safe area for status bar/notch
+
   // Get first initial from provider name
   const getInitial = () => {
     if (!providerName || providerName.trim().length === 0) return 'U';
@@ -24,44 +26,38 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ profileImage }) => {
 
   return (
     <>
-    <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-    <View style={styles.container}>
-      <View style={styles.topSection}>
-        <View style={styles.profileSection}>
-          {/* Moved initial display to the left side */}
-          <TouchableOpacity 
-            style={styles.initialContainer}
-          >
-            <Text weight='bold' style={styles.initialText}>
-              {getInitial()}
-            </Text>
-          </TouchableOpacity>
-          
-          <View style={styles.nameContainer}>
-            <Text weight='bold' style={styles.greeting}>Hello,</Text>
-            <Text weight='bold' style={styles.userName}>{providerName}</Text>
-          </View>
-        </View>
+      <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
+        <View style={styles.topSection}>
+          <View style={styles.profileSection}>
+            {/* Initial display */}
+            <TouchableOpacity style={styles.initialContainer}>
+              <Text weight='bold' style={styles.initialText}>
+                {getInitial()}
+              </Text>
+            </TouchableOpacity>
 
-        {/* Changed bell icon to profile icon */}
-        <TouchableOpacity 
-          style={styles.profileButton}
-          onPress={() => router.push('./profile')}
-        >
-       <User size={24} color="#15803d" />
-        
-        </TouchableOpacity>
+            <View style={styles.nameContainer}>
+              <Text weight='bold' style={styles.greeting}>Hello,</Text>
+              <Text weight='bold' style={styles.userName}>{providerName}</Text>
+            </View>
+          </View>
+
+          {/* Profile button */}
+          <TouchableOpacity 
+            style={styles.profileButton}
+            onPress={() => router.push('./profile')}
+          >
+            <User size={24} color="#15803d" />
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
     </>
   );
 };
 
-
 const styles = StyleSheet.create({
   container: {
     backgroundColor: '#15803d',
-    paddingTop: Platform.OS === 'ios' ? 80 : 50,
     paddingHorizontal: 20,
     paddingBottom: 20,
   },

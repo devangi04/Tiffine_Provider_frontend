@@ -17,10 +17,11 @@ import { Text } from '@/components/ztext';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp } from '@react-navigation/native';
 import Icon  from 'react-native-vector-icons/MaterialIcons';
-
+import { BackHandler, Keyboard } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useAppSelector, useAppDispatch } from './store/hooks';
+
 import { 
   fetchCustomers, 
   fetchMoreCustomers,
@@ -31,6 +32,7 @@ import {
   resetCustomers,
   addCustomerToFront
 } from './store/slices/customerslice';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type RootStackParamList = {
   AddCustomer: undefined;
@@ -148,6 +150,27 @@ const CustomerListScreen: React.FC<Props> = ({ navigation }) => {
       };
     }, [providerId, lastRefreshed])
   );
+
+useFocusEffect(
+  useCallback(() => {
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        if (isSearchFocused || searchQuery.trim().length > 0) {
+          Keyboard.dismiss();
+          setSearchQuery('');        // clear input
+          setIsSearchFocused(false); // exit search mode
+          return true;               // ⛔ stop navigation
+        }
+
+        return false; // ✅ normal back
+      }
+    );
+
+    return () => subscription.remove();
+  }, [isSearchFocused, searchQuery])
+);
+
 
   const loadInitialCustomers = async () => {
     if (!providerId) return;
@@ -521,7 +544,7 @@ const CustomerListScreen: React.FC<Props> = ({ navigation }) => {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
       <StatusBar barStyle="light-content" />
       
       {/* Sticky Header */}
@@ -564,7 +587,7 @@ const CustomerListScreen: React.FC<Props> = ({ navigation }) => {
       >
         <Icon name="add" size={24} color="#fff" />
       </TouchableOpacity> */}
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -577,7 +600,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafcff',
     paddingTop: 30,
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingBottom: 18,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
     zIndex: 10,
@@ -586,7 +609,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 1,
+   
   },
   totalCustomersContainer: {
     flexDirection: 'row',

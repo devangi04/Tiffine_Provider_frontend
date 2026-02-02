@@ -5,15 +5,16 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
   Dimensions,
+  Platform
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Text from '@/components/ztext';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const HEADER_HEIGHT = 60;
 
@@ -29,7 +30,7 @@ const AboutUsScreen = () => {
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['left', 'right', 'bottom']}   style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
 
       {/* ================= HEADER ================= */}
@@ -51,8 +52,7 @@ const AboutUsScreen = () => {
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={{
-          paddingTop: HEADER_HEIGHT + insets.top + 30,
-          paddingBottom: 40 + insets.bottom,
+          paddingTop: HEADER_HEIGHT + insets.top ,
         }}
         showsVerticalScrollIndicator={false}
       >
@@ -174,6 +174,7 @@ const styles = StyleSheet.create({
 
   scrollView: {
     flex: 1,
+     paddingTop: Platform.OS === 'ios' ? 30 : 20,
   },
 
   heroCard: {

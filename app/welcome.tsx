@@ -363,19 +363,24 @@ export default function ProviderWelcomeFlow() {
     router.push('/login');
   };
 
-  const handleNext = () => {
-    stopAutoSlide();
-    if (currentIndex < FEATURES.length - 1) {
-        dispatch(setHasCompletedWelcome(true)); // Add this
-      router.push('/login');
-      const nextIndex = currentIndex + 1;
-      setCurrentIndex(nextIndex);
-      flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
-      startAutoSlide();
-    } else {
-      router.push('/login');
-    }
-  };
+const handleNext = () => {
+  stopAutoSlide();
+  
+  if (currentIndex < FEATURES.length - 1) {
+    // Show next slide
+    const nextIndex = currentIndex + 1;
+    setCurrentIndex(nextIndex);
+    flatListRef.current?.scrollToIndex({ 
+      index: nextIndex, 
+      animated: true 
+    });
+    startAutoSlide();
+  } else {
+    // Last slide - navigate to login
+    dispatch(setHasCompletedWelcome(true));
+    router.push('/login');
+  }
+};
 
   const onViewableItemsChanged = useRef(({ viewableItems }) => {
     if (viewableItems.length > 0 && viewableItems[0].index !== undefined) {

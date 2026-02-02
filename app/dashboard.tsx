@@ -6,7 +6,6 @@ import {
   StyleSheet, 
   StatusBar,
   Dimensions,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   Keyboard,
@@ -31,7 +30,7 @@ import Text from '@/components/ztext';
 import { API_URL } from './config/env';
 const { width, height } = Dimensions.get('window');
 import { BackHandler } from 'react-native';
-
+import { SafeAreaView } from 'react-native-safe-area-context';
 const API_BASE_URL = API_URL;
 
 // Define types for the provider data
@@ -551,7 +550,7 @@ const handleSearchItemClick = (item: SearchResultItem, category: string) => {
     return (
       <TouchableOpacity 
         style={styles.menuCard}
-        onPress={() => router.push('/schedule')}
+        onPress={() => router.push('/response')}
         activeOpacity={0.9}
       >
         <View style={styles.menuCardHeader}>
@@ -588,59 +587,47 @@ const handleSearchItemClick = (item: SearchResultItem, category: string) => {
             <Ionicons name="fast-food-outline" size={48} color="#D1D5DB" />
             <Text weight="bold" style={styles.emptyMenuTitle}>No Menu Available</Text>
             <Text weight="bold" style={styles.emptyMenuText}>
-              Today's menu hasn't been send yet. Tap to add menu items.
+              Today's menu hasn't been send yet
             </Text>
           </View>
         ) : (
           <>
             {/* Compact Menu Preview */}
-            <View style={styles.compactMenu}>
-              {sortedMenu.slice(0, 4).map((item, index) => {
-                const categoryName = item.type || item.categoryName || 'Category';
-                const dishName = item.dish || item.dishes?.[0]?.dishName || 'No dish';
-                
-                return (
-                  <View 
-                    key={item.type || index} 
-                    style={[
-                      styles.compactCategory,
-                      index >= 3 && styles.blurredCategory
-                    ]}
-                  >
-                    <View style={styles.categoryHeader}>
-                      <CategoryIcon 
-                        categoryName={categoryName} 
-                        size={16} 
-                        color={index >= 3 ? "#D1D5DB" : "#6B7280"} 
-                      />
-                      <Text weight="bold" style={[
-                        styles.compactCategoryName,
-                        index >= 3 && styles.blurredText
-                      ]}>
-                        {capitalizeFirst(categoryName)}
-                      </Text>
-                    </View>
-                    <Text weight="bold" style={[
-                      styles.compactDish,
-                      index >= 3 && styles.blurredText
-                    ]}>
-                      {capitalizeFirst(dishName)}
-                    </Text>
-                  </View>
-                );
-              })}
-              
-              {/* View Details Button */}
-              {sortedMenu.length > 3 && (
-                <TouchableOpacity 
-                  style={styles.viewDetailsButton}
-                  onPress={() => router.push('/schedule')}
-                >
-                  <Text weight="bold" style={styles.viewDetailsText}>View Sent menu</Text>
-                  <Ionicons name="chevron-forward" size={16} color="#FF3B30" />
-                </TouchableOpacity>
-              )}
-            </View>
+         <View style={styles.compactMenu}>
+  {sortedMenu.map((item, index) => {
+    const categoryName = item.type || item.categoryName || 'Category';
+    const dishes =
+      item.dishes && item.dishes.length > 0
+        ? item.dishes
+        : item.dish
+        ? [{ dishName: item.dish }]
+        : [];
+
+    return (
+      <View key={`${categoryName}-${index}`} style={styles.compactCategory}>
+        {/* Category Header */}
+        <View style={styles.categoryHeader}>
+          <CategoryIcon categoryName={categoryName} size={16} color="#6B7280" />
+          <Text weight="bold" style={styles.compactCategoryName}>
+            {capitalizeFirst(categoryName)}
+          </Text>
+        </View>
+
+        {/* All Dishes */}
+        {dishes.map((dish, dishIndex) => (
+          <Text
+            key={`${dish.dishName}-${dishIndex}`}
+            weight="bold"
+            style={styles.compactDish}
+          >
+            • {capitalizeFirst(dish.dishName)}
+          </Text>
+        ))}
+      </View>
+    );
+  })}
+</View>
+
           </>
         )}
       </TouchableOpacity>
@@ -822,11 +809,11 @@ const handleSearchItemClick = (item: SearchResultItem, category: string) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar
+      {/* <StatusBar
         translucent
         backgroundColor="transparent"
-        barStyle="light-content"
-      />
+        barStyle="dark-content"
+      /> */}
       
       <KeyboardAvoidingView 
         style={styles.keyboardAvoid}
@@ -1222,7 +1209,7 @@ const styles = StyleSheet.create({
 
   // Orders Card
   ordersCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: '#ffffff',
     borderRadius: 20,
     padding: 20,
     marginBottom: 24,

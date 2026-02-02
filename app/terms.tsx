@@ -9,12 +9,13 @@ import {
   StatusBar,
   Linking,
   Share,
-  Animated
+  Animated,
+  Platform
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, Feather, MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Text from '@/components/ztext';
 
 const { width } = Dimensions.get('window');
@@ -218,7 +219,7 @@ const TermsConditionsScreen = () => {
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <StatusBar
         backgroundColor="#f8fafc"
         barStyle="dark-content"
@@ -249,12 +250,15 @@ const TermsConditionsScreen = () => {
       </View>
 
       {/* ================= SCROLL CONTENT ================= */}
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        scrollEventThrottle={16}
-      >
+        <ScrollView
+      style={styles.scrollView}
+      showsVerticalScrollIndicator={false}
+      contentInsetAdjustmentBehavior="never"   // ✅ VERY IMPORTANT
+      contentContainerStyle={[
+        styles.scrollContent,
+        { paddingBottom: insets.bottom + 16 }, // ✅ natural spacing
+      ]}
+    >
         {/* Hero Section */}
         <LinearGradient
           colors={['#8b5cf6', '#a78bfa']}
@@ -291,7 +295,7 @@ const TermsConditionsScreen = () => {
               <View style={[styles.keyPointIcon, { backgroundColor: 'rgba(139, 92, 246, 0.1)' }]}>
                 <Ionicons name="calendar" size={20} color="#8b5cf6" />
               </View>
-              <Text style={styles.keyPointText}>3-Day Free Trial</Text>
+              <Text style={styles.keyPointText}>7-Day Free Trial</Text>
             </View>
             
             <View style={styles.keyPointCard}>
@@ -367,9 +371,9 @@ const TermsConditionsScreen = () => {
           <Text style={styles.legalTitle}>Legal Information</Text>
           <View style={styles.legalDetails}>
             <Text style={styles.legalText}>
-              <Text style={styles.legalBold}>Company:</Text> Techtriosphere{'\n'}
-              <Text style={styles.legalBold}>Address:</Text> 1205, Phoenix building, Vijay Cross Road to Commerce Six Road, Gujarat, India{'\n'}
-              <Text style={styles.legalBold}>Legal Jurisdiction:</Text> Ahmedabad, Gujarat, India
+              <Text style={styles.legalBold}>Company:</Text> Triosphere Tech Pvt. Ltd.{'\n'}
+              <Text style={styles.legalBold}>Address:</Text> 1205, Phoenix building, Vijay Cross Road to Commerce Six Road,Ahmedabad, Gujarat, India.{'\n'}
+              <Text style={styles.legalBold}>Legal Jurisdiction:</Text> Ahmedabad, Gujarat, India.
             </Text>
           </View>
         </View>
@@ -381,10 +385,9 @@ const TermsConditionsScreen = () => {
                    <Text style={styles.footerVersion}>Version 1.0.0</Text>
         </View>
 
-        {/* Bottom spacing */}
-        <View style={{ height: 40 + insets.bottom }} />
+       
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -457,7 +460,7 @@ const styles = StyleSheet.create({
   },
   
   scrollContent: {
-    paddingTop: HEADER_HEIGHT + (StatusBar.currentHeight || 0) + 20, // Fixed: Add space for header
+    paddingTop: Platform.OS === 'ios' ? 90 : 80,
     paddingBottom: 40,
     paddingHorizontal: 20,
   },
@@ -780,7 +783,7 @@ const styles = StyleSheet.create({
   footer: {
     alignItems: 'center',
     paddingTop: 24,
-    paddingBottom: 40,
+    paddingBottom: 16,
   },
   
   footerTitle: {

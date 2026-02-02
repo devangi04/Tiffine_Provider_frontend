@@ -38,6 +38,7 @@ import PastHistory from "@/components/pasthistory";
 import { BlurView } from "expo-blur";
 import { API_URL } from "./config/env";
 import { useFocusEffect } from "@react-navigation/native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const API_BASE_URL = `${API_URL}/api`;
 const { width, height } = Dimensions.get("window");
@@ -481,83 +482,86 @@ useEffect(() => {
   };
 
   // Send menu function
-  const sendMenu = useCallback(
-    async (menuId: string) => {
-      try {
-        const menu = combinedData.menus.find((m) => m._id === menuId);
-        if (!menu) {
-          Alert.alert("Error", "Menu not found");
-          return;
-        }
-
-        const todayKey = `${menu.day}_${menu.mealType}`;
-
-        // Check if any menu for this day+meal combo was sent
-        if (combinedData.todaySentMenus[todayKey]) {
-          Alert.alert(
-            "Cannot Send Menu",
-            `Today's ${menu.mealType} menu for ${
-              menu.day.charAt(0).toUpperCase() + menu.day.slice(1)
-            } has already been sent.`,
-            [{ text: "OK" }]
-          );
-          return;
-        }
-
-        Alert.alert(
-          "Confirm Send",
-          `Are you sure you want to send the ${menu.mealType} menu for ${
-            menu.day.charAt(0).toUpperCase() + menu.day.slice(1)
-          }?`,
-          [
-            { text: "Cancel", style: "cancel" },
-            {
-              text: "Send",
-              onPress: async () => {
-                try {
-                  setSendingMenu(menuId);
-                  const response = await fetch(`${API_URL}/api/sentmenu`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ providerId, menuId }),
-                  });
-
-                  const result = await response.json();
-
-                  if (result.success) {
-                    // Update both states
-                    setCombinedData((prev) => ({
-                      ...prev,
-                      todaySentMenus: {
-                        ...prev.todaySentMenus,
-                        [todayKey]: true,
-                      },
-                      sentMenuIds: {
-                        ...prev.sentMenuIds,
-                        [menuId]: true,
-                      },
-                    }));
-
-                    Alert.alert("Success", "Menu sent successfully!");
-                    setSelectedMenuId(null);
-                    setIsOverlayVisible(false);
-                  }
-                } catch (error) {
-                  Alert.alert("Error", "Failed to send menu");
-                } finally {
-                  setSendingMenu(null);
-                }
-              },
-            },
-          ]
-        );
-      } catch (error) {
-        console.error("Error in sendMenu:", error);
-        Alert.alert("Error", "An unexpected error occurred");
+const sendMenu = useCallback(
+  async (menuId: string) => {
+    try {
+      const menu = combinedData.menus.find((m) => m._id === menuId);
+      if (!menu) {
+        Alert.alert("Error", "Menu not found");
+        return;
       }
-    },
-    [combinedData, providerId]
-  );
+
+      // Check if ANY menu has been sent today
+      const hasAnyMenuBeenSentToday = Object.keys(combinedData.todaySentMenus).length > 0;
+      
+      if (hasAnyMenuBeenSentToday) {
+        // Get the first sent menu info to show in the message
+        const firstSentKey = Object.keys(combinedData.todaySentMenus)[0];
+        const [sentDay, sentMealType] = firstSentKey.split('_');
+        
+        Alert.alert(
+          "Cannot Send Menu",
+          `Today's menu has already been sent (${sentDay.charAt(0).toUpperCase() + sentDay.slice(1)} ${sentMealType}).\n\nYou can only send one menu per day.`,
+          [{ text: "OK" }]
+        );
+        return;
+      }
+
+      Alert.alert(
+        "Confirm Send",
+        `Are you sure you want to send the ${menu.mealType} menu for ${
+          menu.day.charAt(0).toUpperCase() + menu.day.slice(1)
+        }?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Send",
+            onPress: async () => {
+              try {
+                setSendingMenu(menuId);
+                const response = await fetch(`${API_URL}/api/sentmenu`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ providerId, menuId }),
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                  // Update both states
+                  const todayKey = `${menu.day}_${menu.mealType}`;
+                  setCombinedData((prev) => ({
+                    ...prev,
+                    todaySentMenus: {
+                      ...prev.todaySentMenus,
+                      [todayKey]: true,
+                    },
+                    sentMenuIds: {
+                      ...prev.sentMenuIds,
+                      [menuId]: true,
+                    },
+                  }));
+
+                  Alert.alert("Success", "Menu sent successfully!");
+                  setSelectedMenuId(null);
+                  setIsOverlayVisible(false);
+                }
+              } catch (error) {
+                Alert.alert("Error", "Failed to send menu");
+              } finally {
+                setSendingMenu(null);
+              }
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      console.error("Error in sendMenu:", error);
+      Alert.alert("Error", "An unexpected error occurred");
+    }
+  },
+  [combinedData, providerId]
+);
 
   // Menu history toggle
   const toggleHistory = async (day: string) => {
@@ -679,7 +683,7 @@ useEffect(() => {
       const { IconComponent, color } = getMealTypeIcon(item.mealType);
 
       const todayKey = `${item.day}_${item.mealType}`;
-      const isComboSentToday = !!combinedData.todaySentMenus[todayKey];
+     const isComboSentToday = Object.keys(combinedData.todaySentMenus).length > 0;
       const isThisMenuSentToday = !!combinedData.sentMenuIds[item._id];
       const isCurrentlySending = sendingMenu === item._id;
 
@@ -818,7 +822,7 @@ useEffect(() => {
                   disabled={true}
                 >
                   <Send size={16} color="#94A3B8" />
-                  <Text style={styles.disabledSendText}>Sent</Text>
+                  <Text style={styles.disabledSendText}>Limit reached</Text>
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity
@@ -904,7 +908,7 @@ useEffect(() => {
     const hasDishes = menu.items?.some(menuItem => menuItem.dishIds?.length > 0);
     const { IconComponent, color } = getMealTypeIcon(menu.mealType);
     const todayKey = `${menu.day}_${menu.mealType}`;
-    const isComboSentToday = !!combinedData.todaySentMenus[todayKey];
+   const isComboSentToday = Object.keys(combinedData.todaySentMenus).length > 0;
     const isThisMenuSentToday = !!combinedData.sentMenuIds[menu._id];
 
     const renderOverlayContent = () => (
@@ -1018,37 +1022,38 @@ useEffect(() => {
                 <Text color='red' style={styles.bottomButtonText}>Cancel</Text>
               </TouchableOpacity>
 
-              {!isComboSentToday ? (
-                <TouchableOpacity 
-                  style={[
-                    styles.bottomButton, 
-                    styles.activeSendButton,
-                    Platform.OS === 'android' && styles.androidBottomButton
-                  ]}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    closeOverlay();
-                    setTimeout(() => sendMenu(menu._id), 300);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Send size={20} color="#117ae3ff" />
-                  <Text color='#117ae3ff' style={styles.bottomButtonText}>Send</Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity 
-                  style={[
-                    styles.bottomButton, 
-                    styles.disabledBottomButton,
-                    Platform.OS === 'android' && styles.androidBottomButton
-                  ]}
-                  disabled={true}
-                  activeOpacity={0.8}
-                >
-                  <Send size={20} color="black" />
-                  <Text color='black' style={styles.bottomButtonText}>Already Sent</Text>
-                </TouchableOpacity>
-              )}
+
+{!isComboSentToday ? (
+  <TouchableOpacity 
+    style={[
+      styles.bottomButton, 
+      styles.activeSendButton,
+      Platform.OS === 'android' && styles.androidBottomButton
+    ]}
+    onPress={(e) => {
+      e.stopPropagation();
+      closeOverlay();
+      setTimeout(() => sendMenu(menu._id), 300);
+    }}
+    activeOpacity={0.7}
+  >
+    <Send size={20} color="#117ae3ff" />
+    <Text color='#117ae3ff' style={styles.bottomButtonText}>Send</Text>
+  </TouchableOpacity>
+) : (
+  <TouchableOpacity 
+    style={[
+      styles.bottomButton, 
+      styles.disabledBottomButton,
+      Platform.OS === 'android' && styles.androidBottomButton
+    ]}
+    disabled={true}
+    activeOpacity={0.8}
+  >
+    <Send size={20} color="black" />
+    <Text color='black' style={styles.bottomButtonText}>Daily Limit Reached</Text>
+  </TouchableOpacity>
+)}
             </View>
           </Animated.View>
         </View>
@@ -1267,7 +1272,7 @@ useEffect(() => {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
       {/* Days Container */}
       <View style={styles.daysContainer}>
         <View style={styles.daysGrid}>{DAYS.map(renderDayTab)}</View>
@@ -1501,7 +1506,7 @@ useEffect(() => {
 
       {/* Duplicate Modal */}
       {renderDuplicateModal()}
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -1574,7 +1579,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   activeDayName: {
-    fontSize: 15,
+    fontSize: 13,
     color: "#FFFFFF",
     fontWeight: "700",
   },

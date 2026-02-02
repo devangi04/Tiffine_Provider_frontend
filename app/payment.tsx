@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef,useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -11,7 +11,7 @@ import {
   Modal,
 } from 'react-native';
 import {Text} from '@/components/ztext';
-import { useRouter } from 'expo-router';
+import { useRouter ,useFocusEffect } from 'expo-router';
 import { 
   ChevronLeft, 
   Search, 
@@ -28,6 +28,8 @@ import api from './api/api';
 import moment from 'moment';
 import { useAppSelector } from './store/hooks';
 import { API_URL } from './config/env';
+import { BackHandler  ,Keyboard} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const API_BASE_URL = `${API_URL}/api`;
 
@@ -54,6 +56,7 @@ interface Bill {
   transactions: any[];
   createdAt: string;
   emailSent?: boolean;
+  providerId?: string;
 }
 
 interface CustomerWithBill extends Customer {
@@ -79,6 +82,9 @@ const PaymentStatusScreen = () => {
   const [error, setError] = useState<string | null>(null);
   const [generatingBills, setGeneratingBills] = useState(false);
   const [sendingEmails, setSendingEmails] = useState(false);
+  
+  // Add this state to track if bills are generated for current provider
+  const [billsGeneratedForProvider, setBillsGeneratedForProvider] = useState(false);
   
   // Load More state
   const [displayedCustomers, setDisplayedCustomers] = useState<CustomerWithBill[]>([]);
@@ -112,16 +118,37 @@ const PaymentStatusScreen = () => {
     setHasMore(loadedCount < filtered.length);
   }, [customers, activeFilter, searchQuery, loadedCount]);
 
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener(
+        'hardwareBackPress',
+        () => {
+          if (isSearchFocused || searchQuery.trim().length > 0) {
+            Keyboard.dismiss();
+            setSearchQuery('');        // clear input
+            setIsSearchFocused(false); // exit search mode
+            return true;               // ⛔ stop navigation
+          }
+  
+          return false; // ✅ normal back
+        }
+      );
+  
+      return () => subscription.remove();
+    }, [isSearchFocused, searchQuery])
+  );
+
 const fetchPaymentStatus = async () => {
   try {
     setLoading(true);
     setError(null);
+    setBillsGeneratedForProvider(false); // Reset initially
     
     // Calculate date range for the selected month
     const monthStart = moment(currentMonth).startOf('month').toDate();
     const monthEnd = moment(currentMonth).endOf('month').toDate();
     
-    // Fetch ALL customers
+    // Fetch ALL customers for THIS provider
     const customersResponse = await api.get(`${API_BASE_URL}/customer/provider/${providerId}`, {
       params: { 
         limit: 1000
@@ -159,14 +186,16 @@ const fetchPaymentStatus = async () => {
     if (customersForMonth.length === 0) {
       setCustomers([]);
       setDisplayedCustomers([]);
+      setBillsGeneratedForProvider(false);
       return;
     }
 
-    // Rest of your existing code...
+    // Fetch bills for THIS provider for the selected month
     const billsResponse = await api.get(`${API_BASE_URL}/bills/list`, {
       params: { 
         month: currentMonth,
-        limit: 1000
+        limit: 1000,
+        providerId: providerId // Add providerId to filter
       }
     });
     
@@ -176,10 +205,50 @@ const fetchPaymentStatus = async () => {
     } else if (Array.isArray(billsResponse.data)) {
       bills = billsResponse.data;
     }
+    
+    // Now filter bills to only include those belonging to current provider
+    // This ensures we only check bills for this provider
+    const providerBills = bills.filter(bill => {
+      // Check if bill has providerId field
+      if (bill.providerId) {
+        return bill.providerId === providerId;
+      }
+      
+      // If no providerId field, check via customer's providerId
+      const billCustomer = bill.customerId as Customer;
+      if (billCustomer && billCustomer.providerId) {
+        return billCustomer.providerId === providerId;
+      }
+      
+      return false;
+    });
+    
+    // Check if bills have been generated for this provider for this month
+    // We should check if ALL active customers have bills
+    const customersWithoutBills = customersForMonth.filter(customer => {
+      return !providerBills.find(bill => {
+        try {
+          if (typeof bill.customerId === 'string') {
+            return bill.customerId === customer._id;
+          } else if (bill.customerId && typeof bill.customerId === 'object') {
+            const billCustomerId = bill.customerId as Customer;
+            return billCustomerId._id === customer._id || billCustomerId.id === customer._id;
+          }
+          return false;
+        } catch (error) {
+          console.error('Error matching bill to customer:', error);
+          return false;
+        }
+      });
+    });
+    
+    // Bills are generated if there are no customers without bills
+    const areBillsGenerated = customersWithoutBills.length === 0 && customersForMonth.length > 0;
+    setBillsGeneratedForProvider(areBillsGenerated);
         
-    // Match customers with bills (use customersForMonth instead of allCustomers)
+    // Match customers with bills
     const customersWithBills: CustomerWithBill[] = customersForMonth.map(customer => {
-      const customerBill = bills.find(bill => {
+      const customerBill = providerBills.find(bill => {
         try {
           if (typeof bill.customerId === 'string') {
             return bill.customerId === customer._id;
@@ -223,7 +292,6 @@ const fetchPaymentStatus = async () => {
     setHasMore(customersWithBills.length > 20);
     
   } catch (error: any) {
-    // Error handling remains the same
     console.error('Error fetching payment status:', error);
     
     let errorMessage = 'Failed to load payment status';
@@ -248,8 +316,44 @@ const fetchPaymentStatus = async () => {
     setRefreshing(false);
   }
 };
-  // Generate bills for all customers
+
+// Helper function to check if bill generation is allowed
+const canGenerateBills = (): boolean => {
+  // Don't allow generating bills for future months
+  if (isFutureMonth(currentMonth)) {
+    return false;
+  }
+  
+  // Don't allow generating bills before provider creation
+  if (isBeforeProviderCreationMonth(currentMonth)) {
+    return false;
+  }
+  
+  // Don't allow if bills already generated for this provider
+  if (billsGeneratedForProvider) {
+    return false;
+  }
+  
+  // Check if there are customers to generate bills for
+  if (customers.length === 0) {
+    return false;
+  }
+  
+  return true;
+};
+ 
  const generateAllBills = async () => {
+  if (!canGenerateBills()) {
+    Alert.alert(
+      'Cannot Generate Bills',
+      billsGeneratedForProvider 
+        ? 'Bills have already been generated for this month.'
+        : 'Cannot generate bills for this month.',
+      [{ text: 'OK' }]
+    );
+    return;
+  }
+  
   try {
     setGeneratingBills(true);
     
@@ -263,7 +367,6 @@ const fetchPaymentStatus = async () => {
           text: 'Cancel',
           style: 'cancel',
           onPress: () => {
-            // Reset the generating state when user cancels
             setGeneratingBills(false);
           }
         },
@@ -272,16 +375,15 @@ const fetchPaymentStatus = async () => {
           onPress: async () => {
             try {
               const response = await api.post(
-                `${API_BASE_URL}/bills/generate-all/${year}/${month}`
+                `${API_BASE_URL}/bills/generate-all/${year}/${month}`,
+                { providerId } // Pass providerId in request body
               );
 
               if (response.data.success) {
                 const { billsGenerated, billsSkipped, errors } = response.data.data;
                 
-                let message = `Successfully generated ${billsGenerated} bills`;
-                if (billsSkipped > 0) {
-                  message += `, ${billsSkipped} skipped (already exist or no data)`;
-                }
+                let message = `Successfully generated ${billsGenerated} bills for your customers`;
+
                 if (errors.length > 0) {
                   message += `, ${errors.length} errors`;
                 }
@@ -289,7 +391,11 @@ const fetchPaymentStatus = async () => {
                 Alert.alert(
                   'Success', 
                   message,
-                  [{ text: 'OK', onPress: fetchPaymentStatus }]
+                  [{ text: 'OK', onPress: () => {
+                    // Set bills generated to true and refresh
+                    setBillsGeneratedForProvider(true);
+                    fetchPaymentStatus();
+                  }}]
                 );
               } else {
                 Alert.alert('Error', response.data.message || 'Failed to generate bills');
@@ -306,26 +412,67 @@ const fetchPaymentStatus = async () => {
         }
       ],
       {
-        // This callback runs when the alert is dismissed (including when tapping outside)
         onDismiss: () => {
           setGeneratingBills(false);
         }
       }
     );
   } catch (error) {
-    // This catches errors in the initial setup, not in the async generation
     setGeneratingBills(false);
+    Alert.alert('Error', 'Failed to initiate bill generation');
   }
 };
  
-  const handleMonthChange = (direction: 'prev' | 'next') => {
-    const newMonth = moment(currentMonth).add(direction === 'prev' ? -1 : 1, 'month').format('YYYY-MM');
-    setCurrentMonth(newMonth);
-  };
+ const handleMonthChange = (direction: 'prev' | 'next') => {
+  const newMonth = moment(currentMonth).add(direction === 'prev' ? -1 : 1, 'month').format('YYYY-MM');
+  
+  // Prevent navigation to future months
+  if (direction === 'next' && isFutureMonth(newMonth)) {
+    Alert.alert(
+      'Future Month',
+      'Cannot view payment status for future months.',
+      [{ text: 'OK' }]
+    );
+    return;
+  }
+  
+   // Prevent navigation to months before provider creation
+  if (direction === 'prev' && isBeforeProviderCreationMonth(newMonth)) {
+    Alert.alert(
+      'Unavailable Month',
+      'Cannot view payment status before your provider account was created.',
+      [{ text: 'OK' }]
+    );
+    return;
+  }
+  setCurrentMonth(newMonth);
+};
 
   const handleSearchFocus = () => {
     setIsSearchFocused(true);
   };
+
+// Helper function to check if month is before provider creation
+const isBeforeProviderCreationMonth = (month: string): boolean => {
+  const providerCreatedAt = provider.createdAt || "2026-01-28T11:14:57.453+00:00";
+  const selectedMonth = moment(month).startOf('month');
+  const creationMonth = moment(providerCreatedAt).startOf('month');
+  return selectedMonth.isBefore(creationMonth, 'month');
+};
+
+// Helper function to check if a month is in the future
+const isFutureMonth = (month: string): boolean => {
+  const currentMonth = moment().format('YYYY-MM');
+  const selectedMonth = moment(month).format('YYYY-MM');
+  return moment(selectedMonth).isAfter(currentMonth, 'month');
+};
+
+// Helper function to check if it's the current month
+const isCurrentMonth = (month: string): boolean => {
+  const currentMonth = moment().format('YYYY-MM');
+  const selectedMonth = moment(month).format('YYYY-MM');
+  return moment(selectedMonth).isSame(currentMonth, 'month');
+};
 
   const handleSearchBlur = () => {
     if (searchQuery === '') {
@@ -423,11 +570,29 @@ const getSummaryStats = () => {
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
-  const handleMonthSelect = (monthIndex: number) => {
-    const selectedMonth = moment().year(currentCalendarYear).month(monthIndex).format('YYYY-MM');
-    setCurrentMonth(selectedMonth);
-    setCalendarVisible(false);
-  };
+ const handleMonthSelect = (monthIndex: number) => {
+  const selectedMonth = moment().year(currentCalendarYear).month(monthIndex).format('YYYY-MM');
+  
+  // Prevent selection of future months
+  if (isFutureMonth(selectedMonth)) {
+    Alert.alert(
+      'Future Month',
+      'Cannot view payment status for future months.',
+      [{ text: 'OK' }]
+    );
+    return;
+  }
+  if (isBeforeProviderCreationMonth(selectedMonth)) {
+    Alert.alert(
+      'Unavailable Month',
+      'Cannot view payment status before your provider account was created.',
+      [{ text: 'OK' }]
+    );
+    return;
+  }
+  setCurrentMonth(selectedMonth);
+  setCalendarVisible(false);
+};
 
   const renderCalendarModal = () => {
     const currentMonthIndex = moment(currentMonth).month();
@@ -461,30 +626,46 @@ const getSummaryStats = () => {
             </View>
             
             <View style={styles.monthsGrid}>
-              {months.map((month, index) => {
-                const isSelected = currentMonthIndex === index && currentYear === currentCalendarYear;
-                const isCurrentMonth = moment().month() === index && moment().year() === currentCalendarYear;
-                
-                return (
-                  <TouchableOpacity
-                    key={month}
-                    style={[
-                      styles.monthButton,
-                      isCurrentMonth && styles.monthButtonCurrent,
-                      isSelected && styles.monthButtonSelected
-                    ]}
-                    onPress={() => handleMonthSelect(index)}
-                  >
-                    <Text weight='bold' style={[
-                      styles.monthButtonText,
-                      isCurrentMonth && styles.monthButtonTextCurrent,
-                      isSelected && styles.monthButtonTextSelected
-                    ]}>
-                      {month.substring(0, 3)}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+{months.map((month, index) => {
+  const selectedMonth = moment().year(currentCalendarYear).month(index).format('YYYY-MM');
+  const isSelected = moment(currentMonth).month() === index && moment(currentMonth).year() === currentCalendarYear;
+  const isCurrentMonth = moment().month() === index && moment().year() === currentCalendarYear;
+  const isFuture = isFutureMonth(selectedMonth);
+  const isBeforeCreation = isBeforeProviderCreationMonth(selectedMonth);
+  
+  return (
+    <TouchableOpacity
+      key={month}
+      style={[
+        styles.monthButton,
+        isCurrentMonth && styles.monthButtonCurrent,
+        isSelected && styles.monthButtonSelected,
+        (isFuture || isBeforeCreation) && styles.monthButtonDisabled
+      ]}
+      onPress={() => !isFuture && !isBeforeCreation && handleMonthSelect(index)}
+      disabled={isFuture || isBeforeCreation}
+    >
+      <Text weight='bold' style={[
+        styles.monthButtonText,
+        isCurrentMonth && styles.monthButtonTextCurrent,
+        isSelected && styles.monthButtonTextSelected,
+        (isFuture || isBeforeCreation) && styles.monthButtonTextDisabled
+      ]}>
+        {month.substring(0, 3)}
+      </Text>
+      {isFuture && (
+        <Text weight='bold' style={styles.monthButtonDisabledText}>
+          Future
+        </Text>
+      )}
+      {isBeforeCreation && (
+        <Text weight='bold' style={styles.monthButtonDisabledText}>
+          Before Creation
+        </Text>
+      )}
+    </TouchableOpacity>
+  );
+})}
             </View>
             
             <View style={styles.quickActions}>
@@ -646,44 +827,63 @@ const getSummaryStats = () => {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView edges={['left', 'right', 'bottom']}  style={styles.container}>
       {/* Sticky Header Section */}
       <View style={styles.stickyHeader}>
         {/* Date Navigation */}
-        <View style={styles.dateNav}>
-          <View style={styles.dateNavContainer}>
-            <TouchableOpacity 
-              style={styles.navArrow} 
-              onPress={() => handleMonthChange('prev')}
-            >
-              <ChevronLeft size={20} color="#fff" />
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.currentDate}
-              onPress={() => setCalendarVisible(true)}
-            >
-              <Calendar size={18} color="#333" />
-              <Text weight='bold' style={styles.dateText}>
-                {moment(currentMonth).format('MMM YYYY')}
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.navArrow} 
-              onPress={() => handleMonthChange('next')}
-            >
-              <ChevronLeft size={20} color="#fff" style={styles.rightArrow} />
-            </TouchableOpacity>
-          </View>
+      {/* Date Navigation */}
+<View style={styles.dateNav}>
+  <View style={styles.dateNavContainer}>
+    {/* Left arrow is always enabled for past months */}
+    <TouchableOpacity 
+      style={styles.navArrow} 
+      onPress={() => handleMonthChange('prev')}
+    >
+      <ChevronLeft size={20} color="#fff" />
+    </TouchableOpacity>
+    
+    <TouchableOpacity 
+      style={styles.currentDate}
+      onPress={() => setCalendarVisible(true)}
+    >
+      <Calendar size={18} color="#333" />
+      <Text weight='bold' style={styles.dateText}>
+        {moment(currentMonth).format('MMM YYYY')}
+      </Text>
+      
+      {/* Show future month indicator */}
+      {isFutureMonth(currentMonth) && (
+        <View style={styles.futureMonthIndicator}>
+          <Text weight='bold' style={styles.futureMonthText}>Future Month</Text>
         </View>
+      )}
+    </TouchableOpacity>
+    
+    {/* Right arrow - disable for future months */}
+    <TouchableOpacity 
+      style={[styles.navArrow, isFutureMonth(currentMonth) && styles.disabledArrow]} 
+      onPress={() => handleMonthChange('next')}
+      disabled={isFutureMonth(currentMonth)}
+    >
+      <ChevronLeft 
+        size={20} 
+        color={isFutureMonth(currentMonth) ? "#CBD5E1" : "#fff"} 
+        style={styles.rightArrow} 
+      />
+    </TouchableOpacity>
+  </View>
+</View>
 
         {/* Action Buttons */}
         <View style={styles.actionButtonsContainer}>
           <TouchableOpacity 
-            style={[styles.actionButton, styles.generateButton, generatingBills && styles.buttonDisabled]}
+            style={[
+              styles.actionButton, 
+              styles.generateButton, 
+              (!canGenerateBills() || generatingBills) && styles.buttonDisabled
+            ]}
             onPress={generateAllBills}
-            disabled={generatingBills}
+            disabled={!canGenerateBills() || generatingBills}
           >
             {generatingBills ? (
               <ActivityIndicator size="small" color="#ffffff" />
@@ -692,7 +892,12 @@ const getSummaryStats = () => {
             )}
            
             <Text weight='bold' style={styles.actionButtonText}>
-              {generatingBills ? 'Generating...' : 'Generate Bills'}
+              {billsGeneratedForProvider 
+                ? 'Bills Generated' 
+                : generatingBills 
+                  ? 'Generating...' 
+                  : 'Generate Bills'
+              }
             </Text>
           </TouchableOpacity>
 
@@ -820,12 +1025,18 @@ const getSummaryStats = () => {
                     : `No ${activeFilter === 'all' ? '' : activeFilter + ' '}customers found`
                 }
               </Text>
-              {activeFilter === 'no-bill' && customers.length > 0 && (
+              {activeFilter === 'no-bill' && customers.length > 0 && !billsGeneratedForProvider && (
                 <TouchableOpacity 
-                  style={styles.generateEmptyStateButton}
+                  style={[
+                    styles.generateEmptyStateButton,
+                    (!canGenerateBills() || generatingBills) && styles.buttonDisabled
+                  ]}
                   onPress={generateAllBills}
+                  disabled={!canGenerateBills() || generatingBills}
                 >
-                  <Text weight='bold' style={styles.generateEmptyStateButtonText}>Generate Bills for All Customers</Text>
+                  <Text weight='bold' style={styles.generateEmptyStateButtonText}>
+                    {billsGeneratedForProvider ? 'Bills Already Generated' : 'Generate Bills for All Customers'}
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -842,28 +1053,27 @@ const getSummaryStats = () => {
 
       {/* Calendar Modal */}
       {renderCalendarModal()}
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    // paddingTop:130,
     flex: 1,
     backgroundColor: '#f8fafc',
   },
   stickyHeader: {
     backgroundColor: '#F8FAFC',
-    paddingTop: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
     zIndex: 1000,
+     paddingTop: 30,
   },
   scrollContent: {
     flex: 1,
   },
   scrollContentContainer: {
-    paddingBottom: 60,
+    paddingBottom: 100,
   },
   dateNav: {
     paddingHorizontal: 20,
@@ -1283,6 +1493,35 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
+  // Add these to your existing styles
+disabledArrow: {
+  backgroundColor: '#E2E8F0',
+},
+futureMonthIndicator: {
+  backgroundColor: '#EFF6FF',
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  borderRadius: 6,
+  marginLeft: 8,
+  borderWidth: 1,
+  borderColor: '#BFDBFE',
+},
+futureMonthText: {
+  fontSize: 10,
+  color: '#1D4ED8',
+},
+monthButtonDisabled: {
+  backgroundColor: '#F8FAFC',
+  opacity: 0.6,
+},
+monthButtonTextDisabled: {
+  color: '#94A3B8',
+},
+monthButtonDisabledText: {
+  fontSize: 8,
+  color: '#94A3B8',
+  marginTop: 4,
+},
 });
 
 export default PaymentStatusScreen;

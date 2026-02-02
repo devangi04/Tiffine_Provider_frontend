@@ -6,17 +6,17 @@ import {
   StyleSheet, 
   StatusBar,
   Dimensions,
-  SafeAreaView,
   Linking,
   Animated,
-  Share
+  Share,
+  Platform
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Text from '@/components/ztext';
-
+import { SafeAreaView } from 'react-native-safe-area-context';
 const { width } = Dimensions.get('window');
 const HEADER_HEIGHT = 60;
 
@@ -74,7 +74,7 @@ const PrivacyPolicyScreen = () => {
       title: 'How We Use Your Information',
       items: [
         'Account verification using OTP emails',
-        'Subscription management (3-day free trial & payments)',
+        'Subscription management (7-day free trial & payments)',
         'Menu creation and customer management',
         'Sending billing emails to customers',
         'Push notifications for menu reminders',
@@ -84,7 +84,7 @@ const PrivacyPolicyScreen = () => {
     {
       id: 'subscription',
       title: 'Subscription & Payment',
-      content: 'We offer a 3-day free trial from registration. After trial, subscription via Razorpay is required. We integrate with Razorpay for payment processing - they handle payment details according to their Privacy Policy.'
+      content: 'We offer a 7-day free trial from registration. After trial, subscription via Razorpay is required. We integrate with Razorpay for payment processing - they handle payment details according to their Privacy Policy.'
     },
     {
       id: 'data-security',
@@ -106,9 +106,9 @@ const PrivacyPolicyScreen = () => {
       id: 'grievance',
       title: 'Grievance Officer',
       contact: {
-        name: 'Krunal Mistry',
-        email: 'info@triospheretech.com',
-        address: '1205, Phoenix building, Vijay Cross Road to Commerce Six Road, Gujarat, India'
+        name: 'Neel Patel',
+        email: 'lichitiffinservice@gmail.com',
+        address: '1205, Phoenix building, Vijay Cross Road to Commerce Six Road,Ahmedabad, Gujarat, India'
       }
     }
   ];
@@ -117,8 +117,8 @@ const PrivacyPolicyScreen = () => {
     {
       icon: 'mail',
       label: 'General Support',
-      value: 'info@triospheretech.com',
-      action: () => openEmail('info@triospheretech.com')
+      value: 'lichitiffinservice@gmail.com',
+      action: () => openEmail('lichitiffinservice@gmail.com')
     },
     {
       icon: 'shield',
@@ -199,7 +199,7 @@ const PrivacyPolicyScreen = () => {
 
   /* ---------- UI ---------- */
   return (
-    <View style={styles.container}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
       <StatusBar 
         barStyle="dark-content" 
         backgroundColor="#f8fafc" 
@@ -232,11 +232,16 @@ const PrivacyPolicyScreen = () => {
       </View>
 
       {/* ================= SCROLL CONTENT ================= */}
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+    <ScrollView
+  style={styles.scrollView}
+  showsVerticalScrollIndicator={false}
+  contentInsetAdjustmentBehavior="never"   // ✅ VERY IMPORTANT
+  contentContainerStyle={[
+    styles.scrollContent,
+    { paddingBottom: insets.bottom + 16 }, // ✅ natural spacing
+  ]}
+>
+
         {/* Hero Section */}
         <LinearGradient 
           colors={['#15803d', '#4694e2']} 
@@ -328,10 +333,9 @@ const PrivacyPolicyScreen = () => {
                    <Text style={styles.footerVersion}>Version 1.0.0</Text>
         </View>
 
-        {/* Bottom Spacing */}
-        <View style={{ height: insets.bottom + 40 }} />
+       
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -408,9 +412,9 @@ const styles = StyleSheet.create({
   },
 
   scrollContent: {
-    paddingTop: 70,
+    paddingTop: Platform.OS === 'ios' ? 90 : 20,
     paddingBottom: 40,
-    paddingHorizontal: 20,
+     paddingHorizontal: 20,
   },
 
   /* ===== HERO ===== */
@@ -699,7 +703,7 @@ const styles = StyleSheet.create({
   /* ===== FOOTER ===== */
   footer: {
     alignItems: 'center',
-    paddingVertical: 30,
+    paddingVertical: 16,
   },
 
   footerTitle: {

@@ -12,15 +12,19 @@ import {
   Switch,
   Modal,
   Dimensions,
-  Animated
+  Animated,
+  Keyboard,
+  KeyboardAvoidingView
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { Check, X, Edit2, Sun, Moon } from 'lucide-react-native';
 import { useNavigation, useRouter, useLocalSearchParams } from 'expo-router';
 import { useAppSelector } from './store/hooks';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Text, TextStyles } from '@/components/ztext';
+import { Text } from '@/components/ztext';
 import { API_URL } from './config/env';
-
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import axios, { AxiosError } from 'axios';
 const API_BASE_URL = `${API_URL}/api`;
 const DISH_API_URL = `${API_URL}/api/dish`;
 const CATEGORY_API_URL = `${API_URL}/api/category`;
@@ -57,6 +61,7 @@ interface SelectedDishes {
 
 interface MealOptions {
   price: number;
+  
 }
 
 const DAYS = [
@@ -77,32 +82,48 @@ const MEAL_TYPES = [
 const DailyMenuScreen: React.FC = () => {
   const provider = useAppSelector((state) => state.provider);
   const providerId = provider.id;
-
+  const insets =  useSafeAreaInsets();
   const router = useRouter();
-  const { day } = useLocalSearchParams();
+  const navigation = useNavigation();
+  const { 
+    editMode,
+    menuId,
+    day: initialDay,
+    mealType: initialMealType,
+    menuName: initialMenuName,
+    note: initialNote,
+    price: initialPrice,
+    originalPrice: initialOriginalPrice,
+    isSpecialPrice: initialIsSpecialPrice,
+    selectedDishes: selectedDishesParam 
+  } = useLocalSearchParams();
+
   const todayIndex = new Date().getDay();
   const today = DAYS[todayIndex === 0 ? 6 : todayIndex - 1].id;
 
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [categories, setCategories] = useState<DishCategory[]>([]);
-  const [selectedDishes, setSelectedDishes] = useState<SelectedDishes>({});
-  const [menuName, setMenuName] = useState<string>('');
-  const [note, setNote] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedDay, setSelectedDay] = useState<string>(today);
-  const [selectedMealType, setSelectedMealType] = useState<'lunch' | 'dinner'>('lunch');
+  
+  const [selectedDay, setSelectedDay] = useState<string>(
+    initialDay as string || today
+  );
+  const [selectedMealType, setSelectedMealType] = useState<'lunch' | 'dinner'>(
+    (initialMealType as 'lunch' | 'dinner') || 'lunch'
+  );
+  const [isEditMode, setIsEditMode] = useState<boolean>(editMode === 'true');
+  const [currentMenuId, setCurrentMenuId] = useState<string>(menuId as string || '');
+  
   const [isNoteFocused, setIsNoteFocused] = useState<boolean>(false);
-
-  const [mealOptions, setMealOptions] = useState<MealOptions>({
-    price: 0
-  });
-
-  const [isSpecialPricing, setIsSpecialPricing] = useState<boolean>(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  
+  const [isSpecialPricing, setIsSpecialPricing] = useState<boolean>(initialIsSpecialPrice === 'true');
   const [specialPricingNote, setSpecialPricingNote] = useState<string>('');
   const [showPricingModal, setShowPricingModal] = useState<boolean>(false);
 
+  
   // Swipe animations
   const scrollX = useRef(new Animated.Value(0)).current;
   const indicatorPosition = useRef(new Animated.Value(0)).current;
@@ -110,6 +131,19 @@ const DailyMenuScreen: React.FC = () => {
   const lunchTextColor = useRef(new Animated.Value(1)).current;
   const dinnerTextColor = useRef(new Animated.Value(0)).current;
   
+
+  const forcedMealType = isEditMode && initialMealType
+  ? (initialMealType as 'lunch' | 'dinner')
+  : null;
+
+  const scrollRef = useRef<KeyboardAwareScrollView>(null);
+
+const scrollToInput = (reactNode: any) => {
+  scrollRef.current?.scrollToFocusedInput(reactNode);
+};
+
+const singleMealScrollRef = useRef<KeyboardAwareScrollView>(null);
+
   const verticalScrollViewRefs = {
     lunch: useRef<ScrollView>(null),
     dinner: useRef<ScrollView>(null)
@@ -118,8 +152,37 @@ const DailyMenuScreen: React.FC = () => {
     lunch: useRef<TextInput>(null),
     dinner: useRef<TextInput>(null)
   };
-  const navigation = useNavigation();
 
+  useEffect(() => {
+  if (forcedMealType) {
+    setSelectedMealType(forcedMealType);
+  }
+}, [forcedMealType]);
+
+useEffect(() => {
+  if (isEditMode) {
+    // In edit mode, use the specific menu price from params
+    if (initialMealType === 'lunch') {
+      setLunchData(prev => ({
+        ...prev,
+        menuName: initialMenuName as string || 'Lunch Menu',
+        note: initialNote as string || '',
+        mealOptions: { 
+          price: parseInt(initialPrice as string || '0') 
+        }
+      }));
+    } else if (initialMealType === 'dinner') {
+      setDinnerData(prev => ({
+        ...prev,
+        menuName: initialMenuName as string || 'Dinner Menu',
+        note: initialNote as string || '',
+        mealOptions: { 
+          price: parseInt(initialPrice as string || '0') 
+        }
+      }));
+    }
+  }
+}, [isEditMode, initialMealType, initialMenuName, initialNote, initialPrice]);
   // Local state for each meal type
   const [lunchData, setLunchData] = useState<{
     menuName: string;
@@ -127,10 +190,12 @@ const DailyMenuScreen: React.FC = () => {
     selectedDishes: SelectedDishes;
     mealOptions: MealOptions;
   }>({
-    menuName: 'Lunch Menu',
-    note: '',
+    menuName: initialMealType === 'lunch' ? (initialMenuName as string || 'Lunch Menu') : 'Lunch Menu',
+    note: initialMealType === 'lunch' ? (initialNote as string || '') : '',
     selectedDishes: {},
-    mealOptions: { price: 0 }
+    mealOptions: { 
+      price: initialMealType === 'lunch' ? parseInt(initialPrice as string || '0') : 0 
+    }
   });
 
   const [dinnerData, setDinnerData] = useState<{
@@ -139,10 +204,12 @@ const DailyMenuScreen: React.FC = () => {
     selectedDishes: SelectedDishes;
     mealOptions: MealOptions;
   }>({
-    menuName: 'Dinner Menu',
-    note: '',
+    menuName: initialMealType === 'dinner' ? (initialMenuName as string || 'Dinner Menu') : 'Dinner Menu',
+    note: initialMealType === 'dinner' ? (initialNote as string || '') : '',
     selectedDishes: {},
-    mealOptions: { price: 0 }
+    mealOptions: { 
+      price: initialMealType === 'dinner' ? parseInt(initialPrice as string || '0') : 0 
+    }
   });
 
   // Fetch meal preferences
@@ -150,7 +217,19 @@ const DailyMenuScreen: React.FC = () => {
   const [prefsLoading, setPrefsLoading] = useState<boolean>(true);
 
   // Calculate indicator width
-  const indicatorWidth = (width - 60) / 2-4;
+  const indicatorWidth = (width - 60) / 2 - 4;
+
+  // Parse selected dishes from params
+  const parseSelectedDishesFromParams = useCallback((): SelectedDishes => {
+    try {
+      if (selectedDishesParam) {
+        return JSON.parse(selectedDishesParam as string);
+      }
+    } catch (error) {
+      console.error('Error parsing selected dishes:', error);
+    }
+    return {};
+  }, [selectedDishesParam]);
 
   // Setup scroll listener for animations
   useEffect(() => {
@@ -168,6 +247,13 @@ const DailyMenuScreen: React.FC = () => {
     };
   }, []);
 
+  // Navigation setup
+  useEffect(() => {
+    navigation.setOptions({
+      headerShown: false,
+    });
+  }, [navigation]);
+
   // Handle scroll end to update selected meal type
   const handleScrollEnd = useCallback((event: any) => {
     const offsetX = event.nativeEvent.contentOffset.x;
@@ -176,13 +262,11 @@ const DailyMenuScreen: React.FC = () => {
     
     if (mealType !== selectedMealType) {
       setSelectedMealType(mealType);
-      // No loading when switching meal types
     }
   }, [selectedMealType]);
 
   // Handle meal type tab press
   const handleMealTypePress = useCallback((mealType: 'lunch' | 'dinner') => {
-
     const index = mealType === 'lunch' ? 0 : 1;
     
     if (horizontalScrollViewRef.current) {
@@ -239,7 +323,7 @@ const DailyMenuScreen: React.FC = () => {
     }
   };
 
-  const fetchAllMealPreferences = async () => {
+const fetchAllMealPreferences = async () => {
   try {
     const response = await api.get(`${PROVIDER_API_URL}/preferences`, {
       headers: { Authorization: `Bearer ${provider.token}` }
@@ -248,198 +332,183 @@ const DailyMenuScreen: React.FC = () => {
     if (response.data.success) {
       const prefs = response.data.data.mealService;
       
-      // Set lunch preferences
-      const lunchPrefs = prefs.lunch || { price: 0 };
-      setLunchData(prev => ({
-        ...prev,
-        mealOptions: { price: lunchPrefs.price || 0 }
-      }));
-      
-      // Set dinner preferences
-      const dinnerPrefs = prefs.dinner || { price: 0 };
-      setDinnerData(prev => ({
-        ...prev,
-        mealOptions: { price: dinnerPrefs.price || 0 }
-      }));
+      // Only set meal preference prices if NOT in edit mode
+      if (!isEditMode) {
+        // Set lunch preferences
+        const lunchPrefs = prefs.lunch || { price: 0 };
+        setLunchData(prev => ({
+          ...prev,
+          mealOptions: { price: lunchPrefs.price || 0 }
+        }));
+        
+        // Set dinner preferences
+        const dinnerPrefs = prefs.dinner || { price: 0 };
+        setDinnerData(prev => ({
+          ...prev,
+          mealOptions: { price: dinnerPrefs.price || 0 }
+        }));
+      }
     }
   } catch (error) {
-    // Set default values on error
-    setLunchData(prev => ({
-      ...prev,
-      mealOptions: { price: 0 }
-    }));
-    setDinnerData(prev => ({
-      ...prev,
-      mealOptions: { price: 0 }
-    }));
+    // Only set default values if NOT in edit mode
+    if (!isEditMode) {
+      setLunchData(prev => ({
+        ...prev,
+        mealOptions: { price: 0 }
+      }));
+      setDinnerData(prev => ({
+        ...prev,
+        mealOptions: { price: 0 }
+      }));
+    }
+  }
+};
+
+  // Load static data
+  useEffect(() => {
+    if (!providerId) {
+      router.push('/');
+      return;
+    }
+
+    if (!prefsLoading) {
+      fetchStaticData();
+      fetchAllMealPreferences();
+    }
+  }, [providerId, prefsLoading]);
+
+ const fetchStaticData = async () => {
+  try {
+    setLoading(true);
+    setError(null);
+    
+    // Fetch categories
+    const categoriesResponse = await api.get(`${CATEGORY_API_URL}/provider/${providerId}`);
+    const activeCategories = categoriesResponse.data.data.filter((cat: DishCategory) => cat.isActive);
+    
+    activeCategories.sort((a: DishCategory, b: DishCategory) => {
+      if (a.order !== undefined && b.order !== undefined) {
+        return a.order - b.order;
+      }
+      return a.name.localeCompare(b.name);
+    });
+    
+    setCategories(activeCategories);
+    
+    // Initialize selected dishes based on edit mode
+    const parsedSelectedDishes = parseSelectedDishesFromParams();
+    
+    const initialSelectedDishes: SelectedDishes = {};
+    activeCategories.forEach((cat: DishCategory) => {
+      // If edit mode, use the parsed dishes, otherwise empty array
+      initialSelectedDishes[cat._id] = isEditMode && parsedSelectedDishes[cat._id] 
+        ? parsedSelectedDishes[cat._id] 
+        : [];
+    });
+    
+    // Set initial data based on edit mode
+    if (isEditMode) {
+      // In edit mode, use the specific menu data from params
+      if (initialMealType === 'lunch') {
+        setLunchData({
+          menuName: initialMenuName as string || 'Lunch Menu',
+          note: initialNote as string || '',
+          selectedDishes: { ...initialSelectedDishes },
+          mealOptions: { 
+            price: parseInt(initialPrice as string || '0') 
+          }
+        });
+      } else if (initialMealType === 'dinner') {
+        setDinnerData({
+          menuName: initialMenuName as string || 'Dinner Menu',
+          note: initialNote as string || '',
+          selectedDishes: { ...initialSelectedDishes },
+          mealOptions: { 
+            price: parseInt(initialPrice as string || '0') 
+          }
+        });
+      }
+    } else {
+      // In create mode, initialize with default values
+      setLunchData(prev => ({
+        ...prev,
+        selectedDishes: { ...initialSelectedDishes }
+      }));
+      setDinnerData(prev => ({
+        ...prev,
+        selectedDishes: { ...initialSelectedDishes }
+      }));
+    }
+    
+    // Fetch dishes
+    let activeDishes: Dish[] = [];
+    
+    try {
+      const dishesResponse = await api.get(`${DISH_API_URL}/provider/${providerId}`);
+      
+      if (dishesResponse.data.success && dishesResponse.data.data) {
+        dishesResponse.data.data.forEach((categoryGroup: any) => {
+          if (categoryGroup.dishes && Array.isArray(categoryGroup.dishes)) {
+            categoryGroup.dishes.forEach((dish: any) => {
+              let categoryId: string;
+              if (typeof categoryGroup.categoryId === 'object' && categoryGroup.categoryId !== null) {
+                categoryId = categoryGroup.categoryId._id || categoryGroup.categoryId.toString();
+              } else {
+                categoryId = categoryGroup.categoryId.toString();
+              }
+
+              const dishData: Dish = {
+                _id: dish._id?.toString() || Math.random().toString(),
+                name: dish.name || 'Unnamed Dish',
+                categoryId: categoryId,
+                description: dish.description || '',
+                isActive: dish.isActive !== false,
+                basePrice: dish.basePrice || 0,
+                isExtra: dish.isExtra || false
+              };
+              
+              if (dishData.isActive) {
+                activeDishes.push(dishData);
+              }
+            });
+          }
+        });
+      }
+    } catch (dishError) {
+      console.error('Error fetching dishes:', dishError);
+    }
+
+    setDishes(activeDishes);
+    setLoading(false);
+    
+  } catch (error) {
+    setError('Failed to load data. Please try again.');
+    setLoading(false);
   }
 };
 
   // Get active meal types based on fetched preferences
-  const getActiveMealTypes = () => {
-    if (!mealPrefs) {
-      return [];
-    }
-    
-    const activeMealTypes = [];
-    
-    if (mealPrefs.lunch?.enabled === true) {
-      activeMealTypes.push(MEAL_TYPES[0]);
-    }
-    
-    if (mealPrefs.dinner?.enabled === true) {
-      activeMealTypes.push(MEAL_TYPES[1]);
-    }
-    
-    if (activeMealTypes.length === 0) {
-      return MEAL_TYPES;
-    }
-    
-    return activeMealTypes;
-  };
-
-  const activeMealTypes = getActiveMealTypes();
-  const hasMultipleMealTypes = activeMealTypes.length > 1;
-
-  useEffect(() => {
-    navigation.setOptions({
-      headerShown: false,
-    });
-  }, [navigation]);
-
-  // Load static data only once
-useEffect(() => {
-  if (!providerId) {
-    router.push('/');
-    return;
+ const getActiveMealTypes = () => {
+  // 🔒 EDIT MODE: show only selected meal
+  if (forcedMealType) {
+    return MEAL_TYPES.filter(m => m.id === forcedMealType);
   }
 
-  if (!prefsLoading) {
-    fetchStaticData();
-    fetchAllMealPreferences(); // ← Fetch all preferences at once
+  if (!mealPrefs) return [];
+
+  const activeMealTypes = [];
+
+  if (mealPrefs.lunch?.enabled === true) {
+    activeMealTypes.push(MEAL_TYPES[0]);
   }
-}, [providerId, prefsLoading]);
 
-  const fetchProviderPreferencesForMealType = async (mealType: 'lunch' | 'dinner') => {
-    try {
-      const response = await api.get(`${PROVIDER_API_URL}/preferences`, {
-        headers: { Authorization: `Bearer ${provider.token}` }
-      });
-      
-      if (response.data.success) {
-        const prefs = response.data.data.mealService;
-        const currentMealPrefs = prefs[mealType] || {
-          price: 0
-        };
-        
-        if (mealType === 'lunch') {
-          setLunchData(prev => ({
-            ...prev,
-            mealOptions: { price: currentMealPrefs.price || 0 }
-          }));
-        } else {
-          setDinnerData(prev => ({
-            ...prev,
-            mealOptions: { price: currentMealPrefs.price || 0 }
-          }));
-        }
-      }
-    } catch (error) {
-      // Set default values on error
-      if (mealType === 'lunch') {
-        setLunchData(prev => ({
-          ...prev,
-          mealOptions: { price: 0 }
-        }));
-      } else {
-        setDinnerData(prev => ({
-          ...prev,
-          mealOptions: { price: 0 }
-        }));
-      }
-    }
-  };
+  if (mealPrefs.dinner?.enabled === true) {
+    activeMealTypes.push(MEAL_TYPES[1]);
+  }
 
-  const fetchStaticData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Fetch categories
-      const categoriesResponse = await api.get(`${CATEGORY_API_URL}/provider/${providerId}`);
-      const activeCategories = categoriesResponse.data.data.filter((cat: DishCategory) => cat.isActive);
-      
-      activeCategories.sort((a: DishCategory, b: DishCategory) => {
-        if (a.order !== undefined && b.order !== undefined) {
-          return a.order - b.order;
-        }
-        return a.name.localeCompare(b.name);
-      });
-      
-      setCategories(activeCategories);
-      
-      // Initialize selected dishes with empty arrays for both meal types
-      const initialSelectedDishes: SelectedDishes = {};
-      activeCategories.forEach((cat: DishCategory) => {
-        initialSelectedDishes[cat._id] = [];
-      });
-      setSelectedDishes(initialSelectedDishes);
-      
-      // Set initial selected dishes for both meal types
-      setLunchData(prev => ({
-        ...prev,
-        selectedDishes: { ...initialSelectedDishes }
-      }));
-      setDinnerData(prev => ({
-        ...prev,
-        selectedDishes: { ...initialSelectedDishes }
-      }));
-      
-      // Fetch dishes
-      let activeDishes: Dish[] = [];
-      
-      try {
-        const dishesResponse = await api.get(`${DISH_API_URL}/provider/${providerId}`);
-        
-        if (dishesResponse.data.success && dishesResponse.data.data) {
-          dishesResponse.data.data.forEach((categoryGroup: any) => {
-            if (categoryGroup.dishes && Array.isArray(categoryGroup.dishes)) {
-              categoryGroup.dishes.forEach((dish: any) => {
-                let categoryId: string;
-                if (typeof categoryGroup.categoryId === 'object' && categoryGroup.categoryId !== null) {
-                  categoryId = categoryGroup.categoryId._id || categoryGroup.categoryId.toString();
-                } else {
-                  categoryId = categoryGroup.categoryId.toString();
-                }
+  return activeMealTypes.length > 0 ? activeMealTypes : MEAL_TYPES;
+};
 
-                const dishData: Dish = {
-                  _id: dish._id?.toString() || Math.random().toString(),
-                  name: dish.name || 'Unnamed Dish',
-                  categoryId: categoryId,
-                  description: dish.description || '',
-                  isActive: dish.isActive !== false,
-                  basePrice: dish.basePrice || 0,
-                  isExtra: dish.isExtra || false
-                };
-                
-                if (dishData.isActive) {
-                  activeDishes.push(dishData);
-                }
-              });
-            }
-          });
-        }
-      } catch (dishError) {
-      }
-
-      setDishes(activeDishes);
-      setLoading(false);
-      
-    } catch (error) {
-      setError('Failed to load data. Please try again.');
-      setLoading(false);
-    }
-  };
 
   const getDishesByCategoryId = (categoryId: string): Dish[] => {
     return dishes.filter(dish => dish.categoryId === categoryId);
@@ -512,70 +581,123 @@ useEffect(() => {
     );
   };
 
-  const saveMenu = async () => {
-    const currentData = selectedMealType === 'lunch' ? lunchData : dinnerData;
-    
-    try {
-      if (!hasSelectedDishes(selectedMealType)) {
-        Alert.alert('No Dishes Selected', 'Please select at least one dish for the menu.');
-        return;
-      }
-
-      if (currentData.mealOptions.price <= 0) {
-        Alert.alert('Invalid Price', 'Please set a valid price for the menu.');
-        return;
-      }
-
-      setSaving(true);
-      setError(null);
-      
-      const formattedItems = Object.keys(currentData.selectedDishes)
-        .filter(categoryId => currentData.selectedDishes[categoryId].length > 0)
-        .map(categoryId => ({
-          categoryId,
-          dishIds: currentData.selectedDishes[categoryId]
-        }));
-
-      const menuData = {
-        providerId,
-        day: selectedDay,
-        mealType: selectedMealType,
-        items: formattedItems,
-        note: currentData.note.trim() || undefined,
-        name: currentData.menuName.trim() || `${selectedMealType.charAt(0).toUpperCase() + selectedMealType.slice(1)} Menu`,
-        mealOptions: {
-          price: currentData.mealOptions.price
-        },
-        isSpecialPricing: isSpecialPricing,
-        specialPricingNote: specialPricingNote.trim() || undefined
-      };
-
-      const response = await api.post(`${MENU_API_URL}`, menuData);
-      
-      if (response.data.success) {
-        clearSelectedDishes(selectedMealType);
-        Alert.alert('Success', `${selectedMealType.charAt(0).toUpperCase() + selectedMealType.slice(1)} menu saved successfully!`);
-      } else {
-        throw new Error(response.data.message);
-      }
-    } catch (error) {
-      const errorMessage = api.isapiError(error) 
-        ? error.response?.data?.message || error.message 
-        : 'Failed to save menu';
-      setError(errorMessage);
-      Alert.alert('Error', errorMessage);
-    } finally {
-      setSaving(false);
+ const saveMenu = async () => {
+  const currentData = selectedMealType === 'lunch' ? lunchData : dinnerData;
+  
+  try {
+    if (!hasSelectedDishes(selectedMealType)) {
+      Alert.alert('No Dishes Selected', 'Please select at least one dish for the menu.');
+      return;
     }
-  };
 
-  const focusNoteInput = (mealType: 'lunch' | 'dinner') => {
-    setIsNoteFocused(true);
-    setTimeout(() => {
-      noteInputRefs[mealType].current?.focus();
-      verticalScrollViewRefs[mealType].current?.scrollToEnd({ animated: true });
-    }, 100);
-  };
+    if (currentData.mealOptions.price <= 0) {
+      Alert.alert('Invalid Price', 'Please set a valid price for the menu.');
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    
+    const formattedItems = Object.keys(currentData.selectedDishes)
+      .filter(categoryId => currentData.selectedDishes[categoryId].length > 0)
+      .map(categoryId => ({
+        categoryId,
+        dishIds: currentData.selectedDishes[categoryId]
+      }));
+
+    // Try sending price at root level AND in mealOptions
+ const menuData = {
+  providerId,
+  day: selectedDay,
+  mealType: selectedMealType,
+  items: formattedItems,
+  note: currentData.note.trim() || undefined,
+  name:
+    currentData.menuName.trim() ||
+    `${selectedMealType.charAt(0).toUpperCase() + selectedMealType.slice(1)}`,
+
+  pricing: {
+    price: currentData.mealOptions.price
+  },
+
+  specialPricingNote: specialPricingNote.trim() || undefined
+};
+
+    console.log('Saving menu data (with price at root):', {
+      isEditMode,
+      menuId: currentMenuId,
+      menuData,
+      selectedMealType,
+      price: currentData.mealOptions.price
+    });
+
+    let response;
+    
+    if (isEditMode && currentMenuId) {
+      response = await api.put(`${MENU_API_URL}`, {
+        ...menuData,
+        _id: currentMenuId
+      });
+    } else {
+      response = await api.post(`${MENU_API_URL}`, menuData);
+    }
+    
+    console.log('Full API Response:', {
+      success: response.data.success,
+      data: response.data.data,
+      message: response.data.message
+    });
+    
+    if (response.data.success) {
+      if (!isEditMode) {
+        clearSelectedDishes(selectedMealType);
+      }
+      
+      Alert.alert(
+        'Success', 
+        `${selectedMealType.charAt(0).toUpperCase() + selectedMealType.slice(1)} menu ${isEditMode ? 'updated' : 'saved'} successfully!`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              if (isEditMode) {
+                // Go back to saved menus
+                router.back();
+              }
+            }
+          }
+        ]
+      );
+    } else {
+      throw new Error(response.data.message);
+    }
+  } catch (error: unknown) {
+    let errorMessage = 'Failed to save menu';
+
+    if (axios.isAxiosError(error)) {
+      console.log('Axios Error Complete:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        config: error.config
+      });
+      
+      errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        errorMessage;
+    }
+
+    setError(errorMessage);
+    Alert.alert('Error', errorMessage);
+  } finally {
+    setSaving(false);
+  }
+};
+
+const focusNoteInput = (mealType: 'lunch' | 'dinner') => {
+  noteInputRefs[mealType].current?.focus();
+};
+
 
   const getCategoryEmoji = (categoryName: string): string => {
     const emojiMap: Record<string, string> = {
@@ -615,7 +737,21 @@ useEffect(() => {
     }
   };
 
-  // Render Day Selector (FIXED at top)
+  const activeMealTypes = getActiveMealTypes();
+  const hasMultipleMealTypes = activeMealTypes.length > 1;
+
+  // Render Header with Back Button
+  const renderHeader = () => (
+    <View style={styles.header}>
+      <Text weight='bold' style={styles.headerTitle}>
+        {isEditMode ? 'Edit Menu' : 'Create Menu'}
+      </Text>
+
+      <View style={styles.headerSpacer} />
+    </View>
+  );
+
+  // Render Day Selector
   const renderDaySelector = () => {
     return (
       <View style={[styles.daysContainer]}>
@@ -648,7 +784,7 @@ useEffect(() => {
     );
   };
 
-  // Render Meal Type Selector with Swipe Functionality
+  // Render Meal Type Selector
   const renderMealTypeSelector = () => {
     if (prefsLoading) {
       return (
@@ -687,7 +823,7 @@ useEffect(() => {
       <View style={styles.mealTypeTabWrapper}>
         <View style={styles.mealTypeTabContainer}>
           {/* Sliding indicator */}
-           <Animated.View
+          <Animated.View
             pointerEvents="none"
             style={[
               styles.mealTypeTabIndicator,
@@ -703,10 +839,6 @@ useEffect(() => {
               const IconComponent = mealType.icon;
               const isActive = mealType.id === selectedMealType;
               
-              // Interpolate text color based on scroll position
-              const textColor = isActive ? "#15803d" : "#FFFFFF";
-
-
               return (
                 <TouchableOpacity
                   key={mealType.id}
@@ -722,17 +854,17 @@ useEffect(() => {
                       size={18}
                       color={isActive ? "#15803d" : "#FFFFFF"}
                     />
-                   <Text
-                    key={`${mealType.id}-${isActive}`}   // 👈 forces re-mount
-                    style={[
-                      styles.mealTypeTabText,
-                      {
-                        color: isActive ? '#15803d' : '#FFFFFF',
-                      },
-                    ]}
-                  >
-                    {mealType.name}
-                  </Text>
+                    <Text
+                      key={`${mealType.id}-${isActive}`}
+                      style={[
+                        styles.mealTypeTabText,
+                        {
+                          color: isActive ? '#15803d' : '#FFFFFF',
+                        },
+                      ]}
+                    >
+                      {mealType.name}
+                    </Text>
                   </View>
                 </TouchableOpacity>
               );
@@ -809,40 +941,49 @@ useEffect(() => {
   };
 
   // Render Meal Options Section
-  const renderMealOptions = (mealType: 'lunch' | 'dinner') => {
-    const gradientColors = getMealTypeGradient();
-    const currentData = mealType === 'lunch' ? lunchData : dinnerData;
-    const totalSelectedDishes = Object.values(currentData.selectedDishes).reduce((acc, curr) => acc + (curr?.length || 0), 0);
-    
-    return (
-      <View style={[styles.mealOptionsContainer, { borderLeftColor: gradientColors[0] }]}>
-        <View style={styles.sectionHeader}>
-          <View>
-            <Text weight='bold' style={styles.sectionTitle}>
-              {mealType.charAt(0).toUpperCase() + mealType.slice(1)} Options
-            </Text>
-            <Text weight='bold' style={styles.sectionSubtitle}>
-              {totalSelectedDishes} dishes selected
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.priceSection}>
-          <Text weight='bold' style={styles.priceLabel}>Price</Text>
-          <View style={styles.priceInputContainer}>
-            <Text weight='bold' style={[styles.currencySymbol, { color: gradientColors[0] }]}>₹</Text>
-            <TextInput
-              style={styles.priceInputField}
-              value={currentData.mealOptions.price?.toString() || '0'}
-              onChangeText={(value) => updateMealPrice(value, mealType)}
-              keyboardType="numeric"
-              placeholder="0"
-            />
-          </View>
+const renderMealOptions = (mealType: 'lunch' | 'dinner') => {
+  const gradientColors = getMealTypeGradient();
+  const currentData = mealType === 'lunch' ? lunchData : dinnerData;
+  const totalSelectedDishes = Object.values(currentData.selectedDishes).reduce((acc, curr) => acc + (curr?.length || 0), 0);
+  
+  return (
+    <View style={[styles.mealOptionsContainer, { borderLeftColor: gradientColors[0] }]}>
+      <View style={styles.sectionHeader}>
+        <View>
+          <Text weight='bold' style={styles.sectionTitle}>
+            {mealType.charAt(0).toUpperCase() + mealType.slice(1)} Options
+          </Text>
+          <Text weight='bold' style={styles.sectionSubtitle}>
+            {totalSelectedDishes} dishes selected
+            {isEditMode && ' • Editing menu price'}
+            {!isEditMode && ' • Using meal preference price'}
+          </Text>
         </View>
       </View>
-    );
-  };
+
+      <View style={styles.priceSection}>
+        <Text weight='bold' style={styles.priceLabel}>
+          Price {isEditMode ? '(Menu Price)' : '(Default Meal Price)'}
+        </Text>
+        <View style={styles.priceInputContainer}>
+          <Text weight='bold' style={[styles.currencySymbol, { color: gradientColors[0] }]}>₹</Text>
+          <TextInput
+            style={styles.priceInputField}
+            value={currentData.mealOptions.price?.toString() || '0'}
+            onChangeText={(value) => updateMealPrice(value, mealType)}
+            keyboardType="numeric"
+            placeholder="0"
+          />
+        </View>
+        {/* {!isEditMode && (
+          <Text weight='bold' style={styles.priceHint}>
+            This price will be used for all menus unless overridden in edit mode
+          </Text>
+        )} */}
+      </View>
+    </View>
+  );
+};
 
   // Render Menu Name Input
   const renderMenuNameInput = (mealType: 'lunch' | 'dinner') => {
@@ -872,29 +1013,23 @@ useEffect(() => {
     return (
       <View style={styles.notesContainer}>
         <Text weight='bold' style={styles.notesTitle}>📝 Notes (Optional)</Text>
-        <TouchableOpacity 
-          style={styles.notesInputTouchable}
-          onPress={() => focusNoteInput(mealType)}
-          activeOpacity={0.7}
-        >
-          <TextInput
-            ref={noteInputRefs[mealType]}
-            style={styles.notesInput}
-            placeholder="E.g., 'Special paneer today!'"
-            value={currentData.note}
-            onChangeText={(value) => {
-              if (mealType === 'lunch') {
-                setLunchData(prev => ({ ...prev, note: value }));
-              } else {
-                setDinnerData(prev => ({ ...prev, note: value }));
-              }
-            }}
-            multiline
-            numberOfLines={4}
-            onFocus={() => setIsNoteFocused(true)}
-            onBlur={() => setIsNoteFocused(false)}
-          />
-        </TouchableOpacity>
+       
+         <TextInput
+  ref={noteInputRefs[mealType]}
+  style={styles.notesInput}
+  onFocus={(e) => scrollToInput(e.target)}
+  placeholder="E.g., 'Special paneer today!'"
+  value={currentData.note}
+  onChangeText={(value) => {
+    mealType === 'lunch'
+      ? setLunchData(prev => ({ ...prev, note: value }))
+      : setDinnerData(prev => ({ ...prev, note: value }));
+  }}
+  multiline
+  textAlignVertical="top"
+  scrollEnabled={false}
+  blurOnSubmit={false}
+/>
       </View>
     );
   };
@@ -932,113 +1067,174 @@ useEffect(() => {
     );
   }
 
-return (
-  <View style={styles.container}>
-    {/* Fixed Day Tabs at Top */}
-    {renderDaySelector()}
-    
-    {/* Meal Type Selector - Fixed */}
-    {renderMealTypeSelector()}
-    
-    {/* Conditional Content Area */}
-    {hasMultipleMealTypes ? (
-      /* Swipeable Content Area - Only when multiple meal types are enabled */
-      <Animated.ScrollView
-        ref={horizontalScrollViewRef}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-          { useNativeDriver: false }
-        )}
-        onMomentumScrollEnd={handleScrollEnd}
-        scrollEventThrottle={16}
-        style={styles.horizontalScrollView}
-        contentContainerStyle={styles.horizontalScrollContent}
-        decelerationRate="fast"
-        snapToInterval={width}
-        snapToAlignment="center"
-      >
-        {/* Lunch Page */}
-        <View style={styles.pageContainer}>
-          <ScrollView
-            ref={verticalScrollViewRefs.lunch}
-            style={styles.verticalScrollView}
-            contentContainerStyle={styles.scrollContainer}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {renderMenuNameInput('lunch')}
-            {renderMealOptions('lunch')}
-            {categories.map(category => renderCategory(category, 'lunch'))}
-            {renderNotesSection('lunch')}
-            <View style={styles.bottomSpacer} />
-          </ScrollView>
-        </View>
+  return (
+    <View  style={styles.container}>
+      {/* <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      > */}
+        {/* Header */}
+        {/* {renderHeader()} */}
         
-        {/* Dinner Page */}
-        <View style={styles.pageContainer}>
-          <ScrollView
-            ref={verticalScrollViewRefs.dinner}
-            style={styles.verticalScrollView}
-            contentContainerStyle={styles.scrollContainer}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
+        {/* Fixed Day Tabs */}
+        {renderDaySelector()}
+        
+        {/* Meal Type Selector */}
+        {renderMealTypeSelector()}
+        
+        {/* Conditional Content Area */}
+        {hasMultipleMealTypes ? (
+          /* Swipeable Content Area */
+          <Animated.ScrollView
+            ref={horizontalScrollViewRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+              { useNativeDriver: false }
+            )}
+            onMomentumScrollEnd={handleScrollEnd}
+            scrollEventThrottle={16}
+            style={styles.horizontalScrollView}
+            contentContainerStyle={styles.horizontalScrollContent}
+            decelerationRate="fast"
+            snapToInterval={width}
+            snapToAlignment="center"
           >
-            {renderMenuNameInput('dinner')}
-            {renderMealOptions('dinner')}
-            {categories.map(category => renderCategory(category, 'dinner'))}
-            {renderNotesSection('dinner')}
-            <View style={styles.bottomSpacer} />
-          </ScrollView>
-        </View>
-      </Animated.ScrollView>
-    ) : (
-      /* Single meal type view - No swiping */
-      <View style={styles.singleMealContainer}>
-        <ScrollView
-          ref={selectedMealType === 'lunch' ? verticalScrollViewRefs.lunch : verticalScrollViewRefs.dinner}
-          style={styles.verticalScrollView}
-          contentContainerStyle={styles.scrollContainer}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {renderMenuNameInput(selectedMealType)}
-          {renderMealOptions(selectedMealType)}
-          {categories.map(category => renderCategory(category, selectedMealType))}
-          {renderNotesSection(selectedMealType)}
-          <View style={styles.bottomSpacer} />
-        </ScrollView>
-      </View>
-    )}
+            {/* Lunch Page */}
+            <View style={styles.pageContainer}>
+<KeyboardAwareScrollView
+  enableOnAndroid
+  enableAutomaticScroll
+  keyboardOpeningTime={0}
+  keyboardShouldPersistTaps="handled"
+  extraScrollHeight={120}
+  extraHeight={120}
+  contentContainerStyle={{
     
-    {/* Fixed Save Button */}
-    <View style={styles.fixedButtonContainer}>
-      <TouchableOpacity
-        style={[styles.actionButton, { backgroundColor: getMealTypeGradient()[0] }, (!hasSelectedDishes(selectedMealType) || saving) && styles.disabledButton]}
-        onPress={saveMenu}
-        disabled={!hasSelectedDishes(selectedMealType) || saving}
-      >
-        {saving ? (
-          <ActivityIndicator color="#fff" />
+  }}
+>
+
+
+
+                {renderMenuNameInput('lunch')}
+                {renderMealOptions('lunch')}
+                {categories.map(category => renderCategory(category, 'lunch'))}
+                {renderNotesSection('lunch')}
+                <View style={styles.bottomSpacer} />
+              </KeyboardAwareScrollView>
+            </View>
+            
+            {/* Dinner Page */}
+            <View style={styles.pageContainer}>
+          <KeyboardAwareScrollView
+  enableOnAndroid
+  enableAutomaticScroll
+  keyboardOpeningTime={0}
+  keyboardShouldPersistTaps="handled"
+  extraScrollHeight={120}
+  extraHeight={120}
+  contentContainerStyle={{
+    
+  }}
+>
+
+
+                {renderMenuNameInput('dinner')}
+                {renderMealOptions('dinner')}
+                {categories.map(category => renderCategory(category, 'dinner'))}
+                {renderNotesSection('dinner')}
+                <View style={styles.bottomSpacer} />
+              </KeyboardAwareScrollView>
+            </View>
+          </Animated.ScrollView>
         ) : (
-          <Text weight='bold' style={styles.buttonText}>
-            Save {selectedMealType.charAt(0).toUpperCase() + selectedMealType.slice(1)} Menu
-          </Text>
+          /* Single meal type view */
+          <View style={styles.singleMealContainer}>
+           <KeyboardAwareScrollView
+  ref={selectedMealType === 'lunch' ? verticalScrollViewRefs.lunch : verticalScrollViewRefs.dinner}
+  style={styles.verticalScrollView}
+  contentContainerStyle={[
+    styles.scrollContainer, // 👈 space for fixed Save button
+  ]}
+  enableOnAndroid
+  enableAutomaticScroll
+  keyboardOpeningTime={0}
+  extraScrollHeight={120}
+  extraHeight={120}
+  showsVerticalScrollIndicator={false}
+  keyboardShouldPersistTaps="handled"
+>
+
+              {renderMenuNameInput(selectedMealType)}
+              {renderMealOptions(selectedMealType)}
+              {categories.map(category => renderCategory(category, selectedMealType))}
+              {renderNotesSection(selectedMealType)}
+              <View style={styles.bottomSpacer} />
+            </KeyboardAwareScrollView>
+          </View>
         )}
-      </TouchableOpacity>
+        
+        {/* Fixed Save Button */}
+        {!isKeyboardVisible && (
+         <View
+  style={[
+    styles.fixedButtonContainer,
+    {
+       paddingBottom:
+              insets.bottom + (Platform.OS === 'android' ? 0 : 0),
+    },
+  ]}
+>
+
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: getMealTypeGradient()[0] }, (!hasSelectedDishes(selectedMealType) || saving) && styles.disabledButton]}
+              onPress={saveMenu}
+              disabled={!hasSelectedDishes(selectedMealType) || saving}
+            >
+              {saving ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text weight='bold' style={styles.buttonText}>
+                  {isEditMode ? 'Update' : 'Save'} {selectedMealType.charAt(0).toUpperCase() + selectedMealType.slice(1)} Menu
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+      {/* </KeyboardAvoidingView> */}
     </View>
-  </View>
-);
+  );
 };
 
-// Update styles
+// Styles
 const styles = StyleSheet.create({
   container: {
-    // paddingTop:130,
     flex: 1,
     backgroundColor: '#f8fafc',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  headerSpacer: {
+    width: 40,
   },
   loadingContainer: {
     flex: 1,
@@ -1078,7 +1274,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(226, 232, 240, 0.3)',
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 12,
     paddingBottom: 12,
   },
   daysGrid: {
@@ -1126,12 +1322,12 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E2E8F0',
   },
   mealTypeTabContainer: {
-     position: 'relative',
-  backgroundColor: '#15803d',
-  borderRadius: 25,
-  padding: 4,
-  height: 50,
-  overflow: 'hidden', 
+    position: 'relative',
+    backgroundColor: '#15803d',
+    borderRadius: 25,
+    padding: 4,
+    height: 50,
+    overflow: 'hidden',
   },
   mealTypeTabsInner: {
     flexDirection: 'row',
@@ -1143,7 +1339,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 4,
     left: 4,
-    // width: (Dimensions.get('window').width - 60) / 2,
     height: 42,
     borderRadius: 21,
     backgroundColor: '#FFFFFF',
@@ -1151,7 +1346,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 4,
-   
   },
   mealTypeTabButton: {
     flex: 1,
@@ -1187,14 +1381,16 @@ const styles = StyleSheet.create({
   pageContainer: {
     width: Dimensions.get('window').width,
     flex: 1,
+    
   },
   verticalScrollView: {
     flex: 1,
+    
   },
   scrollContainer: {
     paddingHorizontal: 4,
     flexGrow: 1,
-    paddingBottom: 100,
+    paddingBottom: 220
   },
   // Form Elements
   inputContainer: {
@@ -1377,7 +1573,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 20,
+    marginBottom: Platform.OS === 'ios'? 0:90,
     marginHorizontal: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -1412,10 +1608,11 @@ const styles = StyleSheet.create({
     right: 0,
     paddingHorizontal: 24,
     paddingTop: 20,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
+    zIndex: 1000,
+    elevation: 1000,
   },
   actionButton: {
     flex: 1,
@@ -1456,8 +1653,8 @@ const styles = StyleSheet.create({
     color: '#1E293B',
   },
   singleMealContainer: {
-  flex: 1,
-},
+    flex: 1,
+  },
 });
 
 export default DailyMenuScreen;

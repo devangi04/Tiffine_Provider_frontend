@@ -5,15 +5,16 @@ import {
   ScrollView, 
   TouchableOpacity, 
   StyleSheet, 
-  SafeAreaView,
   StatusBar,
-  Animated
+  Animated,
+  Linking
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Text from '@/components/ztext';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const LegalMenuScreen = () => {
   const router = useRouter();
@@ -47,7 +48,7 @@ const LegalMenuScreen = () => {
       icon: 'shield-checkmark',
       iconColor: '#10b981',
       bgColor: 'rgba(16, 185, 129, 0.1)',
-      screen: '/privacypolicy'
+      link:'https://lichi-tiffin.blogspot.com/2026/01/lichi-privacy-policy.html'
     },
     {
       id: 'terms',
@@ -56,12 +57,12 @@ const LegalMenuScreen = () => {
       icon: 'document-text',
       iconColor: '#8b5cf6',
       bgColor: 'rgba(139, 92, 246, 0.1)',
-      screen: '/terms'
+      link:'https://lichi-tiffin.blogspot.com/2026/01/lichi-terms-conditions.html'
     }
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
       {/* <StatusBar
         backgroundColor="#f8fafc"
         barStyle="dark-content"
@@ -93,16 +94,24 @@ const LegalMenuScreen = () => {
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
           { useNativeDriver: false }
         )}
+        contentInsetAdjustmentBehavior="never"
         scrollEventThrottle={16}
         contentContainerStyle={styles.scrollContent}
       >
         {/* Menu Items - Start lower to account for header */}
-        <View style={[styles.menuItemsContainer, { marginTop: 60 }]}>
+        <View style={[styles.menuItemsContainer, { marginTop: 20 }]}>
           {menuItems.map((item) => (
             <TouchableOpacity
               key={item.id}
               style={styles.menuItem}
-              onPress={() => router.push(item.screen as any)}
+             onPress={() => {
+  if (item.link) {
+    Linking.openURL(item.link);
+  } else if (item.screen) {
+    router.push(item.screen as any);
+  }
+}}
+
               activeOpacity={0.7}
             >
               <View style={[styles.menuIconCircle, { backgroundColor: item.bgColor }]}>
@@ -121,14 +130,17 @@ const LegalMenuScreen = () => {
         </View>
 
         {/* Footer */}
-        <View style={styles.footer}>
-          <Text  style={styles.footerText}>Lichi-Provider</Text>
-          <Text style={styles.footerCopyright}>© 2026 Triosphere Tech.pvt.ltd</Text>
-          <Text style={styles.footerVersion}>Version 1.0.0</Text>
-        </View>
+       <View style={styles.footer}>
+  <Text style={styles.footerText}>Lichi-Provider</Text>
+  <Text style={styles.footerCopyright}>
+    © 2026 Triosphere Tech.pvt.ltd
+  </Text>
+  <Text style={styles.footerVersion}>Version 1.0.0</Text>
+</View>
 
-        {/* Bottom spacing */}
-        <View style={{ height: 40 + insets.bottom }} />
+
+      
+     
       </ScrollView>
     </SafeAreaView>
   );
@@ -193,27 +205,32 @@ const styles = StyleSheet.create({
     color: '#666',
     lineHeight: 20,
   },
-  footer: {
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 40,
-    paddingBottom: 40,
-    marginTop: 180,
-  },
-  footerText: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-  },
-  footerCopyright: {
-    fontSize: 12,
-    color: '#999',
-    marginBottom: 4,
-  },
-  footerVersion: {
-    fontSize: 12,
-    color: '#ccc',
-  },
+footer: {
+  position: 'absolute',  
+  left: 0,
+  right: 0,
+  bottom:20,
+  alignItems: 'center',
+  paddingHorizontal: 20,
+},
+
+footerText: {
+  fontSize: 14,
+  color: '#666',
+  marginBottom: 8,
+},
+
+footerCopyright: {
+  fontSize: 12,
+  color: '#999',
+  marginBottom: 4,
+},
+
+footerVersion: {
+  fontSize: 12,
+  color: '#ccc',
+},
+
 });
 
 export default LegalMenuScreen;

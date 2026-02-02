@@ -9,7 +9,6 @@ import {
   Modal,
   Platform,
   Dimensions,
-  SafeAreaView,
   RefreshControl
 } from 'react-native';
 import {Text,TextStyles} from '@/components/ztext';
@@ -22,6 +21,7 @@ import { useAppSelector } from './store/hooks';
 import { API_URL } from './config/env';
 import axios from 'axios'; 
 const { width, height } = Dimensions.get('window');
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface Subscription {
   planId: any;
@@ -448,7 +448,7 @@ const SubscriptionManagement = () => {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
       <ScrollView 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollViewContent}
@@ -498,7 +498,7 @@ const SubscriptionManagement = () => {
                 </View>
               </View>
 
-              {subscription.status === 'active' && daysUntilExpiry !== null && (
+              {/* {subscription.status === 'active' && daysUntilExpiry !== null && (
                 <View style={styles.renewalReminder}>
                   <Ionicons name="notifications-outline" size={20} color="#fff" />
                   <Text weight='bold' style={styles.renewalText}>
@@ -508,7 +508,7 @@ const SubscriptionManagement = () => {
                     }
                   </Text>
                 </View>
-              )}
+              )} */}
             </LinearGradient>
 
             {/* Action Buttons */}
@@ -804,7 +804,7 @@ const styles = StyleSheet.create({
   scrollViewContent: {
     flexGrow: 1,
     padding: 20,
-    paddingBottom: 150,
+    paddingBottom: 120,
   },
   centerContainer: {
     flex: 1,
@@ -818,8 +818,8 @@ const styles = StyleSheet.create({
   },
   subscriptionCard: {
     borderRadius: 15,
-    padding: 25,
-    marginBottom: 20,
+    padding: 20,
+    marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.1,

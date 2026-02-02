@@ -136,11 +136,15 @@ export const createCustomer = createAsyncThunk(
       });
       return response.data.data;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.error || error.message);
+      // IMPORTANT: Your backend returns { success: false, error: "message" }
+      const errorMessage = error.response?.data?.error || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          'Failed to create customer';
+      return rejectWithValue(errorMessage);
     }
   }
 );
-
 // Add this thunk to your existing customerSlice
 export const fetchLocationFromPincode = createAsyncThunk(
   'customers/fetchLocationFromPincode',

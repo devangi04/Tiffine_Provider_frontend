@@ -3,7 +3,6 @@ import {
   View,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
   TextInput,
   Alert,
@@ -24,7 +23,9 @@ import { useAppSelector, useAppDispatch } from '@/app/store/hooks';
 import { setProvider } from '@/app/store/slices/providerslice';
 import {Text,TextStyles} from '@/components/ztext';
 import { API_URL } from './config/env';
-
+import { updateProviderData } from '@/app/store/slices/providerslice';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAwareScrollView } from '@/components/scrollable/KeyboardAwareScrollView';
 const { height } = Dimensions.get('window');
 
 const API_BASE_URL = API_URL;
@@ -213,15 +214,9 @@ const EditProfileScreen = () => {
           });
           
           // Update Redux state as well
-      dispatch(setProvider({
-  id: providerData.id || reduxProvider.id || '',             // required string
-  token: reduxProvider.token || '',                          // keep existing token
-  hasMealPreferences: reduxProvider.hasMealPreferences ?? false, // required boolean
-  name: providerData.name || reduxProvider.name || '',
-  email: providerData.email || reduxProvider.email || '',
-  phone: providerData.phone || reduxProvider.phone || '',
-  subscription: providerData.subscription || reduxProvider.subscription,
- 
+// In handleSaveProfile function:
+dispatch(updateProviderData({
+  phone: formData.phone
 }));
         } else {
           // Fallback to Redux data
@@ -364,7 +359,7 @@ const EditProfileScreen = () => {
   if (fetching) {
     return (
       <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="transparent" />
+       
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#15803d" />
           <Text style={styles.loadingText}>Loading profile data...</Text>
@@ -374,8 +369,8 @@ const EditProfileScreen = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#007AFF" />
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" />
 
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
@@ -383,7 +378,7 @@ const EditProfileScreen = () => {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         {/* Scrollable Content */}
-        <ScrollView
+        <KeyboardAwareScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
@@ -439,7 +434,7 @@ const EditProfileScreen = () => {
               editable={true} // Enabled - only editable field
             />
           </View>
-        </ScrollView>
+        </KeyboardAwareScrollView>
 
         {/* Fixed Save Button */}
         <View style={styles.bottomContainer}>
