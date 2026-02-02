@@ -636,16 +636,8 @@ const handleMonthChange = (direction: 'prev' | 'next') => {
     }
 
     return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <ChevronLeft size={24} color="#1E293B" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Monthly Bill</Text>
-          <View style={{ width: 24 }} />
-        </View>
+      <SafeAreaView  edges={['left', 'right', 'bottom']} style={styles.container}>
+      
 
         <ScrollView
           contentContainerStyle={[styles.contentContainer]}
@@ -818,14 +810,7 @@ const handleMonthChange = (direction: 'prev' | 'next') => {
   if (loading && !bill) {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <ChevronLeft size={24} color="#1E293B" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Monthly Bill</Text>
-          <View style={{ width: 24 }} />
-        </View>
+       
         
         <View style={styles.contentContainer}>
           {renderMonthSelector()}
@@ -847,7 +832,7 @@ const handleMonthChange = (direction: 'prev' | 'next') => {
   // Show other errors
   if (error && !billNotFound && !bill) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor="#fff" />
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -870,7 +855,7 @@ const handleMonthChange = (direction: 'prev' | 'next') => {
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
@@ -884,13 +869,7 @@ const handleMonthChange = (direction: 'prev' | 'next') => {
     return (
       <View style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <ChevronLeft size={24} color="#1E293B" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Monthly Bill</Text>
-          <View style={{ width: 24 }} />
-        </View>
+   
         
         <View style={styles.contentContainer}>
           {renderMonthSelector()}
@@ -907,17 +886,7 @@ const handleMonthChange = (direction: 'prev' | 'next') => {
   // Render normal bill view when bill exists
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <ChevronLeft size={24} color="#1E293B" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Monthly Bill</Text>
-        <TouchableOpacity onPress={downloadBill}>
-          {/* <Download size={24} color="#4F46E5" /> */}
-        </TouchableOpacity>
-      </View>
+  
 
       <ScrollView
         contentContainerStyle={styles.contentContainer}
@@ -1221,7 +1190,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 16,
-    paddingBottom: 32,
+    paddingBottom: 82,
     flexGrow: 1,
   },
   loadingContainer: {

@@ -9,11 +9,10 @@ import {
   RefreshControl,
   Modal,
   TextInput,
-  StatusBar, // Added StatusBar
 } from 'react-native';
 import { Text } from '@/components/ztext';
 import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ChevronLeft,
   Phone,
@@ -65,6 +64,7 @@ const CustomerDetailsScreen = () => {
   const customerState = useAppSelector((state) => state.customer);
   const billState = useAppSelector((state) => state.bills);
   
+  const insets = useSafeAreaInsets();
   // Get customer ID from params
   const customerId = params.id || params.customerId || params._id;
   
@@ -150,8 +150,13 @@ const CustomerDetailsScreen = () => {
   // If still fetching customer
   if (!customer && fetchingCustomer) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
+      <View  style={styles.container}>
+       <View
+  style={[
+    styles.header,
+    { paddingTop: insets.top, minHeight: 56 + insets.top },
+  ]}
+>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <ChevronLeft size={24} color="#1E293B" />
           </TouchableOpacity>
@@ -163,18 +168,17 @@ const CustomerDetailsScreen = () => {
           <ActivityIndicator size="large" color="#15803d" />
           <Text style={styles.loadingText}>Loading customer details...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   // If customer not found even after fetching
   if (!customer && !fetchingCustomer) {
     return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar backgroundColor="#FFFFFF" barStyle="dark-content" />
+      <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <ChevronLeft size={24} color="#1E293B" />
+            <ChevronLeft size={24} color="#243b1e" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Customer Details</Text>
           <View style={{ width: 24 }} />
@@ -198,7 +202,7 @@ const CustomerDetailsScreen = () => {
             <Text style={styles.retryButtonText}>Go Back</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -345,8 +349,7 @@ const CustomerDetailsScreen = () => {
   // Loading state for bills
   if (activeTab === 'bills' && (loadingBills || billLoading)) {
     return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar backgroundColor="#FFFFFF" barStyle="dark-content" />
+      <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <ChevronLeft size={24} color="#1E293B" />
@@ -361,13 +364,12 @@ const CustomerDetailsScreen = () => {
           <ActivityIndicator size="large" color="#15803d" />
           <Text style={styles.loadingText}>Loading bills...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar backgroundColor="#FFFFFF" barStyle="default" />
+    <View style={styles.container}>
       
       {/* Header */}
       <View style={styles.header}>
@@ -716,7 +718,7 @@ const CustomerDetailsScreen = () => {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 

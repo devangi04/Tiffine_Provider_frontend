@@ -5,12 +5,13 @@ import { store,persistor } from './store';
 import { Stack, usePathname } from 'expo-router';
 import { PersistGate } from 'redux-persist/integration/react'; // ✅ Import PersistGate
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { View, StyleSheet, Text,ActivityIndicator ,StatusBar} from 'react-native';
+import { View, StyleSheet, Text,ActivityIndicator} from 'react-native';
 import 'react-native-reanimated';
 import { useFonts } from "expo-font";
 import * as SplashScreen from 'expo-splash-screen';
 import { useSelector } from 'react-redux';
 import type { RootState } from './store';
+import { StatusBar } from 'expo-status-bar';
 
 import {
   NunitoSans_200ExtraLight,
@@ -75,7 +76,8 @@ const hasMealPreferences = useSelector(
 );
 
 const isDarkStatusBar =
-  pathname.endsWith('/searchcustomerdeatils') 
+  pathname.endsWith('/searchcustomerdeatils')||
+  pathname.endsWith('/about')
 
   // ✅ Route config with header + navbar visibility
   const routeConfig: Record<
@@ -86,11 +88,13 @@ const isDarkStatusBar =
       showHeader?: boolean; 
       showNavbar?: boolean; 
       headerType?: 'default' | 'dashboard' | 'none'; 
+       statusBarStyle?: 'light' | 'dark';
+       statusBarBg?: string;
     }
   > = {
     // Auth screens - no header/navbar
     '/welcome': { title: '', showHeader: false, showNavbar: false, headerType: 'none' },
-    '/login': { title: '', showHeader: false, showNavbar: false, headerType: 'none' },
+    '/login': { title: '', showHeader: false, showNavbar: false, headerType: 'none', statusBarStyle: 'dark', statusBarBg: '#ffffff' },
     '/forgotpassword': { title: '', showHeader: false, showNavbar: false, headerType: 'none' },
      '/customer': { title: 'Customer',subtitle: 'Add your customer', showHeader: true, showNavbar: false, headerType: 'default' },
 
@@ -107,11 +111,15 @@ const isDarkStatusBar =
     '/subscriptionmanagement': { title: 'Subscription Details', subtitle: 'See your details', showHeader: true, showNavbar: true, headerType: 'default' },
     '/menu': { title: 'Weekly Menu', subtitle: 'Create Menus', showHeader: true, showNavbar: false, headerType: 'default' },
      '/legalmenu': { title: 'About us', subtitle: 'Terms & Privacy Policy', showHeader: true, showNavbar: false, headerType: 'default' },
+
          '/providerseetingscreen': { title: 'Provider setting', subtitle: 'Configure your services', showHeader: true, showNavbar: false, headerType: 'default' },
 
+        '/searchcustomerdetails':{ title: 'Customer details', subtitle: 'Manage Bill', showHeader: false, showNavbar: false, headerType: 'default', statusBarStyle: 'dark', statusBarBg: '#f8fafc'},
+
     '/categorymaster': { title: 'Category Master', subtitle: 'Manage Categories', showHeader: true, showNavbar: true, headerType: 'default' },
+        '/about': { title: '', subtitle: '', showHeader: false, showNavbar: false, statusBarStyle: 'dark', statusBarBg: '#f8fafc', },
     '/edit': { title: 'Personal Details', subtitle: 'Manage Details', showHeader: true, showNavbar: false, headerType: 'default' },
-    
+        '/bill': { title: 'Customer Bill', subtitle: 'Manage Bill', showHeader: true, showNavbar: true, headerType: 'default' },
     // Tabs
     '/(tabs)': { title: '', showHeader: false, showNavbar: true, headerType: 'none' },
   };
@@ -120,6 +128,7 @@ const isDarkStatusBar =
   const current = Object.keys(routeConfig).find((route) =>
     pathname.startsWith(route)
   );
+
   
   const headerData = current
     ? routeConfig[current]
@@ -157,16 +166,17 @@ const renderHeader = () => {
   return (
     <View style={styles.container}>
 <StatusBar
-  barStyle={isDarkStatusBar ? 'dark-content' : 'light-content'}
-  backgroundColor="transparent"
+  style={headerData.statusBarStyle ?? 'light'}
   translucent
 />
 
 
       {/* ✅ Sticky Header */}
-      <View style={styles.stickyHeader}>
-        {renderHeader()}
-      </View>
+     <View style={{ backgroundColor: headerData.statusBarBg ?? '#15803d',}}>
+    <View style={[styles.stickyHeader, { paddingTop: insets.top }]}>
+      {renderHeader()}
+    </View>
+  </View>
       
       {/* ✅ Main Content Area */}
       <View style={styles.content}>

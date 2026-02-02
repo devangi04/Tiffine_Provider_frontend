@@ -1,22 +1,16 @@
-// AboutUsScreen.tsx
 import React from 'react';
 import {
   View,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  StatusBar,
   Dimensions,
-  Platform
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Text from '@/components/ztext';
-import { SafeAreaView } from 'react-native-safe-area-context';
-
-const HEADER_HEIGHT = 60;
 
 const AboutUsScreen = () => {
   const router = useRouter();
@@ -30,31 +24,36 @@ const AboutUsScreen = () => {
   ];
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']}   style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
 
       {/* ================= HEADER ================= */}
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <LinearGradient colors={['#f8fafc', '#f8fafc']} style={styles.headerGradient}>
-          <View style={styles.headerContent}>
-            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-              <Ionicons name="arrow-back" size={22} color="#333" />
-            </TouchableOpacity>
+<View
+  style={[
+    styles.header,
+    { paddingTop: insets.top, minHeight: 56 + insets.top },
+  ]}
+>
+  <View style={styles.headerInner}>
+    <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+      <Ionicons name="arrow-back" size={20} color="#333" />
+    </TouchableOpacity>
 
-            <Text style={styles.headerTitle}>About Us</Text>
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <Text weight="bold" style={styles.headerTitle}>About Us</Text>
+    </View>
 
-            <View style={styles.placeholder} />
-          </View>
-        </LinearGradient>
-      </View>
+    {/* Placeholder for spacing */}
+    <View style={{ width: 36 }} />
+  </View>
+</View>
+
 
       {/* ================= CONTENT ================= */}
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={{
-          paddingTop: HEADER_HEIGHT + insets.top ,
-        }}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingBottom: insets.bottom + 64,
+        }}
       >
         {/* Hero */}
         <LinearGradient colors={['#15803d', '#4694e2']} style={styles.heroCard}>
@@ -110,9 +109,11 @@ const AboutUsScreen = () => {
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text  style={styles.footerText}>Lichi-Provider</Text>
-                  <Text style={styles.footerCopyright}>© 2026 Triosphere Tech.pvt.ltd</Text>
-                  <Text style={styles.footerVersion}>Version 1.0.0</Text>
+          <Text style={styles.footerText}>Lichi-Provider</Text>
+          <Text style={styles.footerCopyright}>
+            © 2026 Triosphere Tech Pvt. Ltd
+          </Text>
+          <Text style={styles.footerVersion}>Version 1.0.0</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -129,56 +130,41 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
 
+  /* Header */
   header: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 20,
     backgroundColor: '#f8fafc',
-    elevation: 6,
-  },
-
-  headerGradient: {
-    paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.05)',
+    elevation: 4,
   },
 
-  headerContent: {
-    height: HEADER_HEIGHT,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  headerInner: {
+   flexDirection: 'row',
+  alignItems: 'center',  
+  justifyContent: 'space-between',
+  paddingHorizontal: 16,
   },
 
   backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 3,
+    elevation: 2,
   },
 
   headerTitle: {
-    fontSize: 18,
+   fontSize: 18,
     fontWeight: '600',
     color: '#333',
+    textAlign: 'center',
   },
 
-  placeholder: {
-    width: 38,
-  },
-
-  scrollView: {
-    flex: 1,
-     paddingTop: Platform.OS === 'ios' ? 30 : 20,
-  },
-
+  /* Hero */
   heroCard: {
-    marginHorizontal: 20,
+    margin: 20,
     borderRadius: 24,
     padding: 24,
     elevation: 6,
@@ -210,9 +196,10 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.9)',
   },
 
+  /* Content */
   content: {
     paddingHorizontal: 20,
-    paddingTop: 30,
+    paddingTop: 10,
   },
 
   sectionTitle: {
@@ -290,32 +277,26 @@ const styles = StyleSheet.create({
     color: '#333',
   },
 
+  /* Footer */
   footer: {
     alignItems: 'center',
     paddingVertical: 30,
   },
 
-  version: {
-    fontSize: 14,
-    color: '#666',
-  },
   footerText: {
     fontSize: 14,
     color: '#666',
     marginBottom: 8,
   },
+
   footerCopyright: {
     fontSize: 12,
     color: '#999',
     marginBottom: 4,
   },
+
   footerVersion: {
     fontSize: 12,
     color: '#ccc',
-  },
-  copyright: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 6,
   },
 });
