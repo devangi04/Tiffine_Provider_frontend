@@ -153,6 +153,12 @@ const renderHeader = () => {
 
   return (
     <View style={styles.container}>
+       <StatusBar
+  style="light"
+  backgroundColor="transparent"
+  translucent={true}
+  hidden={false}
+/>
       {/* ✅ Sticky Header */}
       <View style={styles.stickyHeader}>
         {renderHeader()}
@@ -194,12 +200,7 @@ const renderHeader = () => {
       {/* ✅ Bottom Navbar */}
       {headerData.showNavbar && <BottomNavBar />}
 
-     <StatusBar
-  style="light"
-  backgroundColor="transparent"
-  translucent={true}
-  hidden={false}
-/>
+  
 
 
     </View>
@@ -276,7 +277,6 @@ export default function RootLayout() {
           <SafeAreaProvider>
             <AuthChecker>
               <LayoutContent /> 
-               <StatusBar style="light" translucent={true} />
             </AuthChecker>
           </SafeAreaProvider>
         )}
