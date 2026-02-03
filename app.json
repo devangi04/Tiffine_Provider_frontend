@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "automatic",
-    "scheme": "tiffine-provider",
+    "scheme": "Lichi-provider",
     "jsEngine": "hermes",
     "android": {
       "package": "com.triospheretech.tiffineprovider",
@@ -39,10 +39,12 @@
       "supportsTablet": true,
       "userInterfaceStyle": "automatic",
       "infoPlist": {
-        "UIBackgroundModes": [
-          "remote-notification"
-        ]
-      }
+  "UIBackgroundModes": ["remote-notification"],
+  "NSUserNotificationUsageDescription": "We send notifications to confirm orders and important updates.",
+  "NSUserNotificationAlertUsageDescription": "Allow notifications to receive auto-confirm updates and order alerts.",
+  "NSUserNotificationSoundUsageDescription": "Notification sounds help you never miss an important order."
+}
+
     },
     "plugins": [
       "expo-router",
@@ -68,7 +70,8 @@
       "useLegacyPackaging": false
     },
     "ios": {
-      "deploymentTarget": "15.1"
+      "deploymentTarget": "15.1",
+       "supportsTablet": true
     }
   }
 ]

@@ -5,7 +5,7 @@ import { store,persistor } from './store';
 import { Stack, usePathname } from 'expo-router';
 import { PersistGate } from 'redux-persist/integration/react'; // ✅ Import PersistGate
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { View, StyleSheet, Text,ActivityIndicator} from 'react-native';
+import { View, StyleSheet, Text,ActivityIndicator,Platform} from 'react-native';
 import 'react-native-reanimated';
 import { useFonts } from "expo-font";
 import * as SplashScreen from 'expo-splash-screen';
@@ -75,9 +75,10 @@ const hasMealPreferences = useSelector(
   (state: RootState) => state.provider.hasMealPreferences
 );
 
-const isDarkStatusBar =
-  pathname.endsWith('/searchcustomerdeatils')||
-  pathname.endsWith('/about')
+const topOffset =
+  Platform.OS === 'android'
+    ? insets.top + 16  
+    : insets.top;  
 
   // ✅ Route config with header + navbar visibility
   const routeConfig: Record<
@@ -114,7 +115,7 @@ const isDarkStatusBar =
 
          '/providerseetingscreen': { title: 'Provider setting', subtitle: 'Configure your services', showHeader: true, showNavbar: false, headerType: 'default' },
 
-        '/searchcustomerdetails':{ title: 'Customer details', subtitle: 'Manage Bill', showHeader: false, showNavbar: false, headerType: 'default', statusBarStyle: 'dark', statusBarBg: '#f8fafc'},
+        '/searchcustomerdetails':{ title: 'Customer Info', subtitle: 'Manage customer details', showHeader: true, showNavbar: false, headerType: 'default'},
 
     '/categorymaster': { title: 'Category Master', subtitle: 'Manage Categories', showHeader: true, showNavbar: true, headerType: 'default' },
         '/about': { title: '', subtitle: '', showHeader: false, showNavbar: false, statusBarStyle: 'dark', statusBarBg: '#f8fafc', },
@@ -122,6 +123,8 @@ const isDarkStatusBar =
         '/bill': { title: 'Customer Bill', subtitle: 'Manage Bill', showHeader: true, showNavbar: true, headerType: 'default' },
     // Tabs
     '/(tabs)': { title: '', showHeader: false, showNavbar: true, headerType: 'none' },
+        '/subscription': { title: '', showHeader: false, showNavbar: false, headerType: 'dashboard', statusBarStyle: 'dark', statusBarBg: '#f8fafc'},
+
   };
 
   // Find current route config
@@ -170,13 +173,16 @@ const renderHeader = () => {
   translucent
 />
 
+<View
+  style={{
+    backgroundColor: headerData.statusBarBg ?? '#15803d',
+    paddingTop: topOffset,
+  }}
+>
+  {renderHeader()}
+</View>
 
-      {/* ✅ Sticky Header */}
-     <View style={{ backgroundColor: headerData.statusBarBg ?? '#15803d',}}>
-    <View style={[styles.stickyHeader, { paddingTop: insets.top }]}>
-      {renderHeader()}
-    </View>
-  </View>
+
       
       {/* ✅ Main Content Area */}
       <View style={styles.content}>

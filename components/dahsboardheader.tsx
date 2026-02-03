@@ -26,7 +26,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ profileImage }) => {
 
   return (
     <>
-      <View style={[styles.container, { paddingTop: insets.top}]}>
+      <View style={[styles.container]}>
         <View style={styles.topSection}>
           <View style={styles.profileSection}>
             {/* Initial display */}

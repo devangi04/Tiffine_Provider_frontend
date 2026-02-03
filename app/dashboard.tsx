@@ -58,13 +58,20 @@ interface Order {
   status: string;
 }
 
+interface MealStats {
+  yes: number;
+  no: number;
+  price: number;
+}
+
 interface DashboardData {
-  todayOrders: number;
-  yesResponses: number;
-  noResponses: number;
+  lunch: MealStats | null;
+  dinner: MealStats | null;
+  totalMeals: number;
   menu: MenuItem[];
   recentOrders: Order[];
 }
+
 
 // Search result types
 interface SearchResultItem {
@@ -679,9 +686,10 @@ const handleSearchItemClick = (item: SearchResultItem, category: string) => {
     <Text weight="extraBold" style={styles.heroTitle}>
       Today's Tiffin Count
     </Text>
-    <Text weight="extraBold" style={styles.heroValue}>
-      {dashboardData?.todayOrders || 0}
-    </Text>
+   <Text weight="extraBold" style={styles.heroValue}>
+  {dashboardData?.totalMeals || 0}
+</Text>
+
   </View>
 
   {/* Image instead of Icon */}
@@ -715,29 +723,59 @@ const handleSearchItemClick = (item: SearchResultItem, category: string) => {
           </Text>
         </View>
 
-        <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <View style={styles.statHeader}>
-              <View style={styles.statInfo}>
-                <Text weight='bold' style={styles.statInfoTitle}>Response</Text>
-                <Text weight='bold' style={styles.statInfoSubtitle}>Will Take Tiffin</Text>
-              </View>
-              <View style={[styles.statIcon, { backgroundColor: '#10b981' }]} />
-            </View>
-            <Text weight='bold' style={styles.statValue}>{dashboardData?.yesResponses || 0}</Text>
-          </View>
+<View style={styles.mealGrid}>
 
-          <View style={styles.statCard}>
-            <View style={styles.statHeader}>
-              <View style={styles.statInfo}>
-                <Text weight='bold' style={styles.statInfoTitle}>Response</Text>
-                <Text weight='bold' style={styles.statInfoSubtitle}>Will Not Take Tiffin</Text>
-              </View>
-              <View style={[styles.statIcon, { backgroundColor: '#eb1b1b' }]} />
-            </View>
-            <Text weight='bold' style={styles.statValue}>{dashboardData?.noResponses || 0}</Text>
-          </View>
+  {/* Lunch Card */}
+  {dashboardData?.lunch && (
+    <View style={[styles.mealCard, styles.lunchCard]}>
+      <View style={styles.mealHeader}>
+        <Ionicons name="sunny-outline" size={22} color="#15803d" />
+        <Text weight="extraBold" style={styles.mealTitle}>Lunch</Text>
+      </View>
+
+      <View style={styles.mealStatsRow}>
+        <View style={[styles.mealPill, styles.yesPill]}>
+          <Text weight="bold" style={styles.pillText}>
+            Yes · {dashboardData.lunch.yes}
+          </Text>
         </View>
+
+        <View style={[styles.mealPill, styles.noPill]}>
+          <Text weight="bold" style={styles.pillText}>
+            No · {dashboardData.lunch.no}
+          </Text>
+        </View>
+      </View>
+    </View>
+  )}
+
+  {/* Dinner Card */}
+  {dashboardData?.dinner && (
+    <View style={[styles.mealCard, styles.dinnerCard]}>
+      <View style={styles.mealHeader}>
+        <Ionicons name="moon-outline" size={22} color="#1e40af" />
+        <Text weight="extraBold" style={styles.mealTitle}>Dinner</Text>
+      </View>
+
+      <View style={styles.mealStatsRow}>
+        <View style={[styles.mealPill, styles.yesPill]}>
+          <Text weight="bold" style={styles.pillText}>
+            Yes · {dashboardData.dinner.yes}
+          </Text>
+        </View>
+
+        <View style={[styles.mealPill, styles.noPill]}>
+          <Text weight="bold" style={styles.pillText}>
+            No · {dashboardData.dinner.no}
+          </Text>
+        </View>
+      </View>
+    </View>
+  )}
+
+</View>
+
+
       </View>
 
       {/* Action Cards */}
@@ -1396,6 +1434,71 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: 'white',
   },
+  mealGrid: {
+  flexDirection: 'row',
+  gap: 16,
+},
+
+mealCard: {
+  flex: 1,
+  borderRadius: 20,
+  padding: 18,
+  backgroundColor: '#ffffff',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.08,
+  shadowRadius: 12,
+  elevation: 3,
+},
+
+lunchCard: {
+  borderLeftWidth: 4,
+  borderLeftColor: '#15803d',
+},
+
+dinnerCard: {
+  borderLeftWidth: 4,
+  borderLeftColor: '#15803d',
+},
+
+mealHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+  marginBottom: 14,
+},
+
+mealTitle: {
+  fontSize: 16,
+  color: '#111827',
+},
+
+mealStatsRow: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+},
+
+mealPill: {
+  paddingVertical: 8,
+  paddingHorizontal: 9,
+  borderRadius: 999,
+  minWidth: 50,
+  alignItems: 'center',
+},
+
+yesPill: {
+  backgroundColor: '#15803d',
+},
+
+noPill: {
+  backgroundColor: '#e71515ff',
+},
+
+pillText: {
+  fontSize: 13,
+  color: '#ffff',
+},
+
   
 });
 

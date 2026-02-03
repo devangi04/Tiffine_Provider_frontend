@@ -1297,7 +1297,7 @@ const handleLogin = async () => {
 
   return (
     <>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView  edges={['left','right','bottom']} style={styles.container}>
         <StatusBar
           barStyle="dark-content"
           backgroundColor="#1c1919ff"

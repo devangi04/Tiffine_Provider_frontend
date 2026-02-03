@@ -61,8 +61,8 @@ const AboutUsScreen = () => {
             <View style={styles.logoCircle}>
               <Ionicons name="restaurant" size={32} color="#fff" />
             </View>
-            <Text style={styles.appName}>Tiffine Service</Text>
-            <Text style={styles.tagline}>Delicious Food, One Tap Away</Text>
+            <Text style={styles.appName}>Lichi Provider</Text>
+            <Text style={styles.tagline}>Manage meals. Track orders. Grow steadily.</Text>
           </View>
         </LinearGradient>
 
@@ -70,15 +70,13 @@ const AboutUsScreen = () => {
         <View style={styles.content}>
           <Text style={styles.sectionTitle}>Our Story</Text>
           <Text style={styles.paragraph}>
-            Welcome to Tiffine, your trusted partner for delicious home-cooked meals
-            delivered right to your doorstep. Founded with a passion for authentic
-            flavors and healthy eating.
+           Tiffine Provider App is designed to help food providers manage daily operations with ease.
+           From handling orders to updating menus, the app brings everything into one simple and reliable platform built for everyday use.
           </Text>
 
           <Text style={styles.sectionTitle}>Our Mission</Text>
           <Text style={styles.paragraph}>
-            To make quality food accessible to everyone while empowering home chefs
-            and food providers with smart tools.
+          To simplify food service management for providers by offering clear tools, smooth workflows, and dependable support — so operations stay organized and stress-free.
           </Text>
 
           <Text style={styles.sectionTitle}>Features</Text>

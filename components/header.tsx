@@ -69,7 +69,7 @@ const Header: React.FC<HeaderProps> = ({
         styles.container,
         {
           backgroundColor,
-          paddingTop: insets.top
+         
         },
       ]}
     >

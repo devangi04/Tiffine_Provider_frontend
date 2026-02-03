@@ -372,7 +372,7 @@ const CustomerDetailsScreen = () => {
     <View style={styles.container}>
       
       {/* Header */}
-      <View style={styles.header}>
+      {/* <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ChevronLeft size={24} color="#1E293B" />
         </TouchableOpacity>
@@ -380,7 +380,7 @@ const CustomerDetailsScreen = () => {
         <TouchableOpacity onPress={handleEditCustomer}>
           <Edit size={20} color="#15803d" />
         </TouchableOpacity>
-      </View>
+      </View> */}
 
       {/* Customer Profile Card */}
       <View style={styles.profileCard}>

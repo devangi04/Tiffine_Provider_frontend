@@ -1190,7 +1190,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 16,
-    paddingBottom: 82,
+    paddingBottom: 112,
     flexGrow: 1,
   },
   loadingContainer: {

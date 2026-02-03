@@ -482,6 +482,7 @@ useEffect(() => {
   };
 
   // Send menu function
+// Send menu function - UPDATED for meal-type independent restriction
 const sendMenu = useCallback(
   async (menuId: string) => {
     try {
@@ -491,19 +492,29 @@ const sendMenu = useCallback(
         return;
       }
 
-      // Check if ANY menu has been sent today
-      const hasAnyMenuBeenSentToday = Object.keys(combinedData.todaySentMenus).length > 0;
+      // Check if the SAME MEAL TYPE menu has been sent today for ANY day
+      const hasSameMealTypeBeenSentToday = Object.keys(combinedData.todaySentMenus).some(
+        (key) => {
+          const [sentDay, sentMealType] = key.split('_');
+          return sentMealType === menu.mealType;
+        }
+      );
       
-      if (hasAnyMenuBeenSentToday) {
-        // Get the first sent menu info to show in the message
-        const firstSentKey = Object.keys(combinedData.todaySentMenus)[0];
-        const [sentDay, sentMealType] = firstSentKey.split('_');
-        
-        Alert.alert(
-          "Cannot Send Menu",
-          `Today's menu has already been sent (${sentDay.charAt(0).toUpperCase() + sentDay.slice(1)} ${sentMealType}).\n\nYou can only send one menu per day.`,
-          [{ text: "OK" }]
+      if (hasSameMealTypeBeenSentToday) {
+        // Find which day the same meal type was sent
+        const sameMealTypeKey = Object.keys(combinedData.todaySentMenus).find(
+          (key) => key.split('_')[1] === menu.mealType
         );
+        
+        if (sameMealTypeKey) {
+          const [sentDay, sentMealType] = sameMealTypeKey.split('_');
+          
+          Alert.alert(
+            "Cannot Send Menu",
+            `Today's ${menu.mealType} menu has already been sent (${sentDay.charAt(0).toUpperCase() + sentDay.slice(1)}).\n\nYou can only send one ${menu.mealType} menu per day.`,
+            [{ text: "OK" }]
+          );
+        }
         return;
       }
 
@@ -562,7 +573,6 @@ const sendMenu = useCallback(
   },
   [combinedData, providerId]
 );
-
   // Menu history toggle
   const toggleHistory = async (day: string) => {
     const isExpanded = expandedHistoryDays[day];
@@ -683,7 +693,12 @@ const sendMenu = useCallback(
       const { IconComponent, color } = getMealTypeIcon(item.mealType);
 
       const todayKey = `${item.day}_${item.mealType}`;
-     const isComboSentToday = Object.keys(combinedData.todaySentMenus).length > 0;
+      const isSameMealTypeSentToday = Object.keys(combinedData.todaySentMenus).some(
+  (key) => {
+    const [sentDay, sentMealType] = key.split('_');
+    return sentMealType === item.mealType;
+  }
+);
       const isThisMenuSentToday = !!combinedData.sentMenuIds[item._id];
       const isCurrentlySending = sendingMenu === item._id;
 
@@ -816,7 +831,7 @@ const sendMenu = useCallback(
                 color="#EF4444"
               />
 
-              {isComboSentToday ? (
+              {isSameMealTypeSentToday ? (
                 <TouchableOpacity
                   style={[styles.sendButton, styles.disabledSendButton]}
                   disabled={true}
@@ -908,7 +923,12 @@ const sendMenu = useCallback(
     const hasDishes = menu.items?.some(menuItem => menuItem.dishIds?.length > 0);
     const { IconComponent, color } = getMealTypeIcon(menu.mealType);
     const todayKey = `${menu.day}_${menu.mealType}`;
-   const isComboSentToday = Object.keys(combinedData.todaySentMenus).length > 0;
+const isSameMealTypeSentToday = Object.keys(combinedData.todaySentMenus).some(
+  (key) => {
+    const [sentDay, sentMealType] = key.split('_');
+    return sentMealType === menu.mealType;
+  }
+);
     const isThisMenuSentToday = !!combinedData.sentMenuIds[menu._id];
 
     const renderOverlayContent = () => (
@@ -1023,7 +1043,7 @@ const sendMenu = useCallback(
               </TouchableOpacity>
 
 
-{!isComboSentToday ? (
+{!isSameMealTypeSentToday ? (
   <TouchableOpacity 
     style={[
       styles.bottomButton, 

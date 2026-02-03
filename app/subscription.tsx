@@ -369,8 +369,7 @@ const SubscriptionPlans = () => {
   // If payment screen is active, show payment UI
   if (isPaymentScreen && paymentLink) {
     return (
-      <SafeAreaView  style={styles.safeArea}>
-        <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
+      <SafeAreaView  edges={['bottom','left','right']} style={styles.safeArea}>
         <View style={styles.paymentHeader}>
           <TouchableOpacity 
             style={styles.backButton}
@@ -539,7 +538,7 @@ const SubscriptionPlans = () => {
       
       <KeyboardAvoidingView 
         style={styles.keyboardAvoid}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+       
       >
         {/* Fixed Header */}
         <View style={styles.header}>
@@ -761,7 +760,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
-    paddingTop: Platform.OS === 'ios' ? 10 : 20,
     paddingBottom: 15,
     paddingHorizontal: 20,
     shadowColor: '#000',
