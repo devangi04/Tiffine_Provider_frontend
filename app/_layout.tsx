@@ -5,7 +5,7 @@ import { store,persistor } from './store';
 import { Stack, usePathname } from 'expo-router';
 import { PersistGate } from 'redux-persist/integration/react'; // ✅ Import PersistGate
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { View, StyleSheet, Text,ActivityIndicator,Platform} from 'react-native';
+import { View, StyleSheet, Text,ActivityIndicator,Platform,} from 'react-native';
 import 'react-native-reanimated';
 import { useFonts } from "expo-font";
 import * as SplashScreen from 'expo-splash-screen';

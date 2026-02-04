@@ -404,10 +404,9 @@ const handleNext = () => {
   if (showWelcome) {
     return (
       <>
-      <StatusBar barStyle='light-content' backgroundColor="transparent"/>
       <LinearGradient
         colors={['#15803d', '#15803d', '#a8ffcbff']}
-        style={[styles.container,{ paddingTop: insets.top }]}
+        style={[styles.container]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
@@ -470,7 +469,7 @@ const handleNext = () => {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.logoContainer}>
-          <Text style={styles.logo}>Tiffine</Text>
+          <Text style={styles.logo}>Lichi</Text>
           <Text style={styles.providerBadgeSmall}>PROVIDER</Text>
         </View>
         <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
@@ -639,7 +638,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingTop: 60,
     paddingBottom: 20,
   },
   logoContainer: {

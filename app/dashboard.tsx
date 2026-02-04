@@ -447,7 +447,7 @@ const handleSearchItemClick = (item: SearchResultItem, category: string) => {
           <Ionicons name="search-outline" size={64} color="#ccc" />
           <Text weight="medium" style={styles.emptySearchText}>Start typing to search</Text>
           <Text style={styles.emptySearchSubtext}>
-            Search for customers, dishes, menus, responses, or bills
+            Search for customers
           </Text>
         </View>
       );

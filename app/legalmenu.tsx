@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Text from '@/components/ztext';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Constants from 'expo-constants';
 
 const LegalMenuScreen = () => {
   const router = useRouter();
@@ -133,9 +134,12 @@ const LegalMenuScreen = () => {
        <View style={styles.footer}>
   <Text style={styles.footerText}>Lichi-Provider</Text>
   <Text style={styles.footerCopyright}>
-    © 2026 Triosphere Tech.pvt.ltd
+    © 2026 Triosphere Tech Pvt. Ltd.
   </Text>
-  <Text style={styles.footerVersion}>Version 1.0.0</Text>
+ <Text style={styles.footerVersion}>
+  Version {Constants.expoConfig?.version }
+</Text>
+
 </View>
 
 

@@ -349,7 +349,7 @@ const renderWheel = (
         >
           <View style={styles.timePickerHeader}>
             <TouchableOpacity onPress={onClose} style={styles.cancelButton}>
-              <Text style={styles.cancelButtonText}>Cancel</Text>
+              <Text  style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
             <Text style={styles.timePickerTitle}>Select Time</Text>
             <TouchableOpacity onPress={handleConfirm} style={styles.confirmButton}>
@@ -389,7 +389,7 @@ const renderWheel = (
             style={styles.iosConfirmButton}
             onPress={handleConfirm}
           >
-            <Text style={styles.iosConfirmButtonText}>
+            <Text  style={styles.iosConfirmButtonText}>
               Set Time
             </Text>
           </TouchableOpacity>
@@ -423,8 +423,8 @@ const SectionHeader = ({
       <Icon name={icon} size={22} color="#15803d" />
     </View>
     <View style={styles.sectionHeaderText}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {subtitle && <Text style={styles.sectionSubtitle}>{subtitle}</Text>}
+      <Text weight="bold" style={styles.sectionTitle}>{title}</Text>
+      {subtitle && <Text weight="bold" style={styles.sectionSubtitle}>{subtitle}</Text>}
     </View>
     {rightElement}
   </View>
@@ -747,7 +747,7 @@ const handleSavePreferences = async () => {
           <>
             <View style={styles.formRow}>
               <View style={styles.formColumn}>
-                <Text style={styles.inputLabel}>Daily Price</Text>
+                <Text weight="bold" style={styles.inputLabel}>Daily Price</Text>
                 <View style={styles.inputContainer}>
                   <Icon name="currency-rupee" size={20} color="#666" style={styles.inputIcon} />
                   <TextInput
@@ -762,14 +762,14 @@ const handleSavePreferences = async () => {
               </View>
               
               <View style={styles.formColumn}>
-                <Text style={styles.inputLabel}>Cutoff Time</Text>
+                <Text weight="bold" style={styles.inputLabel}>Cutoff Time</Text>
                 <TouchableOpacity 
                   style={styles.timeSelector}
                   onPress={() => openTimePicker(mealType)}
                 >
                   <Icon name="access-time" size={20} color="#15803d" />
                   <View style={styles.timeSelectorContent}>
-                    <Text style={styles.timeDisplay}>{meal.cutoffTime}</Text>
+                    <Text weight="bold" style={styles.timeDisplay}>{meal.cutoffTime}</Text>
                   </View>
                   <Icon name="chevron-right" size={20} color="#666" />
                 </TouchableOpacity>
@@ -798,7 +798,7 @@ const handleSavePreferences = async () => {
       <View style={styles.infoList}>
         <View style={styles.infoItem}>
           <Icon name="check-circle" size={18} color="#4CAF50" />
-          <Text style={styles.infoText}>Enable meals you want to offer</Text>
+          <Text  weight="bold"style={styles.infoText}>Enable meals you want to offer</Text>
         </View>
         <View style={styles.infoItem}>
           <Icon name="check-circle" size={18} color="#4CAF50" />

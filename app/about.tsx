@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Text from '@/components/ztext';
+import Constants from 'expo-constants';
 
 const AboutUsScreen = () => {
   const router = useRouter();
@@ -111,7 +112,9 @@ const AboutUsScreen = () => {
           <Text style={styles.footerCopyright}>
             © 2026 Triosphere Tech Pvt. Ltd
           </Text>
-          <Text style={styles.footerVersion}>Version 1.0.0</Text>
+         <Text style={styles.footerVersion}>
+          Version {Constants.expoConfig?.version }
+        </Text>
         </View>
       </ScrollView>
     </SafeAreaView>
