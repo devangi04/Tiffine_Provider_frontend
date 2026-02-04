@@ -176,12 +176,12 @@ const renderHeader = () => {
 <View
   style={{
     backgroundColor: headerData.statusBarBg ?? '#15803d',
-    paddingTop: topOffset,
+    height: insets.top,
   }}
 >
-  {renderHeader()}
+ 
 </View>
-
+ {renderHeader()}
 
       
       {/* ✅ Main Content Area */}
