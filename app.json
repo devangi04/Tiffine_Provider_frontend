@@ -3,10 +3,6 @@
     "name": "Lichi Provider",
     "slug": "tiffinprovider",
     "version": "1.0.0",
-    "splash": {
-      "resizeMode": "contain",
-      "backgroundColor": "#0C831F"
-    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "automatic",
@@ -53,6 +49,18 @@
     "plugins": [
       "expo-router",
       "expo-font",
+         [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/Single_Logo_Trans.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#15803d",
+          "dark": {
+            "backgroundColor": "#15803d"
+          }
+        }
+      ],
       [
         "expo-notifications",
         {
@@ -62,6 +70,7 @@
           "androidCollapsedTitle": "New Notification"
         }
       ],
+
   [
   "expo-build-properties",
   {
