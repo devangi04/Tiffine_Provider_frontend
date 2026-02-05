@@ -215,9 +215,7 @@ const EditProfileScreen = () => {
           
           // Update Redux state as well
 // In handleSaveProfile function:
-dispatch(updateProviderData({
-  phone: formData.phone
-}));
+
         } else {
           // Fallback to Redux data
           if (reduxProvider) {
@@ -310,18 +308,13 @@ dispatch(updateProviderData({
         Alert.alert('Success', 'Phone number updated successfully!');
         
         // Update Redux with new phone
-       dispatch(setProvider({
-  id: reduxProvider.id,
-  email: reduxProvider.email,
-  name: reduxProvider.name,
+    dispatch(updateProviderData({
   phone: formData.phone,
-  subscription: reduxProvider.subscription || {},
-  token: reduxProvider.token || '',                  // <--- keep token
-  hasMealPreferences: reduxProvider.hasMealPreferences ?? false // keep boolean
 }));
 
+
         
-        router.back();
+       router.replace('/profile');
       } else {
         throw new Error(response.data.error || 'Failed to update phone number');
       }
@@ -442,7 +435,13 @@ dispatch(updateProviderData({
             style={[styles.submitButton, loading && styles.submitButtonDisabled]}
             onPress={handleSaveProfile}
             activeOpacity={0.9}
-            disabled={loading || fetching || formData.phone === reduxProvider.phone}
+            disabled={
+  loading ||
+  fetching ||
+  !reduxProvider.phone ||
+  formData.phone === reduxProvider.phone
+}
+
           >
             <LinearGradient
               colors={['#15803d', '#15803d']}

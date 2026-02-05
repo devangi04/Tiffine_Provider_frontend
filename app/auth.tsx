@@ -32,8 +32,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import socketService from '../app/config/socketservice'; // Adjust path as needed
 import { fetchTrialStatus } from '@/app/store/slices/providerslice';
-
-
+import { registerForPushNotifications } from './config/notificationservice';
 
 // Floating Input Component with auto-focus navigation
 const FloatingInput = ({ 
@@ -346,9 +345,13 @@ const handleLogin = async () => {
     setIsLoginSubmitted(true);
     dispatch(setLoading(true));
 
+     // ✅ 1️⃣ Ask permission and get push token
+    let pushToken = await registerForPushNotifications();
+    // pushToken can be null or 'BLOCKED'
+
     const response = await api.post(
       `${API_BASE_URL}/api/auth/login`,
-      { email, password },
+      { email, password ,pushToken},
       { timeout: 10000 }
     );
     if (!response.data.success) {
@@ -1298,11 +1301,6 @@ const handleLogin = async () => {
   return (
     <>
       <SafeAreaView  edges={['left','right','bottom']} style={styles.container}>
-        <StatusBar
-          barStyle="dark-content"
-          backgroundColor="#1c1919ff"
-          translucent={false}
-        />
         <KeyboardAvoidingView
           style={styles.container}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

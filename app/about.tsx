@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
+  Image
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,7 +29,7 @@ const AboutUsScreen = () => {
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
 
       {/* ================= HEADER ================= */}
-<View
+{/* <View
   style={[
     styles.header,
     { paddingTop: insets.top, minHeight: 56 + insets.top },
@@ -43,10 +44,10 @@ const AboutUsScreen = () => {
       <Text weight="bold" style={styles.headerTitle}>About Us</Text>
     </View>
 
-    {/* Placeholder for spacing */}
+   
     <View style={{ width: 36 }} />
   </View>
-</View>
+</View> */}
 
 
       {/* ================= CONTENT ================= */}
@@ -57,27 +58,27 @@ const AboutUsScreen = () => {
         }}
       >
         {/* Hero */}
-        <LinearGradient colors={['#15803d', '#4694e2']} style={styles.heroCard}>
-          <View style={styles.heroContent}>
-            <View style={styles.logoCircle}>
-              <Ionicons name="restaurant" size={32} color="#fff" />
-            </View>
-            <Text style={styles.appName}>Lichi Provider</Text>
-            <Text style={styles.tagline}>Manage meals. Track orders. Grow steadily.</Text>
+         <View style={styles.logoSection}>
+          <View style={styles.logoCircle}>
+           <Image 
+                      source={require('@/assets/images/Single_Logo_Trans.png')} 
+                      style={styles.logoImage}
+                      resizeMode="contain"
+                    />
           </View>
-        </LinearGradient>
+        </View>
 
         {/* Text Content */}
         <View style={styles.content}>
           <Text style={styles.sectionTitle}>Our Story</Text>
           <Text style={styles.paragraph}>
-           Tiffine Provider App is designed to help food providers manage daily operations with ease.
+           Lichi Provider App is designed to help food providers manage daily operations with ease.
            From handling orders to updating menus, the app brings everything into one simple and reliable platform built for everyday use.
           </Text>
 
           <Text style={styles.sectionTitle}>Our Mission</Text>
           <Text style={styles.paragraph}>
-          To simplify food service management for providers by offering clear tools, smooth workflows, and dependable support — so operations stay organized and stress-free.
+          To simplify food service management for providers by offering clear tools, smooth workflows, and dependable support - so operations stay organized and stress-free.
           </Text>
 
           <Text style={styles.sectionTitle}>Features</Text>
@@ -97,11 +98,11 @@ const AboutUsScreen = () => {
           <View style={styles.contactBox}>
             <View style={styles.contactItem}>
               <Ionicons name="mail-outline" size={18} color="#666" />
-              <Text style={styles.contactText}>support@tiffine.com</Text>
+              <Text style={styles.contactText}>lichitiffinservice@gmail.com</Text>
             </View>
             <View style={styles.contactItem}>
               <Ionicons name="call-outline" size={18} color="#666" />
-              <Text style={styles.contactText}>+91 98765 43210</Text>
+              <Text style={styles.contactText}>+91 83203 33166</Text>
             </View>
           </View>
         </View>
@@ -110,7 +111,7 @@ const AboutUsScreen = () => {
         <View style={styles.footer}>
           <Text style={styles.footerText}>Lichi-Provider</Text>
           <Text style={styles.footerCopyright}>
-            © 2026 Triosphere Tech Pvt. Ltd
+            © 2026 Triosphere Tech Pvt. Ltd.
           </Text>
          <Text style={styles.footerVersion}>
           Version {Constants.expoConfig?.version }
@@ -175,16 +176,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  logoCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+   logoSection: {
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
+    paddingVertical: 32,
+    paddingHorizontal: 20,
   },
-
+  logoCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 90,
+    backgroundColor: '#15803d',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 15 },
+    shadowOpacity: 0.3,
+    shadowRadius: 25,
+    elevation: 20,
+  },
+  logoText: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#fff',
+  },
+    logoImage: {
+    width: 60,
+    height: 60,
+  },
   appName: {
     fontSize: 24,
     fontWeight: '700',
@@ -214,6 +232,7 @@ const styles = StyleSheet.create({
   paragraph: {
     fontSize: 15,
     lineHeight: 24,
+    textAlign:'justify',
     color: '#555',
   },
 

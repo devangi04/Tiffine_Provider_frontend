@@ -322,17 +322,34 @@ useFocusEffect(
     router.push('/customer');
   };
 
-  const generateBill = (customer: Customer) => {
-    if (!customer._id) {
-      Alert.alert("Error", "Invalid customer ID");
-      return;
-    }
-    
-    router.push({
-      pathname: '/bill',
-      params: { customerId: customer._id }
-    });
-  };
+ const generateBill = (customer: Customer) => {
+  if (!customer._id) {
+    Alert.alert("Error", "Invalid customer ID");
+    return;
+  }
+
+  Alert.alert(
+    "Generate Bill Manually?",
+    "Bills are generated automatically at month end. Do you want to generate this bill manually now?",
+    [
+      {
+        text: "Cancel",
+        style: "cancel", // 👈 important, does nothing
+      },
+      {
+        text: "Generate",
+        onPress: () => {
+          router.push({
+            pathname: "/bill",
+            params: { customerId: customer._id },
+          });
+        },
+      },
+    ],
+    { cancelable: true }
+  );
+};
+
 
   const renderCustomerItem = ({ item }: { item: Customer }) => {
     // Use pending toggle value if available, otherwise use actual value

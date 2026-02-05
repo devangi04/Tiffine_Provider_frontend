@@ -793,7 +793,8 @@ const handleMonthChange = (direction: 'prev' | 'next') => {
             
             <TouchableOpacity 
               style={styles.payButton}
-              onPress={() => setShowPaymentModal(true)}
+              onPress={() =>{ setPaymentAmount(bill.remainingAmount.toFixed(2));
+                setShowPaymentModal(true)}}
             >
               <IndianRupee size={18} color="#fff" />
               <Text style={styles.payButtonText}>
@@ -1083,9 +1084,10 @@ const handleMonthChange = (direction: 'prev' | 'next') => {
               <TextInput
                 style={styles.input}
                 keyboardType="numeric"
+                editable={false}
                 value={paymentAmount}
                 onChangeText={setPaymentAmount}
-                placeholder={`${bill.remainingAmount?.toFixed(2) || '0.00'}`}
+                
               />
             </View>
             
@@ -1645,7 +1647,7 @@ const styles = StyleSheet.create({
   },
   payButton: {
     flexDirection: 'row',
-    backgroundColor: '#4F46E5',
+    backgroundColor: '#15803d',
     padding: 12,
     borderRadius: 8,
     justifyContent: 'center',

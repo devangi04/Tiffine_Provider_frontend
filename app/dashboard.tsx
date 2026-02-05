@@ -14,7 +14,8 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image
+  Image,
+  Button
 } from 'react-native';
 
 import { LinearGradient } from 'expo-linear-gradient';
@@ -32,6 +33,7 @@ const { width, height } = Dimensions.get('window');
 import { BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 const API_BASE_URL = API_URL;
+import { registerForPushNotifications } from './config/notificationservice';
 
 // Define types for the provider data
 interface ProviderData {
@@ -477,7 +479,7 @@ const handleSearchItemClick = (item: SearchResultItem, category: string) => {
       return (
         <View style={styles.searchResultsLoading}>
           <Text style={styles.noResultsText}>No results found for "{searchQuery}"</Text>
-          <Text style={styles.noResultsSubtext}>Try searching for customers, dishes, menus, responses, or bills</Text>
+          <Text style={styles.noResultsSubtext}>Try searching for customers</Text>
         </View>
       );
     }
@@ -733,16 +735,25 @@ const handleSearchItemClick = (item: SearchResultItem, category: string) => {
         <Text weight="extraBold" style={styles.mealTitle}>Lunch</Text>
       </View>
 
-      <View style={styles.mealStatsRow}>
-        <View style={[styles.mealPill, styles.yesPill]}>
-          <Text weight="bold" style={styles.pillText}>
-            Yes · {dashboardData.lunch.yes}
-          </Text>
+      <View style={styles.mealStatsContainer}>
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <View style={[styles.indicator, styles.yesIndicator]} />
+            <Text weight="bold" style={styles.statLabel}>Yes</Text>
+            <Text weight="bold" style={styles.statValue}>{dashboardData.lunch.yes}</Text>
+          </View>
+
+          <View style={styles.statItem}>
+            <View style={[styles.indicator, styles.noIndicator]} />
+            <Text weight="bold" style={styles.statLabel}>No</Text>
+            <Text weight="bold" style={styles.statValue}>{dashboardData.lunch.no}</Text>
+          </View>
         </View>
 
-        <View style={[styles.mealPill, styles.noPill]}>
-          <Text weight="bold" style={styles.pillText}>
-            No · {dashboardData.lunch.no}
+        <View style={styles.totalContainer}>
+          <Text style={styles.totalLabel}>Total</Text>
+          <Text weight="bold" style={styles.totalValue}>
+            {dashboardData.lunch.yes + dashboardData.lunch.no}
           </Text>
         </View>
       </View>
@@ -757,16 +768,25 @@ const handleSearchItemClick = (item: SearchResultItem, category: string) => {
         <Text weight="extraBold" style={styles.mealTitle}>Dinner</Text>
       </View>
 
-      <View style={styles.mealStatsRow}>
-        <View style={[styles.mealPill, styles.yesPill]}>
-          <Text weight="bold" style={styles.pillText}>
-            Yes · {dashboardData.dinner.yes}
-          </Text>
+      <View style={styles.mealStatsContainer}>
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <View style={[styles.indicator, styles.yesIndicator]} />
+            <Text weight="bold" style={styles.statLabel}>Yes</Text>
+            <Text weight="bold" style={styles.statValue}>{dashboardData.dinner.yes}</Text>
+          </View>
+
+          <View style={styles.statItem}>
+            <View style={[styles.indicator, styles.noIndicator]} />
+            <Text weight="bold" style={styles.statLabel}>No</Text>
+            <Text weight="bold" style={styles.statValue}>{dashboardData.dinner.no}</Text>
+          </View>
         </View>
 
-        <View style={[styles.mealPill, styles.noPill]}>
-          <Text weight="bold" style={styles.pillText}>
-            No · {dashboardData.dinner.no}
+        <View style={styles.totalContainer}>
+          <Text style={styles.totalLabel}>Total</Text>
+          <Text weight="bold" style={styles.totalValue}>
+            {dashboardData.dinner.yes + dashboardData.dinner.no}
           </Text>
         </View>
       </View>
@@ -800,6 +820,9 @@ const handleSearchItemClick = (item: SearchResultItem, category: string) => {
             </View>
           </View>
         </TouchableOpacity>
+
+
+
       </View>
 
       {/* Today's Menu Card - UPDATED DESIGN */}
@@ -1434,21 +1457,23 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: 'white',
   },
-  mealGrid: {
+mealGrid: {
   flexDirection: 'row',
-  gap: 16,
+  gap: 12,
+  paddingHorizontal: 4,
 },
 
 mealCard: {
   flex: 1,
-  borderRadius: 20,
-  padding: 18,
+  borderRadius: 16,
+  padding: 16,
   backgroundColor: '#ffffff',
   shadowColor: '#000',
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.08,
-  shadowRadius: 12,
-  elevation: 3,
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.05,
+  shadowRadius: 8,
+  elevation: 2,
+  minWidth: 140, // Ensures minimum width on small screens
 },
 
 lunchCard: {
@@ -1458,45 +1483,84 @@ lunchCard: {
 
 dinnerCard: {
   borderLeftWidth: 4,
-  borderLeftColor: '#15803d',
+  borderLeftColor: '#1e40af',
 },
 
 mealHeader: {
   flexDirection: 'row',
   alignItems: 'center',
   gap: 8,
-  marginBottom: 14,
+  marginBottom: 16,
 },
 
 mealTitle: {
-  fontSize: 16,
+  fontSize: 15,
   color: '#111827',
+  flex: 1,
 },
 
-mealStatsRow: {
+mealStatsContainer: {
+  gap: 12,
+},
+
+statsRow: {
   flexDirection: 'row',
+  gap: 12,
   justifyContent: 'space-between',
 },
 
-mealPill: {
-  paddingVertical: 8,
-  paddingHorizontal: 9,
-  borderRadius: 999,
-  minWidth: 50,
+statItem: {
+  flex: 1,
   alignItems: 'center',
+  paddingVertical: 8,
+  paddingHorizontal: 4,
+  borderRadius: 12,
+  backgroundColor: '#f9fafb',
 },
 
-yesPill: {
+indicator: {
+  width: 12,
+  height: 12,
+  borderRadius: 6,
+  marginBottom: 4,
+},
+
+yesIndicator: {
   backgroundColor: '#15803d',
 },
 
-noPill: {
-  backgroundColor: '#e71515ff',
+noIndicator: {
+  backgroundColor: '#dc2626',
 },
 
-pillText: {
+statLabel: {
+  fontSize: 12,
+  color: '#6b7280',
+  marginBottom: 2,
+},
+
+statValue: {
+  fontSize: 18,
+  color: '#111827',
+},
+
+totalContainer: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  paddingTop: 10,
+  borderTopWidth: 1,
+  borderTopColor: '#f3f4f6',
+},
+
+totalLabel: {
   fontSize: 13,
-  color: '#ffff',
+  color: '#6b7280',
+},
+
+totalValue: {
+  fontSize: 16,
+  color: '#111827',
 },
 
   

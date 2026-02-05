@@ -21,7 +21,7 @@ import { useNavigation } from 'expo-router';
 import moment from 'moment';
 import { API_URL } from './config/env';
 import { useAppSelector } from './store/hooks';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
 const API_BASE_URL = `${API_URL}/api`;
@@ -145,6 +145,8 @@ const ResponseScreen = () => {
   const [mealPrefs, setMealPrefs] = useState<any>(null);
   const [prefsLoading, setPrefsLoading] = useState<boolean>(true);
   const [hasMultipleMealTypes, setHasMultipleMealTypes] = useState<boolean>(true);
+
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     navigation.setOptions({
@@ -1500,7 +1502,7 @@ const renderResponseItem = useCallback(({ item }: { item: Response }) => {
   const currentLoadingMore = getCurrentLoadingMore();
 
   return (
-    <View style={[styles.container]}>
+    <SafeAreaView  edges={['left','right','bottom']} style={[styles.container]}>
       {/* Date Selector */}
    {/* Date Selector */}
 
@@ -1655,7 +1657,7 @@ const renderResponseItem = useCallback(({ item }: { item: Response }) => {
           )}
           onMomentumScrollEnd={handleScrollEnd}
           scrollEventThrottle={16}
-          style={styles.scrollView}
+          style={styles.scrollView }
           renderItem={({ item: mealType, index }) => {
             const { displayedResponses: mealDisplayedResponses } = getDisplayedResponses(mealType.id as 'lunch' | 'dinner');
             
@@ -1663,15 +1665,17 @@ const renderResponseItem = useCallback(({ item }: { item: Response }) => {
               <View style={[styles.contentPage, { width }]}>
                 <FlatList
                   data={mealDisplayedResponses}
+                  
                   renderItem={renderResponseItem}
                   keyExtractor={(item) => `${item._id}-${item.mealType}`}
-                  contentContainerStyle={styles.listContent}
+                  contentContainerStyle={[styles.listContent,{ paddingBottom: insets.bottom + 49 }]}
                   refreshControl={
                     <RefreshControl 
                       refreshing={refreshing} 
                       onRefresh={onRefresh} 
                     />
                   }
+                  
                   ListEmptyComponent={renderEmptyState(mealType.id as 'lunch' | 'dinner')}
                   ListFooterComponent={() => renderLoadMoreButton(mealType.id as 'lunch' | 'dinner')}
                   initialNumToRender={INITIAL_LOAD_COUNT}
@@ -1713,7 +1717,7 @@ const renderResponseItem = useCallback(({ item }: { item: Response }) => {
       
       {/* Calendar Modal */}
       {renderCalendarModal()}
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -1724,7 +1728,7 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-    paddingBottom: 80
+   
   },
   contentPage: {
     width: Dimensions.get('window').width,

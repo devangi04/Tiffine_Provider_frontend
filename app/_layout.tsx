@@ -2,7 +2,7 @@
 import { useEffect,useState } from 'react';
 import { Provider } from 'react-redux';
 import { store,persistor } from './store';
-import { Stack, usePathname } from 'expo-router';
+import { Stack, usePathname, useRouter } from 'expo-router';
 import { PersistGate } from 'redux-persist/integration/react'; // ✅ Import PersistGate
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View, StyleSheet, Text,ActivityIndicator,Platform,} from 'react-native';
@@ -13,6 +13,7 @@ import { useSelector } from 'react-redux';
 import type { RootState } from './store';
 import { StatusBar } from 'expo-status-bar';
 
+import { configureNotifications, registerForPushNotifications, savePushTokenToBackend } from './config/notificationservice';
 import {
   NunitoSans_200ExtraLight,
   NunitoSans_300Light,
@@ -63,6 +64,7 @@ import BottomNavBar from '../components/navbar';
 import DashboardHeader from '../components/dahsboardheader';
 import AuthChecker from '@/components/authcheck';
 import CustomSplashScreen from '@/components/splashscreen';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
@@ -118,12 +120,12 @@ const topOffset =
         '/searchcustomerdetails':{ title: 'Customer Info', subtitle: 'Manage customer details', showHeader: true, showNavbar: false, headerType: 'default'},
 
     '/categorymaster': { title: 'Category Master', subtitle: 'Manage Categories', showHeader: true, showNavbar: true, headerType: 'default' },
-        '/about': { title: '', subtitle: '', showHeader: false, showNavbar: false, statusBarStyle: 'dark', statusBarBg: '#f8fafc', },
     '/edit': { title: 'Personal Details', subtitle: 'Manage Details', showHeader: true, showNavbar: false, headerType: 'default' },
         '/bill': { title: 'Customer Bill', subtitle: 'Manage Bill', showHeader: true, showNavbar: true, headerType: 'default' },
     // Tabs
     '/(tabs)': { title: '', showHeader: false, showNavbar: true, headerType: 'none' },
         '/subscription': { title: '', showHeader: false, showNavbar: false, headerType: 'dashboard', statusBarStyle: 'dark', statusBarBg: '#f8fafc'},
+        '/about': { title: 'About us', subtitle: 'Our Story ', showHeader: true, showNavbar: false,headerType: 'default' },
 
   };
 
@@ -235,6 +237,24 @@ export default function RootLayout() {
     }, 1200); // 👈 guaranteed splash time (1.2s)
 
     return () => clearTimeout(timer);
+  }, []);
+
+  const router = useRouter();
+
+  useEffect(() => {
+    configureNotifications();
+
+    (async () => {
+      const providerId = await AsyncStorage.getItem('providerId'); // or from Redux
+      if (!providerId) return;
+
+      const token = await registerForPushNotifications();
+
+      if (token) {
+        await savePushTokenToBackend(token, providerId);
+        console.log('✅ Push token registered with backend:', token);
+      }
+    })();
   }, []);
   const [fontsLoaded, fontError] = useFonts({
     // Nunito Sans (existing)

@@ -57,7 +57,8 @@ const CustomerDetailsScreen = () => {
   const [selectedBill, setSelectedBill] = useState<any>(null);
   const [fetchingCustomer, setFetchingCustomer] = useState(false);
   const [loadingBills, setLoadingBills] = useState(false); // Local state for bills loading
-  
+  const [emailSendingBillId, setEmailSendingBillId] = useState<string | null>(null);
+
   // Get data from Redux store
   const dispatch = useAppDispatch();
   const provider = useAppSelector((state) => state.provider);
@@ -76,26 +77,19 @@ const CustomerDetailsScreen = () => {
   const billLoading = billState.loading;
   const errorBills = billState.error;
 
-  useEffect(() => {
-    navigation.setOptions({
-      headerShown: false,
-    });
-    
-    // If customer not found in Redux, fetch it
-    if (customerId && !customer && !fetchingCustomer) {
-      fetchSingleCustomer();
-    }
-    
-    // Fetch bills when bills tab is active
-    if (activeTab === 'bills' && customerId) {
-      fetchCustomerBillsData();
-    }
-    
-    // Clean up when component unmounts
-    return () => {
-      dispatch(clearCurrentBills());
-    };
-  }, [customerId, activeTab]);
+useEffect(() => {
+  navigation.setOptions({ headerShown: false });
+
+  if (customerId && !customer && !fetchingCustomer) {
+    fetchSingleCustomer();
+  }
+
+  if (activeTab === 'bills' && customerId) {
+    fetchCustomerBillsData();
+  }
+
+}, [customerId, activeTab]);
+
 
   const fetchSingleCustomer = async () => {
     if (!customerId) return;
@@ -277,30 +271,34 @@ const CustomerDetailsScreen = () => {
     });
   };
 
-  const handleSendEmail = (bill: any) => {
-    const billId = bill.id || bill._id;
-    
-    Alert.alert(
-      'Send Email',
-      'Send bill via email to customer?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Send', 
-          onPress: () => {
-            dispatch(sendBillEmail(billId))
-              .unwrap()
-              .then(() => {
-                Alert.alert('Success', 'Email sent successfully');
-              })
-              .catch((error) => {
-                Alert.alert('Error', error || 'Failed to send email');
-              });
+const handleSendEmail = (bill: any) => {
+  const billId = bill.id || bill._id;
+
+  Alert.alert(
+    'Send Email',
+    'Send bill via email to customer?',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Send',
+        onPress: async () => {
+          try {
+            setEmailSendingBillId(billId);
+
+            await dispatch(sendBillEmail(billId)).unwrap();
+
+            Alert.alert('Success', 'Email sent successfully');
+          } catch (error: any) {
+            Alert.alert('Error', error || 'Failed to send email');
+          } finally {
+            setEmailSendingBillId(null);
           }
-        }
-      ]
-    );
-  };
+        },
+      },
+    ]
+  );
+};
+
 
   const handleAddPayment = (bill: any) => {
     setSelectedBill(bill);
@@ -347,26 +345,7 @@ const CustomerDetailsScreen = () => {
   };
 
   // Loading state for bills
-  if (activeTab === 'bills' && (loadingBills || billLoading)) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <ChevronLeft size={24} color="#1E293B" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Customer Details</Text>
-          <TouchableOpacity onPress={handleEditCustomer}>
-            <Edit size={20} color="#15803d" />
-          </TouchableOpacity>
-        </View>
-        
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#15803d" />
-          <Text style={styles.loadingText}>Loading bills...</Text>
-        </View>
-      </View>
-    );
-  }
+
 
   return (
     <View style={styles.container}>
@@ -612,13 +591,25 @@ const CustomerDetailsScreen = () => {
                         </TouchableOpacity>
                       )}
                       
-                      <TouchableOpacity 
-                        style={[styles.billActionBtn, styles.emailBtn]}
-                        onPress={() => handleSendEmail(bill)}
-                      >
-                        <Mail size={16} color="#15803d" />
-                        <Text style={styles.emailBtnText}>Email</Text>
-                      </TouchableOpacity>
+                     <TouchableOpacity
+  style={[
+    styles.billActionBtn,
+    styles.emailBtn,
+    emailSendingBillId === (bill.id || bill._id) && { opacity: 0.6 }
+  ]}
+  disabled={emailSendingBillId === (bill.id || bill._id)}
+  onPress={() => handleSendEmail(bill)}
+>
+  {emailSendingBillId === (bill.id || bill._id) ? (
+    <ActivityIndicator size="small" color="#15803d" />
+  ) : (
+    <>
+      <Mail size={16} color="#15803d" />
+      <Text style={styles.emailBtnText}>Email</Text>
+    </>
+  )}
+</TouchableOpacity>
+
                     </View>
                   </View>
                 ))}
@@ -645,6 +636,7 @@ const CustomerDetailsScreen = () => {
                 style={styles.input}
                 keyboardType="numeric"
                 value={paymentAmount}
+                editable={false}
                 onChangeText={setPaymentAmount}
                 placeholder="Enter amount"
               />
@@ -753,9 +745,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.4,
     shadowRadius: 4,
-    elevation: 3,
+    
   },
   profileHeader: {
     flexDirection: 'row',
@@ -1042,7 +1034,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   emailBtn: {
-    backgroundColor: '#E0E7FF',
+    backgroundColor: '#f2f4f9',
   },
   emailBtnText: {
     color: '#15803d',
